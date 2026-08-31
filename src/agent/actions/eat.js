@@ -9,25 +9,30 @@ import { distance, lerp } from '../../utils/mathUtils.js';
 import { TILE_SIZE, AGENT_SPEED } from '../../utils/constants.js';
 import { urgency, applyEffect } from '../needs.js';
 import { recallNearest } from '../memory.js';
+import { isHostileTerritory } from '../../clan/diplomacy.js';
 
 const ARRIVE_THRESHOLD = 4;
 const RESTORE_PER_SEC = 100 / 15;
 
-export function score(agent) {
-  const known = recallNearest(agent.memory, agent.position, (e) => e.type === TILE_TYPES.GRASS);
+function isSafeGrass(world, agent) {
+  return (e) => e.type === TILE_TYPES.GRASS && !isHostileTerritory(world, agent, e.tx, e.ty);
+}
+
+export function score(agent, world) {
+  const known = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent));
   if (!known) return 0;
   return urgency(agent.needs.hunger);
 }
 
-function findFoodTile(agent) {
-  const entry = recallNearest(agent.memory, agent.position, (e) => e.type === TILE_TYPES.GRASS);
+function findFoodTile(agent, world) {
+  const entry = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent));
   if (!entry) return null;
   return { x: (entry.tx + 0.5) * TILE_SIZE, y: (entry.ty + 0.5) * TILE_SIZE };
 }
 
 export function step(agent, world, dt) {
   if (!agent.target) {
-    agent.target = findFoodTile(agent);
+    agent.target = findFoodTile(agent, world);
     if (!agent.target) return; // nenhuma grama conhecida; espera a próxima reconsideração
   }
 

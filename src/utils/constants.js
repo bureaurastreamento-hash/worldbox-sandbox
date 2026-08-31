@@ -47,4 +47,6 @@ export const TERRITORY_RADIUS = 10; // tiles
 
 export const SECOND_VILLAGE_MIN_DIST = 40; // tiles, distância da primeira vila
 export const SECOND_VILLAGE_MAX_DIST = 55;
-export const HOSTILE_CHANCE = 0.3; // chance da 2ª vila nascer hostil com a 1ª
+
+// Peso de sorteio da postura inicial entre os dois clãs fundadores.
+export const INITIAL_STANCE_WEIGHTS = { war: 0.15, tense: 0.15, neutral: 0.5, allied: 0.2 };

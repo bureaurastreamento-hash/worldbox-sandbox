@@ -31,5 +31,17 @@ export function createRng(seed) {
     return Math.floor(range(min, max + 1));
   }
 
-  return { next, range, int };
+  // Sorteia uma chave de { chave: peso, ... } proporcionalmente ao peso.
+  function weighted(weights) {
+    const entries = Object.entries(weights);
+    const total = entries.reduce((sum, [, w]) => sum + w, 0);
+    let roll = next() * total;
+    for (const [key, w] of entries) {
+      if (roll < w) return key;
+      roll -= w;
+    }
+    return entries[entries.length - 1][0];
+  }
+
+  return { next, range, int, weighted };
 }

@@ -6,6 +6,7 @@
 import { isWalkable } from '../../world/tile.js';
 import { distance, lerp } from '../../utils/mathUtils.js';
 import { TILE_SIZE, AGENT_SPEED } from '../../utils/constants.js';
+import { isHostileTerritory } from '../../clan/diplomacy.js';
 
 const ARRIVE_THRESHOLD = 2;
 
@@ -16,7 +17,9 @@ export function score() {
 }
 
 function pickTarget(agent, world) {
-  const candidates = agent.perception.tiles.filter((t) => isWalkable(t.type));
+  const candidates = agent.perception.tiles.filter(
+    (t) => isWalkable(t.type) && !isHostileTerritory(world, agent, t.tx, t.ty),
+  );
   if (candidates.length === 0) return null;
 
   const choice = candidates[world.rng.int(0, candidates.length - 1)];

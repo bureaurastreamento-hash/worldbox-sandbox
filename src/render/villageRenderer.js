@@ -1,10 +1,35 @@
 import { TILE_SIZE } from '../utils/constants.js';
+import { getClan } from '../world/world.js';
+import { getStance } from '../clan/clan.js';
 
-function relationColors(village) {
-  const hostile = Object.values(village.relations).includes('hostile');
-  return hostile
-    ? { fill: 'rgba(201, 67, 43, 0.15)', stroke: 'rgba(201, 67, 43, 0.5)' }
-    : { fill: 'rgba(90, 140, 200, 0.12)', stroke: 'rgba(90, 140, 200, 0.45)' };
+const STANCE_RANK = { neutral: 0, allied: 0, tense: 1, war: 2 };
+
+const STANCE_COLORS = {
+  war: { fill: 'rgba(201, 67, 43, 0.18)', stroke: 'rgba(201, 67, 43, 0.55)' },
+  tense: { fill: 'rgba(212, 150, 40, 0.15)', stroke: 'rgba(212, 150, 40, 0.5)' },
+  neutral: { fill: 'rgba(90, 140, 200, 0.12)', stroke: 'rgba(90, 140, 200, 0.45)' },
+  allied: { fill: 'rgba(80, 180, 120, 0.14)', stroke: 'rgba(80, 180, 120, 0.5)' },
+};
+
+const STANCE_LABELS = { war: ' · guerra', tense: ' · tensão', neutral: '', allied: ' · aliada' };
+
+// Pior postura do clã da vila em relação a qualquer outro clã presente
+// (com só 2 clãs, é sempre a única relação que existe).
+function worstStance(world, village) {
+  const myClan = getClan(world, village.clanId);
+  if (!myClan) return 'neutral';
+
+  let worst = 'neutral';
+  for (const other of world.villages) {
+    if (other.id === village.id) continue;
+    const otherClan = getClan(world, other.clanId);
+    if (!otherClan) continue;
+
+    const stance = getStance(myClan, otherClan);
+    if (STANCE_RANK[stance] > STANCE_RANK[worst]) worst = stance;
+    else if (worst === 'neutral' && stance === 'allied') worst = 'allied';
+  }
+  return worst;
 }
 
 export function drawTerritories(ctx, world, camera) {
@@ -14,7 +39,7 @@ export function drawTerritories(ctx, world, camera) {
   for (const village of world.villages) {
     const pos = camera.worldToScreen(village.center.x, village.center.y, viewW, viewH);
     const r = village.territory.radius * TILE_SIZE * camera.zoom;
-    const { fill, stroke } = relationColors(village);
+    const { fill, stroke } = STANCE_COLORS[worstStance(world, village)];
 
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
@@ -45,8 +70,7 @@ export function drawVillages(ctx, world, camera) {
     ctx.textAlign = 'center';
     const food = Math.round(village.stock.food ?? 0);
     const cap = village.capacity.food ?? 0;
-    const hostile = Object.values(village.relations).includes('hostile');
-    const suffix = hostile ? ' · hostil' : '';
+    const suffix = STANCE_LABELS[worstStance(world, village)];
     ctx.fillText(`${village.name} — 🌾 ${food}/${cap}${suffix}`, pos.x, pos.y - size / 2 - 4);
   }
 }

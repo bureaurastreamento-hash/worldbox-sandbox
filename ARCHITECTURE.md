@@ -98,11 +98,11 @@ src/
 - **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
 - **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar.
 
-- **`village/village.js`** — dados/factory da vila (estoque, população, território); `setRelation`/`getRelation` guardam a postura simétrica entre duas vilas (`neutral`/`hostile`) até existirem clãs (fatia 7) pra formalizar isso em tratados.
+- **`village/village.js`** — dados/factory da vila (estoque, população, território); `village.clanId` é atribuído por `clan/clan.js:addVillage`.
 - **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `gather.js` lê para enviesar o score, igual para todos os moradores.
 
-- **`clan/clan.js`** — agrupa vilas, mantém postura com outros clãs.
-- **`clan/diplomacy.js`** — propõe/assina tratados; expõe os termos vigentes para `village/stock.js` (comércio) e `combat/combat.js` (guerra declarada).
+- **`clan/clan.js`** — agrupa vilas (`addVillage` seta `village.clanId`); `stanceByClan` guarda a postura (`war`/`tense`/`neutral`/`allied`) com cada outro clã, simétrica via `setStance`/`getStance`.
+- **`clan/diplomacy.js`** — `proposeTreaty`/`signTreaty` criam e assinam tratados (aliança, não-agressão, comércio, defesa); assinar aplica a postura correspondente via `clan.js:setStance`. `isHostileTerritory(world, agent, tx, ty)` é o efeito real na fatia 7: `wander.js`, `gather.js` e `eat.js` a consultam pra nunca escolher como alvo um tile dentro do território de um clã em guerra/tensão — mesmo com a necessidade crítica. `trade`/`defense_pact` ganham consequência mais forte nas fatias 8 (comércio) e 9 (combate), que vão ler os tratados vigentes daqui.
 
 - **`combat/combat.js`** — resolve engajamentos unidade a unidade; combate entra em `decision.js` como mais um tipo de ação candidata (engajar/fugir), e este módulo resolve o resultado.
 

@@ -27,6 +27,10 @@ export function getVillage(world, villageId) {
   return world.villages.find((v) => v.id === villageId) ?? null;
 }
 
+export function getClan(world, clanId) {
+  return world.clans.find((c) => c.id === clanId) ?? null;
+}
+
 // Espirala a partir de (centerTx, centerTy) até achar um tile andável.
 export function findWalkableNear(world, centerTx, centerTy, maxRadius = Math.max(world.width, world.height)) {
   for (let r = 0; r <= maxRadius; r++) {

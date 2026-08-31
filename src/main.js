@@ -1,6 +1,8 @@
 import { createWorld, findSpawnTile, findWalkableNear } from './world/world.js';
-import { createVillage, addResident, setRelation } from './village/village.js';
+import { createVillage, addResident } from './village/village.js';
 import { computeDemand } from './village/stock.js';
+import { createClan, addVillage as addVillageToClan, setStance } from './clan/clan.js';
+import { proposeTreaty, signTreaty } from './clan/diplomacy.js';
 import { createAgent } from './agent/agent.js';
 import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
@@ -22,7 +24,7 @@ import {
   FOUNDER_AGE,
   SECOND_VILLAGE_MIN_DIST,
   SECOND_VILLAGE_MAX_DIST,
-  HOSTILE_CHANCE,
+  INITIAL_STANCE_WEIGHTS,
 } from './utils/constants.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -71,7 +73,21 @@ const rivalTx = clamp(Math.round(homeSpawn.tx + Math.cos(angle) * dist), 8, worl
 const rivalTy = clamp(Math.round(homeSpawn.ty + Math.sin(angle) * dist), 8, world.height - 9);
 const rivalVillage = spawnVillage({ id: 'village-2', name: 'Vila Vizinha', tx: rivalTx, ty: rivalTy });
 
-setRelation(homeVillage, rivalVillage, world.rng.next() < HOSTILE_CHANCE ? 'hostile' : 'neutral');
+const homeClan = createClan({ id: 'clan-1', name: 'Clã de Vila', color: '#4a7fd9' });
+const rivalClan = createClan({ id: 'clan-2', name: 'Clã de Vila Vizinha', color: '#c9432b' });
+addVillageToClan(homeClan, homeVillage);
+addVillageToClan(rivalClan, rivalVillage);
+world.clans.push(homeClan, rivalClan);
+
+const initialStance = world.rng.weighted(INITIAL_STANCE_WEIGHTS);
+if (initialStance === 'allied') {
+  // demonstra o fluxo de tratado de verdade no caso amistoso; guerra/tensão/
+  // neutro nascem como o estado padrão, sem documento nenhum assinado.
+  const treaty = proposeTreaty(homeClan, rivalClan, 'alliance');
+  signTreaty(treaty, homeClan, rivalClan);
+} else {
+  setStance(homeClan, rivalClan, initialStance);
+}
 
 const camera = createCamera({
   x: homeVillage.center.x,

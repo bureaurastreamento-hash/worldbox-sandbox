@@ -4,6 +4,7 @@ export function createVillage({ id, name, center }) {
   return {
     id,
     name,
+    clanId: null, // atribuído por clan/clan.js:addVillage
     center: { x: center.x, y: center.y },
     territory: { radius: TERRITORY_RADIUS }, // tiles
     stock: { food: 0 },
@@ -11,20 +12,9 @@ export function createVillage({ id, name, center }) {
     demand: { food: 0 },
     population: [],
     reproCooldown: REPRO_COOLDOWN_MIN,
-    relations: {}, // villageId -> 'neutral' | 'hostile'
   };
 }
 
 export function addResident(village, agentId) {
   village.population.push(agentId);
-}
-
-// Relação é sempre simétrica nesta fatia (sem clãs/tratados ainda).
-export function setRelation(villageA, villageB, stance) {
-  villageA.relations[villageB.id] = stance;
-  villageB.relations[villageA.id] = stance;
-}
-
-export function getRelation(village, otherVillageId) {
-  return village.relations[otherVillageId] ?? 'neutral';
 }
