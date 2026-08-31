@@ -42,3 +42,9 @@ export const REPRO_MIN_ADULTS = 2;
 export const REPRO_ELIGIBLE_HUNGER = 50; // não reproduz com fome abaixo disso
 export const REPRO_FOOD_DEMAND_MAX = 0.7; // só reproduz se a vila não estiver faminta
 export const VILLAGE_POP_CAP = 12;
+
+export const TERRITORY_RADIUS = 10; // tiles
+
+export const SECOND_VILLAGE_MIN_DIST = 40; // tiles, distância da primeira vila
+export const SECOND_VILLAGE_MAX_DIST = 55;
+export const HOSTILE_CHANCE = 0.3; // chance da 2ª vila nascer hostil com a 1ª

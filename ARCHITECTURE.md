@@ -98,7 +98,7 @@ src/
 - **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
 - **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar.
 
-- **`village/village.js`** — dados/factory da vila (estoque, população, território).
+- **`village/village.js`** — dados/factory da vila (estoque, população, território); `setRelation`/`getRelation` guardam a postura simétrica entre duas vilas (`neutral`/`hostile`) até existirem clãs (fatia 7) pra formalizar isso em tratados.
 - **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `gather.js` lê para enviesar o score, igual para todos os moradores.
 
 - **`clan/clan.js`** — agrupa vilas, mantém postura com outros clãs.

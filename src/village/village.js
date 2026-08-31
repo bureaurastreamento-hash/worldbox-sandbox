@@ -1,18 +1,30 @@
-import { VILLAGE_FOOD_CAPACITY, REPRO_COOLDOWN_MIN } from '../utils/constants.js';
+import { VILLAGE_FOOD_CAPACITY, REPRO_COOLDOWN_MIN, TERRITORY_RADIUS } from '../utils/constants.js';
 
 export function createVillage({ id, name, center }) {
   return {
     id,
     name,
     center: { x: center.x, y: center.y },
+    territory: { radius: TERRITORY_RADIUS }, // tiles
     stock: { food: 0 },
     capacity: { food: VILLAGE_FOOD_CAPACITY },
     demand: { food: 0 },
     population: [],
     reproCooldown: REPRO_COOLDOWN_MIN,
+    relations: {}, // villageId -> 'neutral' | 'hostile'
   };
 }
 
 export function addResident(village, agentId) {
   village.population.push(agentId);
+}
+
+// Relação é sempre simétrica nesta fatia (sem clãs/tratados ainda).
+export function setRelation(villageA, villageB, stance) {
+  villageA.relations[villageB.id] = stance;
+  villageB.relations[villageA.id] = stance;
+}
+
+export function getRelation(village, otherVillageId) {
+  return village.relations[otherVillageId] ?? 'neutral';
 }
