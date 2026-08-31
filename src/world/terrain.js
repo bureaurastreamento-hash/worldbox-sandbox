@@ -1,15 +1,20 @@
 // Geração procedural por ruído de valor (value noise) em camadas, sem
-// dependências externas. A mesma seed sempre gera o mesmo terreno.
+// dependências externas. A mesma seed sempre gera o mesmo terreno. Um
+// falloff radial garante água na borda do mapa — o mundo é sempre uma
+// ilha/continente cercado de oceano, nunca um corte abrupto no meio do mato.
 
 import { createRng } from '../utils/rng.js';
 import { TILE_TYPES, createTile } from './tile.js';
 
 const NOISE_SCALE = 18; // tiles por "feature" de terreno
-const OCTAVES = 4;
+const OCTAVES = 5;
 
 const WATER_MAX = 0.32;
+const SAND_MAX = 0.36;
 const GRASS_MAX = 0.55;
 const FOREST_MAX = 0.75;
+
+const EDGE_MARGIN_FRACTION = 0.12; // fração da menor dimensão reservada pro falloff de borda
 
 function hash2D(x, y, seed) {
   let h = x * 374761393 + y * 668265263 + seed * 2147483647;
@@ -60,9 +65,20 @@ function fractalNoise(x, y, seed) {
 
 function elevationToType(elevation) {
   if (elevation < WATER_MAX) return TILE_TYPES.WATER;
+  if (elevation < SAND_MAX) return TILE_TYPES.SAND;
   if (elevation < GRASS_MAX) return TILE_TYPES.GRASS;
   if (elevation < FOREST_MAX) return TILE_TYPES.FOREST;
   return TILE_TYPES.MOUNTAIN;
+}
+
+// 1 no interior do mapa, cai suavemente pra 0 perto da borda mais próxima.
+function edgeFalloff(tx, ty, width, height) {
+  const marginTiles = Math.floor(Math.min(width, height) * EDGE_MARGIN_FRACTION);
+  if (marginTiles <= 0) return 1;
+
+  const distToEdge = Math.min(tx, ty, width - 1 - tx, height - 1 - ty);
+  if (distToEdge >= marginTiles) return 1;
+  return smoothstep(Math.max(0, distToEdge) / marginTiles);
 }
 
 export function generateTerrain({ seed, width, height }) {
@@ -73,7 +89,8 @@ export function generateTerrain({ seed, width, height }) {
   for (let ty = 0; ty < height; ty++) {
     const row = [];
     for (let tx = 0; tx < width; tx++) {
-      const elevation = fractalNoise(tx / NOISE_SCALE, ty / NOISE_SCALE, noiseSeed);
+      const rawElevation = fractalNoise(tx / NOISE_SCALE, ty / NOISE_SCALE, noiseSeed);
+      const elevation = rawElevation * edgeFalloff(tx, ty, width, height);
       row.push(createTile(elevationToType(elevation)));
     }
     tiles.push(row);

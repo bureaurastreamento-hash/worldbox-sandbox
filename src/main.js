@@ -28,13 +28,8 @@ import {
 } from './utils/constants.js';
 
 const canvas = document.getElementById('game-canvas');
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 const seed = String(Date.now());
 const world = createWorld({ seed, width: WORLD_WIDTH, height: WORLD_HEIGHT });
@@ -93,7 +88,17 @@ const camera = createCamera({
   x: homeVillage.center.x,
   y: homeVillage.center.y,
   zoom: 1,
+  worldPxWidth: world.width * TILE_SIZE,
+  worldPxHeight: world.height * TILE_SIZE,
 });
+camera.clampToViewport(canvas.width, canvas.height);
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  camera.clampToViewport(canvas.width, canvas.height);
+}
+window.addEventListener('resize', resizeCanvas);
 
 const renderer = createRenderer(canvas, camera);
 const timeState = createTimeState({ speed: 1 });

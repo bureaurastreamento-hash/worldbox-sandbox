@@ -1,7 +1,7 @@
 export const TILE_SIZE = 32;
 
-export const WORLD_WIDTH = 120;
-export const WORLD_HEIGHT = 120;
+export const WORLD_WIDTH = 220;
+export const WORLD_HEIGHT = 220;
 
 export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 4;
@@ -45,8 +45,8 @@ export const VILLAGE_POP_CAP = 12;
 
 export const TERRITORY_RADIUS = 10; // tiles
 
-export const SECOND_VILLAGE_MIN_DIST = 40; // tiles, distância da primeira vila
-export const SECOND_VILLAGE_MAX_DIST = 55;
+export const SECOND_VILLAGE_MIN_DIST = 70; // tiles, distância da primeira vila
+export const SECOND_VILLAGE_MAX_DIST = 100;
 
 // Peso de sorteio da postura inicial entre os dois clãs fundadores.
 export const INITIAL_STANCE_WEIGHTS = { war: 0.15, tense: 0.15, neutral: 0.5, allied: 0.2 };

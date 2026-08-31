@@ -1,5 +1,6 @@
 export const TILE_TYPES = {
   WATER: 'water',
+  SAND: 'sand',
   GRASS: 'grass',
   FOREST: 'forest',
   MOUNTAIN: 'mountain',

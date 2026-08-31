@@ -1,12 +1,40 @@
 import { MIN_ZOOM, MAX_ZOOM } from '../utils/constants.js';
 import { clamp } from '../utils/mathUtils.js';
 
-export function createCamera({ x = 0, y = 0, zoom = 1 } = {}) {
-  const camera = { x, y, zoom };
+export function createCamera({ x = 0, y = 0, zoom = 1, worldPxWidth = 0, worldPxHeight = 0 } = {}) {
+  const camera = { x, y, zoom, worldPxWidth, worldPxHeight };
 
-  camera.pan = (dxScreen, dyScreen) => {
+  // Zoom mínimo que ainda mostra só o mapa (nunca menos que isso, senão
+  // apareceria vazio além da borda). Cresce se a janela for maior que o mundo.
+  function minZoomForViewport(viewW, viewH) {
+    if (!camera.worldPxWidth || !camera.worldPxHeight) return MIN_ZOOM;
+    return Math.max(MIN_ZOOM, viewW / camera.worldPxWidth, viewH / camera.worldPxHeight);
+  }
+
+  function clampToBounds(viewW, viewH) {
+    if (!camera.worldPxWidth || !camera.worldPxHeight || !viewW || !viewH) return;
+
+    const minZoom = minZoomForViewport(viewW, viewH);
+    if (camera.zoom < minZoom) camera.zoom = minZoom;
+
+    const halfViewW = viewW / 2 / camera.zoom;
+    const halfViewH = viewH / 2 / camera.zoom;
+
+    camera.x =
+      halfViewW * 2 >= camera.worldPxWidth
+        ? camera.worldPxWidth / 2
+        : clamp(camera.x, halfViewW, camera.worldPxWidth - halfViewW);
+
+    camera.y =
+      halfViewH * 2 >= camera.worldPxHeight
+        ? camera.worldPxHeight / 2
+        : clamp(camera.y, halfViewH, camera.worldPxHeight - halfViewH);
+  }
+
+  camera.pan = (dxScreen, dyScreen, viewW, viewH) => {
     camera.x -= dxScreen / camera.zoom;
     camera.y -= dyScreen / camera.zoom;
+    clampToBounds(viewW, viewH);
   };
 
   camera.worldToScreen = (wx, wy, viewW, viewH) => ({
@@ -25,7 +53,12 @@ export function createCamera({ x = 0, y = 0, zoom = 1 } = {}) {
     const after = camera.screenToWorld(screenX, screenY, viewW, viewH);
     camera.x += before.x - after.x;
     camera.y += before.y - after.y;
+    clampToBounds(viewW, viewH);
   };
+
+  // Chamar em resize: viewport mudou de tamanho, então o zoom mínimo e o
+  // clamp de posição podem ter mudado mesmo sem o usuário mexer em nada.
+  camera.clampToViewport = (viewW, viewH) => clampToBounds(viewW, viewH);
 
   return camera;
 }

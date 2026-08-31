@@ -8,8 +8,8 @@ sprite.onload = () => {
 };
 sprite.src = 'assets/sprites/human.png';
 
-const RADIUS_BY_STAGE = { child: 3, adult: 5, elder: 5 }; // fallback enquanto o sprite carrega
-const HEIGHT_BY_STAGE = { child: 14, adult: 20, elder: 20 }; // px de tela em zoom 1
+const RADIUS_BY_STAGE = { child: 5, adult: 8, elder: 8 }; // fallback enquanto o sprite carrega
+const HEIGHT_BY_STAGE = { child: 26, adult: 38, elder: 38 }; // px de tela em zoom 1
 
 export function drawAgents(ctx, world, camera, selectedAgentId) {
   const viewW = ctx.canvas.width;
@@ -19,7 +19,7 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
     const pos = camera.worldToScreen(agent.position.x, agent.position.y, viewW, viewH);
 
     if (agent.id === selectedAgentId) {
-      const ringR = Math.max(6, 9 * camera.zoom);
+      const ringR = Math.max(10, 16 * camera.zoom);
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, ringR, 0, Math.PI * 2);
       ctx.strokeStyle = '#ffffff';

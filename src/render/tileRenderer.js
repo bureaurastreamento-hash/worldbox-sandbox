@@ -2,6 +2,7 @@ import { TILE_SIZE } from '../utils/constants.js';
 
 const TILE_COLORS = {
   water: '#2a6f97',
+  sand: '#d9c27a',
   grass: '#4c9a4c',
   forest: '#2d5e2d',
   mountain: '#8a8a8a',

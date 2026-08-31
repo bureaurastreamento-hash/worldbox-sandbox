@@ -42,7 +42,7 @@ export function attachInputHandlers(canvas, context) {
     lastX = e.clientX;
     lastY = e.clientY;
     movedSinceDown += Math.abs(dx) + Math.abs(dy);
-    camera.pan(dx, dy);
+    camera.pan(dx, dy, canvas.width, canvas.height);
   });
 
   window.addEventListener('mouseup', (e) => {
