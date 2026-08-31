@@ -1,9 +1,11 @@
 // Fronteira mais importante da arquitetura: isto é o único lugar que pode
 // consultar o mundo "de verdade" para descobrir o que existe. decision.js e
-// as ações nunca chamam getTileAt diretamente — só leem agent.perception
-// (o que está visível agora) ou agent.memory (o que já foi visto antes).
+// as ações nunca chamam getTileAt/world.agents diretamente — só leem
+// agent.perception (o que está visível agora) ou agent.memory (o que já foi
+// visto antes).
 
 import { getTileAt } from '../world/world.js';
+import { distance } from '../utils/mathUtils.js';
 import { TILE_SIZE, PERCEPTION_RADIUS } from '../utils/constants.js';
 
 export function scanPerception(agent, world) {
@@ -22,6 +24,13 @@ export function scanPerception(agent, world) {
     }
   }
 
-  agent.perception = { tiles };
+  const perceptionRadiusPx = PERCEPTION_RADIUS * TILE_SIZE;
+  const agents = [];
+  for (const other of world.agents) {
+    if (other.id === agent.id || !other.alive) continue;
+    if (distance(agent.position, other.position) <= perceptionRadiusPx) agents.push(other);
+  }
+
+  agent.perception = { tiles, agents };
   return agent.perception;
 }

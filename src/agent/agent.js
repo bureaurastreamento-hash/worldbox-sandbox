@@ -11,7 +11,7 @@ export function createAgent({ id, position, villageId = null, decisionTimer = 0,
     villageId,
     carrying: 0, // unidades de recurso carregadas (gather.js/deliver.js)
     needs: createNeeds(),
-    perception: { tiles: [] }, // o que está visível agora (perception.js reescreve a cada tick)
+    perception: { tiles: [], agents: [] }, // o que está visível agora (perception.js reescreve a cada tick)
     memory: createMemory(), // o que já foi visto, com confiança decrescente
     currentAction: null,
     decisionTimer, // jitter por agente para não recalcular todos no mesmo tick

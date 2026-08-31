@@ -47,6 +47,11 @@ export const TERRITORY_RADIUS = 10; // tiles
 
 export const SECOND_VILLAGE_MIN_DIST = 70; // tiles, distância da primeira vila
 export const SECOND_VILLAGE_MAX_DIST = 100;
+// Vilas destinadas à guerra nascem mais perto — territórios/rondas têm
+// chance real de se cruzar na fronteira; sem isso, o combate nunca
+// aconteceria organicamente (as vilas nunca se encontrariam).
+export const WAR_VILLAGE_MIN_DIST = 25;
+export const WAR_VILLAGE_MAX_DIST = 45;
 
 // Peso de sorteio da postura inicial entre os dois clãs fundadores.
 export const INITIAL_STANCE_WEIGHTS = { war: 0.15, tense: 0.15, neutral: 0.5, allied: 0.2 };
@@ -59,3 +64,9 @@ export const NEUTRAL_TRADE_TREATY_CHANCE = 0.4;
 export const TRADE_SURPLUS_DEMAND_MAX = 0.3;
 export const TRADE_DEFICIT_DEMAND_MIN = 0.6;
 export const TRADE_RATE_PER_SEC = 2; // unidades de recurso por segundo numa rota ativa
+
+export const COMBAT_DAMAGE_PER_SEC = 6; // dano mútuo por segundo em combate corpo a corpo
+export const MELEE_RANGE = TILE_SIZE * 1.2; // px de mundo pra contar como "adjacente"
+export const FIGHT_SCORE = 0.85;
+export const FLEE_SCORE = 0.9; // foge tem prioridade um pouco maior que lutar
+export const FLEE_HEALTH_THRESHOLD = 35; // abaixo disso (%), foge em vez de lutar

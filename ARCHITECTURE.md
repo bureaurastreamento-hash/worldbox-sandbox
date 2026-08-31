@@ -49,6 +49,8 @@ src/
       sleep.js
       gather.js
       deliver.js
+      fight.js
+      flee.js
 
   village/
     village.js
@@ -100,11 +102,11 @@ src/
 
 - **`agent/agent.js`** — dados e factory do agente (posição, id; needs/traits/perception/memory se anexam aqui nas fatias 2-3).
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
-- **`agent/perception.js`** — varre o raio de visão via `spatialIndex`; produz o que o agente vê *agora*.
+- **`agent/perception.js`** — varre o raio de visão via `spatialIndex`; produz o que o agente vê *agora* — tiles e também outros agentes vivos por perto (`agent.perception.agents`, usado por `combat/combat.js`).
 - **`agent/memory.js`** — locais/relações conhecidos, com confiança que decai. `perception` alimenta `memory`; `decision` só considera o que está em `memory` ou na percepção atual — nunca o estado real do `world` que o agente não viu. Essa é a fronteira mais importante da arquitetura: **decision.js nunca lê `world` diretamente para saber "o que existe", só para executar uma ação já escolhida sobre um alvo já conhecido.**
 - **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
 - **`agent/movement.js`** — `moveToward(agent, world, dt, targetWorldPos)` compartilhado por toda ação que anda até um alvo: calcula o caminho uma vez (`world/pathfinding.js`) e segue os waypoints, devolvendo `'moving' | 'arrived' | 'unreachable'`. Nenhuma ação implementa movimento por conta própria.
-- **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar.
+- **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar. `fight.js`/`flee.js` usam `combat/combat.js:findNearestEnemy` — crianças e agentes com vida abaixo do limiar nunca lutam (score 0), só fogem (score alto); o resto prioriza lutar, mas foge se a vida cair demais em combate — reavaliado a cada reconsideração, não uma decisão travada.
 
 - **`village/village.js`** — dados/factory da vila (estoque, população, território); `village.clanId` é atribuído por `clan/clan.js:addVillage`.
 - **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `gather.js` lê para enviesar o score, igual para todos os moradores, e que `trade.js` lê pra achar sobra/déficit.
@@ -113,9 +115,9 @@ src/
 - **`clan/clan.js`** — agrupa vilas (`addVillage` seta `village.clanId`); `stanceByClan` guarda a postura (`war`/`tense`/`neutral`/`allied`) com cada outro clã, simétrica via `setStance`/`getStance`.
 - **`clan/diplomacy.js`** — `proposeTreaty`/`signTreaty` criam e assinam tratados (aliança, não-agressão, comércio, defesa); assinar aplica a postura correspondente via `clan.js:setStance`. `isHostileTerritory(world, agent, tx, ty)` é o efeito da fatia 7: `wander.js`, `gather.js` e `eat.js` a consultam pra nunca escolher como alvo um tile dentro do território de um clã em guerra/tensão — mesmo com a necessidade crítica. `canTrade(clanA, clanB)` é o efeito da fatia 8, consumido por `village/trade.js`: mesma clã sempre comercia; clãs diferentes precisam ser aliados ou ter um tratado `trade` assinado — postura neutra sozinha não basta, é assim que o tratado passa a importar de verdade. `defense_pact` ganha consequência na fatia 9 (combate), que vai ler os tratados vigentes daqui.
 
-- **`combat/combat.js`** — resolve engajamentos unidade a unidade; combate entra em `decision.js` como mais um tipo de ação candidata (engajar/fugir), e este módulo resolve o resultado.
+- **`combat/combat.js`** — `isEnemy(world, agentA, agentB)` (postura de clã = `'war'`); `findNearestEnemy(agent, world)` busca em `agent.perception.agents`, não no mundo inteiro — um agente só reage a inimigo que já percebeu; `resolveEngagement(agent, enemy, dt)` aplica dano mútuo por tick de combate corpo a corpo. `fight.js`/`flee.js` são os únicos consumidores.
 
-- **`lifecycle/lifecycle.js`** — `ageAgent`/`checkDeath` por agente (idade, saúde drenada por fome crítica, morte por saúde zerada ou idade máxima); `updateVillageReproduction` por vila (cooldown + elegibilidade + `village.demand.food` decidem se tenta reproduzir); `pruneDead` remove agentes mortos de `world.agents` e de `village.population`.
+- **`lifecycle/lifecycle.js`** — `ageAgent`/`checkDeath` por agente (idade, saúde drenada por fome crítica ou combate, morte por saúde zerada ou idade máxima); `checkDeath` só regenera vida quando o agente não tem inimigo por perto (`combat/combat.js:findNearestEnemy`) — senão a regeneração desfaria o dano de combate a cada tick, já que `checkDeath` roda antes de `fight.js`. `updateVillageReproduction` por vila (cooldown + elegibilidade + `village.demand.food` decidem se tenta reproduzir); `pruneDead` remove agentes mortos (fome, combate ou idade) de `world.agents` e de `village.population`.
 
 - **`simulation/lod.js`** — classifica agentes/vilas em ativos (full-fidelity: needs+decision+perception todo tick) vs. simulados de forma agregada (fora da área relevante). Camada transversal que `gameLoop.js` consulta antes de decidir quais agentes atualizar em detalhe num dado tick.
 
@@ -153,4 +155,6 @@ Abrir http://localhost:8000 — nenhum passo de build.
 
 ---
 
-Status: fatias 1-8 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 9 (combate simulado por agente).
+Status: fatias 1-9 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 10 (escala/LOD) ou fatia 11 (UI de observação).
+
+Nota sobre a fatia 9: vilas destinadas à guerra nascem mais perto (`WAR_VILLAGE_MIN/MAX_DIST` em `utils/constants.js`) — sem isso, a distância padrão entre vilas (70-100 tiles) é maior que qualquer coisa que um agente perceba ou percorra vagando, e elas nunca se encontrariam pra lutar.

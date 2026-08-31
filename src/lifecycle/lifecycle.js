@@ -1,6 +1,7 @@
 import { clamp } from '../utils/mathUtils.js';
 import { createAgent } from '../agent/agent.js';
 import { addResident } from '../village/village.js';
+import { findNearestEnemy } from '../combat/combat.js';
 import {
   CHILD_ADULT_AGE,
   ADULT_ELDER_AGE,
@@ -22,12 +23,14 @@ export function ageAgent(agent, dt) {
   else agent.lifeStage = 'elder';
 }
 
-export function checkDeath(agent, dt) {
+export function checkDeath(agent, world, dt) {
   if (!agent.alive) return;
 
   if (agent.needs.hunger <= 0) {
     agent.health = clamp(agent.health - STARVE_HEALTH_DRAIN_PER_SEC * dt, 0, 100);
-  } else {
+  } else if (!findNearestEnemy(agent, world)) {
+    // sem isso, a regeneração desfaria o dano de combate no próximo tick
+    // (checkDeath roda antes de fight.js aplicar dano de novo)
     agent.health = clamp(agent.health + HEALTH_REGEN_PER_SEC * dt, 0, 100);
   }
 

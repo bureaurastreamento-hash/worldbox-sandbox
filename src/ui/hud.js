@@ -6,6 +6,8 @@ const ACTION_LABELS = {
   sleep: 'dormindo',
   gather: 'colhendo',
   deliver: 'entregando',
+  fight: 'lutando',
+  flee: 'fugindo',
 };
 
 export function createHud(container, timeState) {

@@ -25,6 +25,8 @@ import {
   FOUNDER_AGE,
   SECOND_VILLAGE_MIN_DIST,
   SECOND_VILLAGE_MAX_DIST,
+  WAR_VILLAGE_MIN_DIST,
+  WAR_VILLAGE_MAX_DIST,
   INITIAL_STANCE_WEIGHTS,
   NEUTRAL_TRADE_TREATY_CHANCE,
 } from './utils/constants.js';
@@ -64,8 +66,15 @@ function spawnVillage({ id, name, tx, ty }) {
 const homeSpawn = findSpawnTile(world);
 const homeVillage = spawnVillage({ id: 'village-1', name: 'Vila', tx: homeSpawn.tx, ty: homeSpawn.ty });
 
+// Sorteia a postura ANTES de posicionar a 2ª vila: se vai dar guerra, ela
+// nasce bem mais perto — territórios/rondas precisam ter chance real de se
+// cruzar na fronteira, senão as duas nunca se encontrariam pra lutar.
+const initialStance = world.rng.weighted(INITIAL_STANCE_WEIGHTS);
+const [minDist, maxDist] =
+  initialStance === 'war' ? [WAR_VILLAGE_MIN_DIST, WAR_VILLAGE_MAX_DIST] : [SECOND_VILLAGE_MIN_DIST, SECOND_VILLAGE_MAX_DIST];
+
 const angle = world.rng.range(0, Math.PI * 2);
-const dist = world.rng.range(SECOND_VILLAGE_MIN_DIST, SECOND_VILLAGE_MAX_DIST);
+const dist = world.rng.range(minDist, maxDist);
 const rivalTx = clamp(Math.round(homeSpawn.tx + Math.cos(angle) * dist), 8, world.width - 9);
 const rivalTy = clamp(Math.round(homeSpawn.ty + Math.sin(angle) * dist), 8, world.height - 9);
 const rivalVillage = spawnVillage({ id: 'village-2', name: 'Vila Vizinha', tx: rivalTx, ty: rivalTy });
@@ -76,7 +85,6 @@ addVillageToClan(homeClan, homeVillage);
 addVillageToClan(rivalClan, rivalVillage);
 world.clans.push(homeClan, rivalClan);
 
-const initialStance = world.rng.weighted(INITIAL_STANCE_WEIGHTS);
 if (initialStance === 'allied') {
   // demonstra o fluxo de tratado de verdade no caso amistoso; guerra/tensão/
   // neutro nascem como o estado padrão, sem documento nenhum assinado.
@@ -136,7 +144,7 @@ const loop = createGameLoop({
 
       updateNeeds(agent.needs, dt);
       ageAgent(agent, dt);
-      checkDeath(agent, dt);
+      checkDeath(agent, world, dt);
       if (!agent.alive) continue;
 
       updateDecision(agent, world, dt);
