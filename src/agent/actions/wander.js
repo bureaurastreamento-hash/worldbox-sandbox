@@ -1,15 +1,13 @@
 // Ação de menor prioridade: o que o agente faz quando nenhuma necessidade
-// está urgente o bastante para valer a pena (ver decision.js).
+// está urgente o bastante para valer a pena (ver decision.js). Escolhe entre
+// os tiles atualmente visíveis (agent.perception) — não consulta o mundo
+// além do que o agente está vendo agora.
 
-import { getTileAt } from '../../world/world.js';
 import { isWalkable } from '../../world/tile.js';
 import { distance, lerp } from '../../utils/mathUtils.js';
 import { TILE_SIZE, AGENT_SPEED } from '../../utils/constants.js';
 
 const ARRIVE_THRESHOLD = 2;
-const MIN_RADIUS = 2;
-const MAX_RADIUS = 6;
-const MAX_ATTEMPTS = 20;
 
 export const BASE_SCORE = 0.05;
 
@@ -18,22 +16,11 @@ export function score() {
 }
 
 function pickTarget(agent, world) {
-  const curTx = Math.floor(agent.position.x / TILE_SIZE);
-  const curTy = Math.floor(agent.position.y / TILE_SIZE);
+  const candidates = agent.perception.tiles.filter((t) => isWalkable(t.type));
+  if (candidates.length === 0) return null;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const dx = world.rng.int(-MAX_RADIUS, MAX_RADIUS);
-    const dy = world.rng.int(-MAX_RADIUS, MAX_RADIUS);
-    if (Math.abs(dx) < MIN_RADIUS && Math.abs(dy) < MIN_RADIUS) continue;
-
-    const tx = curTx + dx;
-    const ty = curTy + dy;
-    const tile = getTileAt(world, tx, ty);
-    if (tile && isWalkable(tile.type)) {
-      return { x: (tx + 0.5) * TILE_SIZE, y: (ty + 0.5) * TILE_SIZE };
-    }
-  }
-  return null;
+  const choice = candidates[world.rng.int(0, candidates.length - 1)];
+  return { x: (choice.tx + 0.5) * TILE_SIZE, y: (choice.ty + 0.5) * TILE_SIZE };
 }
 
 export function step(agent, world, dt) {

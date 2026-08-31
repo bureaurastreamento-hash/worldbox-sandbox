@@ -31,6 +31,11 @@ export function createHud(container, timeState) {
 
   container.appendChild(bar);
 
+  const hint = document.createElement('div');
+  hint.className = 'hud-hint';
+  hint.textContent = '[D] raio de percepção';
+  container.appendChild(hint);
+
   const status = document.createElement('div');
   status.className = 'hud-status';
   status.innerHTML = `

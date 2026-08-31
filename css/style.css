@@ -27,6 +27,12 @@ html, body {
   padding: 8px;
 }
 
+.hud-hint {
+  padding: 0 8px 4px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+}
+
 .hud-status {
   pointer-events: auto;
   width: 160px;

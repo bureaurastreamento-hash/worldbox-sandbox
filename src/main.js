@@ -1,6 +1,8 @@
 import { createWorld, findSpawnTile } from './world/world.js';
 import { createAgent } from './agent/agent.js';
 import { updateNeeds } from './agent/needs.js';
+import { scanPerception } from './agent/perception.js';
+import { remember, decayMemory } from './agent/memory.js';
 import { updateDecision } from './agent/decision.js';
 import { createTimeState } from './core/time.js';
 import { createGameLoop } from './core/gameLoop.js';
@@ -40,8 +42,9 @@ const camera = createCamera({
 
 const renderer = createRenderer(canvas, camera);
 const timeState = createTimeState({ speed: 1 });
+const debugState = { showPerception: false };
 
-attachInputHandlers(canvas, camera, timeState);
+attachInputHandlers(canvas, camera, timeState, debugState);
 const hud = createHud(document.getElementById('hud'), timeState);
 
 const loop = createGameLoop({
@@ -49,12 +52,18 @@ const loop = createGameLoop({
   update(dt) {
     if (dt <= 0) return;
     for (const agent of world.agents) {
+      scanPerception(agent, world);
+      for (const tile of agent.perception.tiles) {
+        remember(agent.memory, tile);
+      }
+      decayMemory(agent.memory, dt);
+
       updateNeeds(agent.needs, dt);
       updateDecision(agent, world, dt);
     }
   },
   render() {
-    renderer.render(world);
+    renderer.render(world, debugState);
     hud.updateAgentStatus(world.agents[0]);
   },
 });

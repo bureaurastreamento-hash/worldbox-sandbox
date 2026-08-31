@@ -1,6 +1,6 @@
 import { TIME_SPEEDS } from '../utils/constants.js';
 
-export function attachInputHandlers(canvas, camera, timeState) {
+export function attachInputHandlers(canvas, camera, timeState, debugState) {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
@@ -46,6 +46,8 @@ export function attachInputHandlers(canvas, camera, timeState) {
       timeState.togglePause();
     } else if (e.key >= '1' && e.key <= String(TIME_SPEEDS.length)) {
       timeState.setSpeed(TIME_SPEEDS[Number(e.key) - 1]);
+    } else if (e.code === 'KeyD' && debugState) {
+      debugState.showPerception = !debugState.showPerception;
     }
   });
 }

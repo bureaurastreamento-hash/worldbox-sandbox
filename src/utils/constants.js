@@ -9,3 +9,5 @@ export const MAX_ZOOM = 4;
 export const TIME_SPEEDS = [1, 2, 4];
 
 export const AGENT_SPEED = 60; // px de mundo por segundo
+
+export const PERCEPTION_RADIUS = 8; // tiles
