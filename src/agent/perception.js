@@ -5,6 +5,7 @@
 // visto antes).
 
 import { getTileAt } from '../world/world.js';
+import { queryNearby } from '../world/spatialIndex.js';
 import { distance } from '../utils/mathUtils.js';
 import { TILE_SIZE, PERCEPTION_RADIUS } from '../utils/constants.js';
 
@@ -25,8 +26,9 @@ export function scanPerception(agent, world) {
   }
 
   const perceptionRadiusPx = PERCEPTION_RADIUS * TILE_SIZE;
+  const nearby = world.spatialIndex ? queryNearby(world.spatialIndex, agent.position, perceptionRadiusPx) : world.agents;
   const agents = [];
-  for (const other of world.agents) {
+  for (const other of nearby) {
     if (other.id === agent.id || !other.alive) continue;
     if (distance(agent.position, other.position) <= perceptionRadiusPx) agents.push(other);
   }

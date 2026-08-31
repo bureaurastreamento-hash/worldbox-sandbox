@@ -41,7 +41,7 @@ export const REPRO_COOLDOWN_MAX = 40;
 export const REPRO_MIN_ADULTS = 2;
 export const REPRO_ELIGIBLE_HUNGER = 50; // não reproduz com fome abaixo disso
 export const REPRO_FOOD_DEMAND_MAX = 0.7; // só reproduz se a vila não estiver faminta
-export const VILLAGE_POP_CAP = 12;
+export const VILLAGE_POP_CAP = 30;
 
 export const TERRITORY_RADIUS = 10; // tiles
 
@@ -70,3 +70,15 @@ export const MELEE_RANGE = TILE_SIZE * 1.2; // px de mundo pra contar como "adja
 export const FIGHT_SCORE = 0.85;
 export const FLEE_SCORE = 0.9; // foge tem prioridade um pouco maior que lutar
 export const FLEE_HEALTH_THRESHOLD = 35; // abaixo disso (%), foge em vez de lutar
+
+// Índice espacial: tamanho de célula igual ao raio de percepção garante que
+// uma busca por vizinhos só precise olhar a célula do agente + as 8 ao redor.
+export const SPATIAL_CELL_SIZE = PERCEPTION_RADIUS * TILE_SIZE;
+
+// LOD: agentes fora desse raio da câmera rodam em modo agregado (sem
+// percepção/decisão/pathfinding — caro e inútil se ninguém tá vendo).
+export const LOD_ACTIVE_RADIUS = 40 * TILE_SIZE;
+// Fora de foco, as necessidades não decaem normalmente — são empurradas de
+// volta pra perto do topo (a vila "se vira sozinha" fora da tela), pra não
+// morrer tudo de fome só por estar fora do foco.
+export const BACKGROUND_NEEDS_RESTORE_PER_SEC = 100 / 15;

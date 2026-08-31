@@ -94,7 +94,7 @@ src/
 - **`world/terrain.js`** — geração procedural do grid a partir de uma seed (usa `utils/rng.js`). Só gera dados.
 - **`world/tile.js`** — tipos de tile, factory e `isWalkable` (água e montanha bloqueiam; é a única fonte de verdade sobre o que é andável — `pathfinding.js`, `perception.js` e a colocação inicial de vila/agente usam essa mesma função).
 - **`world/pathfinding.js`** — A* no grid de tiles; `agent/movement.js` é o único consumidor. Sem isso, o deslocamento em linha reta cortava direto por água/montanha sempre que o alvo estava do outro lado de um obstáculo.
-- **`world/spatialIndex.js`** — índice espacial (buckets) para consultas de proximidade; consumido por `agent/perception.js` e, mais tarde, `simulation/lod.js`.
+- **`world/spatialIndex.js`** — `buildSpatialIndex(agents)` (reconstruído em `main.js` a cada tick) + `queryNearby(index, pos, radius)`, buckets de grid do tamanho do raio de percepção. Substitui a varredura O(n) de `agent/perception.js` sobre `world.agents` — sem isso, achar "quem tá por perto" vira O(n²) no total e não escala (medido: 6.6x mais rápido que força bruta com 1500 agentes).
 
 - **`render/camera.js`** — posição/zoom da câmera e transforms mundo↔tela. Consumido por todo o `render/` e por `input/inputHandler.js` (picking sob o cursor).
 - **`render/renderer.js`** — orquestra o desenho por frame: limpa canvas, chama `tileRenderer`, `agentRenderer`, `debugRenderer` (se ativo), nessa ordem. Só lê `world` e `camera`, nunca muta estado de jogo.
@@ -102,7 +102,7 @@ src/
 
 - **`agent/agent.js`** — dados e factory do agente (posição, id; needs/traits/perception/memory se anexam aqui nas fatias 2-3).
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
-- **`agent/perception.js`** — varre o raio de visão via `spatialIndex`; produz o que o agente vê *agora* — tiles e também outros agentes vivos por perto (`agent.perception.agents`, usado por `combat/combat.js`).
+- **`agent/perception.js`** — varre o raio de visão (tiles direto no grid; agentes via `world/spatialIndex.js:queryNearby`, que devolve um superconjunto por bounding box — ainda filtra por distância real depois); produz o que o agente vê *agora* — tiles e também outros agentes vivos por perto (`agent.perception.agents`, usado por `combat/combat.js`).
 - **`agent/memory.js`** — locais/relações conhecidos, com confiança que decai. `perception` alimenta `memory`; `decision` só considera o que está em `memory` ou na percepção atual — nunca o estado real do `world` que o agente não viu. Essa é a fronteira mais importante da arquitetura: **decision.js nunca lê `world` diretamente para saber "o que existe", só para executar uma ação já escolhida sobre um alvo já conhecido.**
 - **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
 - **`agent/movement.js`** — `moveToward(agent, world, dt, targetWorldPos)` compartilhado por toda ação que anda até um alvo: calcula o caminho uma vez (`world/pathfinding.js`) e segue os waypoints, devolvendo `'moving' | 'arrived' | 'unreachable'`. Nenhuma ação implementa movimento por conta própria.
@@ -119,7 +119,7 @@ src/
 
 - **`lifecycle/lifecycle.js`** — `ageAgent`/`checkDeath` por agente (idade, saúde drenada por fome crítica ou combate, morte por saúde zerada ou idade máxima); `checkDeath` só regenera vida quando o agente não tem inimigo por perto (`combat/combat.js:findNearestEnemy`) — senão a regeneração desfaria o dano de combate a cada tick, já que `checkDeath` roda antes de `fight.js`. `updateVillageReproduction` por vila (cooldown + elegibilidade + `village.demand.food` decidem se tenta reproduzir); `pruneDead` remove agentes mortos (fome, combate ou idade) de `world.agents` e de `village.population`.
 
-- **`simulation/lod.js`** — classifica agentes/vilas em ativos (full-fidelity: needs+decision+perception todo tick) vs. simulados de forma agregada (fora da área relevante). Camada transversal que `gameLoop.js` consulta antes de decidir quais agentes atualizar em detalhe num dado tick.
+- **`simulation/lod.js`** — `classifyAgents(world, camera)` separa agentes em `active` (dentro de `LOD_ACTIVE_RADIUS` da câmera) e `background`; `main.js` roda o pipeline completo (percepção/memória/decisão/pathfinding) só para `active`. `background` passa por `stepBackgroundAgent`: sem percepção nem decisão, as necessidades não decaem — são empurradas de volta pra perto do topo (a vila "se vira sozinha" fora de vista), e posição fica parada. Idade e morte por idade continuam rodando pra ambos, direto em `main.js` — população longe da câmera não trava no tempo, só para de ser simulada em detalhe. Classificação recalculada do zero a cada tick (sem estado de "quem tava em foco antes"), então não tem transição a tratar. Medido: mesmos 300 agentes, 92ms/tick com todos full-fidelity vs. 12ms/tick com a maioria em background (51 ativos / 249 background) — ~7.5x.
 
 - **`input/inputHandler.js`** — pan/zoom de câmera (arrastar/scroll), pausar/mudar velocidade, `[D]` toggle de debug. Clique (sem arrastar, distingue por distância percorrida desde o mousedown) seleciona o agente mais próximo do cursor em `uiState.selectedAgentId`; clicar fora de qualquer agente deseleciona.
 - **`ui/hud.js`** — controles de tempo, renderizado em `#hud` (DOM, fora do canvas). O painel de status mostra o agente selecionado (`uiState.selectedAgentId`, lido em `main.js`) em três estados: nada selecionado, vivo, ou morreu (evita o problema de antes: com painel sempre em `world.agents[0]`, a identidade mudava sozinha quando esse agente morria e era removido do array).
@@ -155,6 +155,6 @@ Abrir http://localhost:8000 — nenhum passo de build.
 
 ---
 
-Status: fatias 1-9 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 10 (escala/LOD) ou fatia 11 (UI de observação).
+Status: fatias 1-10 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 11 (UI de observação).
 
 Nota sobre a fatia 9: vilas destinadas à guerra nascem mais perto (`WAR_VILLAGE_MIN/MAX_DIST` em `utils/constants.js`) — sem isso, a distância padrão entre vilas (70-100 tiles) é maior que qualquer coisa que um agente perceba ou percorra vagando, e elas nunca se encontrariam pra lutar.

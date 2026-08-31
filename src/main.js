@@ -1,4 +1,5 @@
 import { createWorld, findSpawnTile, findWalkableNear } from './world/world.js';
+import { buildSpatialIndex } from './world/spatialIndex.js';
 import { createVillage, addResident } from './village/village.js';
 import { computeDemand } from './village/stock.js';
 import { updateTrade } from './village/trade.js';
@@ -9,6 +10,7 @@ import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
 import { updateDecision } from './agent/decision.js';
+import { classifyAgents, stepBackgroundAgent } from './simulation/lod.js';
 import { ageAgent, checkDeath, updateVillageReproduction, pruneDead } from './lifecycle/lifecycle.js';
 import { createTimeState } from './core/time.js';
 import { createGameLoop } from './core/gameLoop.js';
@@ -135,7 +137,10 @@ const loop = createGameLoop({
 
     updateTrade(world, dt);
 
-    for (const agent of world.agents) {
+    world.spatialIndex = buildSpatialIndex(world.agents);
+    const { active, background } = classifyAgents(world, camera);
+
+    for (const agent of active) {
       scanPerception(agent, world);
       for (const tile of agent.perception.tiles) {
         remember(agent.memory, tile);
@@ -148,6 +153,12 @@ const loop = createGameLoop({
       if (!agent.alive) continue;
 
       updateDecision(agent, world, dt);
+    }
+
+    for (const agent of background) {
+      stepBackgroundAgent(agent, dt);
+      ageAgent(agent, dt);
+      checkDeath(agent, world, dt);
     }
 
     for (const v of world.villages) {
