@@ -1,6 +1,12 @@
 import { TIME_SPEEDS } from '../utils/constants.js';
 
-const ACTION_LABELS = { wander: 'vagando', eat: 'comendo', sleep: 'dormindo' };
+const ACTION_LABELS = {
+  wander: 'vagando',
+  eat: 'comendo',
+  sleep: 'dormindo',
+  gather: 'colhendo',
+  deliver: 'entregando',
+};
 
 export function createHud(container, timeState) {
   container.innerHTML = '';

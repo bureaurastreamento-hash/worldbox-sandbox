@@ -23,21 +23,24 @@ export function getTileAt(world, tx, ty) {
   return world.tiles[ty][tx];
 }
 
-// Espirala a partir do centro do mundo até achar um tile andável, para
-// posicionar o agente inicial sem depender de o centro cair em água.
-export function findSpawnTile(world) {
-  const cx = Math.floor(world.width / 2);
-  const cy = Math.floor(world.height / 2);
-  const maxRadius = Math.max(world.width, world.height);
+export function getVillage(world, villageId) {
+  return world.villages.find((v) => v.id === villageId) ?? null;
+}
 
+// Espirala a partir de (centerTx, centerTy) até achar um tile andável.
+export function findWalkableNear(world, centerTx, centerTy, maxRadius = Math.max(world.width, world.height)) {
   for (let r = 0; r <= maxRadius; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        const tile = getTileAt(world, cx + dx, cy + dy);
-        if (tile && isWalkable(tile.type)) return { tx: cx + dx, ty: cy + dy };
+        const tile = getTileAt(world, centerTx + dx, centerTy + dy);
+        if (tile && isWalkable(tile.type)) return { tx: centerTx + dx, ty: centerTy + dy };
       }
     }
   }
-  return { tx: cx, ty: cy };
+  return { tx: centerTx, ty: centerTy };
+}
+
+export function findSpawnTile(world) {
+  return findWalkableNear(world, Math.floor(world.width / 2), Math.floor(world.height / 2));
 }

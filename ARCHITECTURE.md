@@ -27,6 +27,7 @@ src/
     camera.js
     renderer.js
     tileRenderer.js
+    villageRenderer.js
     agentRenderer.js
     debugRenderer.js
 
@@ -41,6 +42,8 @@ src/
       wander.js
       eat.js
       sleep.js
+      gather.js
+      deliver.js
 
   village/
     village.js
@@ -86,17 +89,17 @@ src/
 
 - **`render/camera.js`** — posição/zoom da câmera e transforms mundo↔tela. Consumido por todo o `render/` e por `input/inputHandler.js` (picking sob o cursor).
 - **`render/renderer.js`** — orquestra o desenho por frame: limpa canvas, chama `tileRenderer`, `agentRenderer`, `debugRenderer` (se ativo), nessa ordem. Só lê `world` e `camera`, nunca muta estado de jogo.
-- **`render/tileRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera.
+- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera.
 
 - **`agent/agent.js`** — dados e factory do agente (posição, id; needs/traits/perception/memory se anexam aqui nas fatias 2-3).
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
 - **`agent/perception.js`** — varre o raio de visão via `spatialIndex`; produz o que o agente vê *agora*.
 - **`agent/memory.js`** — locais/relações conhecidos, com confiança que decai. `perception` alimenta `memory`; `decision` só considera o que está em `memory` ou na percepção atual — nunca o estado real do `world` que o agente não viu. Essa é a fronteira mais importante da arquitetura: **decision.js nunca lê `world` diretamente para saber "o que existe", só para executar uma ação já escolhida sobre um alvo já conhecido.**
 - **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
-- **`agent/actions/*`** — cada ação é um módulo com sua função de score-modifier e seu `step()` de execução incremental; `actionTypes.js` é o registro que `decision.js` consulta.
+- **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar.
 
 - **`village/village.js`** — dados/factory da vila (estoque, população, território).
-- **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `decision.js` lê para enviesar o score de ações que suprem um recurso escasso.
+- **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `gather.js` lê para enviesar o score, igual para todos os moradores.
 
 - **`clan/clan.js`** — agrupa vilas, mantém postura com outros clãs.
 - **`clan/diplomacy.js`** — propõe/assina tratados; expõe os termos vigentes para `village/stock.js` (comércio) e `combat/combat.js` (guerra declarada).

@@ -1,5 +1,17 @@
-// Fatia 4: estrutura de dados da vila — estoque, população, território — e
-// sua factory. Agentes referenciam villageId; decision.js lê village.demand
-// ao pontuar ações.
+import { VILLAGE_FOOD_CAPACITY } from '../utils/constants.js';
 
-// TODO (fatia 4): createVillage({ id, center }), addResident(village, agentId)
+export function createVillage({ id, name, center }) {
+  return {
+    id,
+    name,
+    center: { x: center.x, y: center.y },
+    stock: { food: 0 },
+    capacity: { food: VILLAGE_FOOD_CAPACITY },
+    demand: { food: 0 },
+    population: [],
+  };
+}
+
+export function addResident(village, agentId) {
+  village.population.push(agentId);
+}
