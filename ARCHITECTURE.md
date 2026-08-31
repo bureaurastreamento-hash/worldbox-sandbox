@@ -12,7 +12,7 @@ css/
   style.css
 assets/
   sprites/
-    human.png   (provisório — ver memória do projeto: será substituído aos poucos)
+    Human1.png, Human2.png   (provisórios — ver memória do projeto: serão substituídos aos poucos)
 src/
   main.js
 
@@ -98,7 +98,7 @@ src/
 
 - **`render/camera.js`** — posição/zoom da câmera e transforms mundo↔tela. Consumido por todo o `render/` e por `input/inputHandler.js` (picking sob o cursor).
 - **`render/renderer.js`** — orquestra o desenho por frame: limpa canvas, chama `tileRenderer`, `agentRenderer`, `debugRenderer` (se ativo), nessa ordem. Só lê `world` e `camera`, nunca muta estado de jogo.
-- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera. `agentRenderer.js` desenha `assets/sprites/human.png` (com fallback pro círculo antigo enquanto a imagem carrega) e o anel de seleção do agente escolhido pelo jogador.
+- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera. `agentRenderer.js` desenha `Human1.png`/`Human2.png` alternados (ciclo de passo de 2 quadros, só enquanto o agente se move de verdade — detectado comparando posição entre frames, não pela ação atual) com fallback pro círculo antigo enquanto carregam, recortando o conteúdo real de cada sprite pelo canal alpha (as imagens têm bastante espaço vazio ao redor, e o recorte é o que garante que os dois quadros apareçam do mesmo tamanho), e o anel de seleção do agente escolhido pelo jogador.
 
 - **`agent/agent.js`** — dados e factory do agente (posição, id; needs/traits/perception/memory se anexam aqui nas fatias 2-3).
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
