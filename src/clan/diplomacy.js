@@ -1,10 +1,9 @@
-// Propõe/assina tratados entre clãs e expõe os termos vigentes. Fatia 7:
-// assinar um tratado muda a postura (stanceByClan) entre os dois clãs — o
-// efeito concreto nos moradores é isHostileTerritory(), que wander.js,
-// gather.js e eat.js consultam pra não escolher alvos em território de um
-// clã em guerra/tensão. trade/defense_pact ganham efeito mais forte nas
-// fatias 8 (comércio) e 9 (combate), que consomem os tratados vigentes
-// daqui.
+// Propõe/assina tratados entre clãs e expõe os termos vigentes. Assinar um
+// tratado muda a postura (stanceByClan) entre os dois clãs. Dois efeitos
+// concretos consomem isso hoje: isHostileTerritory() (wander/gather/eat não
+// escolhem alvo em território de clã em guerra/tensão) e canTrade()
+// (village/trade.js só move recurso entre clãs aliados ou com tratado
+// 'trade' assinado). defense_pact ganha efeito na fatia 9 (combate).
 
 import { TILE_SIZE } from '../utils/constants.js';
 import { distance } from '../utils/mathUtils.js';
@@ -40,6 +39,16 @@ export function signTreaty(treaty, clanA, clanB, tick = 0) {
 
   setStance(clanA, clanB, STANCE_BY_TREATY_TYPE[treaty.type] ?? 'neutral');
   return treaty;
+}
+
+// Mesma clã sempre comercia; clãs diferentes precisam ser aliados ou ter um
+// tratado de comércio assinado (não basta postura neutra por si só).
+export function canTrade(clanA, clanB) {
+  if (clanA.id === clanB.id) return true;
+  if (getStance(clanA, clanB) === 'allied') return true;
+  return clanA.treaties.some(
+    (t) => t.type === 'trade' && t.status === 'signed' && (t.clanA === clanB.id || t.clanB === clanB.id),
+  );
 }
 
 const DANGEROUS_STANCES = new Set(['war', 'tense']);

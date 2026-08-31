@@ -53,6 +53,7 @@ src/
   village/
     village.js
     stock.js
+    trade.js
 
   clan/
     clan.js
@@ -106,10 +107,11 @@ src/
 - **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar.
 
 - **`village/village.js`** — dados/factory da vila (estoque, população, território); `village.clanId` é atribuído por `clan/clan.js:addVillage`.
-- **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `gather.js` lê para enviesar o score, igual para todos os moradores.
+- **`village/stock.js`** — estoque comunitário e cálculo de demanda; é o valor que `gather.js` lê para enviesar o score, igual para todos os moradores, e que `trade.js` lê pra achar sobra/déficit.
+- **`village/trade.js`** — `updateTrade(world, dt)`, chamado uma vez por tick (não por agente): pra cada par de vilas cujos clãs permitem comércio (`clan/diplomacy.js:canTrade`), move recurso da vila com demanda baixa (sobra) pra vila com demanda alta (déficit), a uma taxa fixa. É comércio no nível da vila, não do agente — as vilas ficam bem além do raio de percepção/memória de qualquer morador, então a rota é "conhecimento institucional" da vila, não uma decisão de utilidade individual. É o que viabiliza o caso de design original (vila guerreira sem produção própria sobrevivendo de uma vila agrícola aliada) quando a especialização de vila existir.
 
 - **`clan/clan.js`** — agrupa vilas (`addVillage` seta `village.clanId`); `stanceByClan` guarda a postura (`war`/`tense`/`neutral`/`allied`) com cada outro clã, simétrica via `setStance`/`getStance`.
-- **`clan/diplomacy.js`** — `proposeTreaty`/`signTreaty` criam e assinam tratados (aliança, não-agressão, comércio, defesa); assinar aplica a postura correspondente via `clan.js:setStance`. `isHostileTerritory(world, agent, tx, ty)` é o efeito real na fatia 7: `wander.js`, `gather.js` e `eat.js` a consultam pra nunca escolher como alvo um tile dentro do território de um clã em guerra/tensão — mesmo com a necessidade crítica. `trade`/`defense_pact` ganham consequência mais forte nas fatias 8 (comércio) e 9 (combate), que vão ler os tratados vigentes daqui.
+- **`clan/diplomacy.js`** — `proposeTreaty`/`signTreaty` criam e assinam tratados (aliança, não-agressão, comércio, defesa); assinar aplica a postura correspondente via `clan.js:setStance`. `isHostileTerritory(world, agent, tx, ty)` é o efeito da fatia 7: `wander.js`, `gather.js` e `eat.js` a consultam pra nunca escolher como alvo um tile dentro do território de um clã em guerra/tensão — mesmo com a necessidade crítica. `canTrade(clanA, clanB)` é o efeito da fatia 8, consumido por `village/trade.js`: mesma clã sempre comercia; clãs diferentes precisam ser aliados ou ter um tratado `trade` assinado — postura neutra sozinha não basta, é assim que o tratado passa a importar de verdade. `defense_pact` ganha consequência na fatia 9 (combate), que vai ler os tratados vigentes daqui.
 
 - **`combat/combat.js`** — resolve engajamentos unidade a unidade; combate entra em `decision.js` como mais um tipo de ação candidata (engajar/fugir), e este módulo resolve o resultado.
 
@@ -151,4 +153,4 @@ Abrir http://localhost:8000 — nenhum passo de build.
 
 ---
 
-Status: fatias 1-7 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 8 (comércio entre vilas).
+Status: fatias 1-8 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 9 (combate simulado por agente).

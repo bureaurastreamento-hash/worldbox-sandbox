@@ -1,6 +1,7 @@
 import { TILE_SIZE } from '../utils/constants.js';
 import { getClan } from '../world/world.js';
 import { getStance } from '../clan/clan.js';
+import { canTrade } from '../clan/diplomacy.js';
 
 const STANCE_RANK = { neutral: 0, allied: 0, tense: 1, war: 2 };
 
@@ -30,6 +31,20 @@ function worstStance(world, village) {
     else if (worst === 'neutral' && stance === 'allied') worst = 'allied';
   }
   return worst;
+}
+
+// Só interessa reportar quando não é óbvio pela postura (aliada já comercia).
+function hasExtraTradeLink(world, village) {
+  const myClan = getClan(world, village.clanId);
+  if (!myClan) return false;
+
+  for (const other of world.villages) {
+    if (other.id === village.id) continue;
+    const otherClan = getClan(world, other.clanId);
+    if (!otherClan || otherClan.id === myClan.id) continue;
+    if (getStance(myClan, otherClan) !== 'allied' && canTrade(myClan, otherClan)) return true;
+  }
+  return false;
 }
 
 export function drawTerritories(ctx, world, camera) {
@@ -71,6 +86,7 @@ export function drawVillages(ctx, world, camera) {
     const food = Math.round(village.stock.food ?? 0);
     const cap = village.capacity.food ?? 0;
     const suffix = STANCE_LABELS[worstStance(world, village)];
-    ctx.fillText(`${village.name} — 🌾 ${food}/${cap}${suffix}`, pos.x, pos.y - size / 2 - 4);
+    const tradeSuffix = hasExtraTradeLink(world, village) ? ' · 🤝 comércio' : '';
+    ctx.fillText(`${village.name} — 🌾 ${food}/${cap}${suffix}${tradeSuffix}`, pos.x, pos.y - size / 2 - 4);
   }
 }

@@ -1,6 +1,7 @@
 import { createWorld, findSpawnTile, findWalkableNear } from './world/world.js';
 import { createVillage, addResident } from './village/village.js';
 import { computeDemand } from './village/stock.js';
+import { updateTrade } from './village/trade.js';
 import { createClan, addVillage as addVillageToClan, setStance } from './clan/clan.js';
 import { proposeTreaty, signTreaty } from './clan/diplomacy.js';
 import { createAgent } from './agent/agent.js';
@@ -25,6 +26,7 @@ import {
   SECOND_VILLAGE_MIN_DIST,
   SECOND_VILLAGE_MAX_DIST,
   INITIAL_STANCE_WEIGHTS,
+  NEUTRAL_TRADE_TREATY_CHANCE,
 } from './utils/constants.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -82,6 +84,12 @@ if (initialStance === 'allied') {
   signTreaty(treaty, homeClan, rivalClan);
 } else {
   setStance(homeClan, rivalClan, initialStance);
+  if (initialStance === 'neutral' && world.rng.next() < NEUTRAL_TRADE_TREATY_CHANCE) {
+    // vínculo econômico sem aliança militar completa — habilita comércio
+    // (village/trade.js) sem mudar a postura neutra.
+    const tradeTreaty = proposeTreaty(homeClan, rivalClan, 'trade');
+    signTreaty(tradeTreaty, homeClan, rivalClan);
+  }
 }
 
 const camera = createCamera({
@@ -116,6 +124,8 @@ const loop = createGameLoop({
     for (const v of world.villages) {
       computeDemand(v);
     }
+
+    updateTrade(world, dt);
 
     for (const agent of world.agents) {
       scanPerception(agent, world);

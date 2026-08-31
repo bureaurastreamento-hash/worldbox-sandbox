@@ -50,3 +50,12 @@ export const SECOND_VILLAGE_MAX_DIST = 100;
 
 // Peso de sorteio da postura inicial entre os dois clãs fundadores.
 export const INITIAL_STANCE_WEIGHTS = { war: 0.15, tense: 0.15, neutral: 0.5, allied: 0.2 };
+// Se a postura sorteada for 'neutral', chance de também nascerem com um
+// tratado de comércio (vínculo econômico sem ser aliança completa).
+export const NEUTRAL_TRADE_TREATY_CHANCE = 0.4;
+
+// Comércio entre vilas: abaixo desse nível de demanda a vila tem sobra pra
+// exportar; acima do outro limite, ela tem déficit e precisa importar.
+export const TRADE_SURPLUS_DEMAND_MAX = 0.3;
+export const TRADE_DEFICIT_DEMAND_MIN = 0.6;
+export const TRADE_RATE_PER_SEC = 2; // unidades de recurso por segundo numa rota ativa
