@@ -1,4 +1,4 @@
-import { VILLAGE_FOOD_CAPACITY } from '../utils/constants.js';
+import { VILLAGE_FOOD_CAPACITY, REPRO_COOLDOWN_MIN } from '../utils/constants.js';
 
 export function createVillage({ id, name, center }) {
   return {
@@ -9,6 +9,7 @@ export function createVillage({ id, name, center }) {
     capacity: { food: VILLAGE_FOOD_CAPACITY },
     demand: { food: 0 },
     population: [],
+    reproCooldown: REPRO_COOLDOWN_MIN,
   };
 }
 

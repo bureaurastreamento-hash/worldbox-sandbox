@@ -1,7 +1,7 @@
 import { createNeeds } from './needs.js';
 import { createMemory } from './memory.js';
 
-export function createAgent({ id, position, villageId = null, decisionTimer = 0 }) {
+export function createAgent({ id, position, villageId = null, decisionTimer = 0, age = 0 }) {
   return {
     id,
     position: { x: position.x, y: position.y },
@@ -13,5 +13,9 @@ export function createAgent({ id, position, villageId = null, decisionTimer = 0 
     memory: createMemory(), // o que já foi visto, com confiança decrescente
     currentAction: null,
     decisionTimer, // jitter por agente para não recalcular todos no mesmo tick
+    age,
+    lifeStage: 'child', // corrigido pelo primeiro ageAgent() do tick, ver lifecycle.js
+    alive: true,
+    health: 100,
   };
 }

@@ -5,7 +5,7 @@
 
 import { TILE_TYPES } from '../../world/tile.js';
 import { distance, lerp } from '../../utils/mathUtils.js';
-import { TILE_SIZE, AGENT_SPEED, CARRY_CAPACITY, GATHER_RATE } from '../../utils/constants.js';
+import { TILE_SIZE, AGENT_SPEED, CARRY_CAPACITY, GATHER_RATE, GATHER_SCORE_WEIGHT } from '../../utils/constants.js';
 import { recallNearest } from '../memory.js';
 import { getVillage } from '../../world/world.js';
 
@@ -17,7 +17,7 @@ export function score(agent, world) {
   if (!village) return 0;
   const known = recallNearest(agent.memory, agent.position, (e) => e.type === TILE_TYPES.GRASS);
   if (!known) return 0;
-  return village.demand.food ?? 0;
+  return (village.demand.food ?? 0) * GATHER_SCORE_WEIGHT;
 }
 
 function findGatherTile(agent) {

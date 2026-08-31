@@ -8,7 +8,7 @@ import { addStock } from '../../village/stock.js';
 import { getVillage } from '../../world/world.js';
 
 const ARRIVE_THRESHOLD = 4;
-export const SCORE_WHEN_CARRYING = 0.95;
+export const SCORE_WHEN_CARRYING = 0.8; // alto e fixo, mas ainda interrompível por fome/sono crítica
 
 export function score(agent) {
   return agent.carrying > 0 ? SCORE_WHEN_CARRYING : 0;

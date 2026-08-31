@@ -6,6 +6,7 @@ import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
 import { updateDecision } from './agent/decision.js';
+import { ageAgent, checkDeath, updateVillageReproduction, pruneDead } from './lifecycle/lifecycle.js';
 import { createTimeState } from './core/time.js';
 import { createGameLoop } from './core/gameLoop.js';
 import { createCamera } from './render/camera.js';
@@ -13,7 +14,7 @@ import { createRenderer } from './render/renderer.js';
 import { attachInputHandlers } from './input/inputHandler.js';
 import { createHud } from './ui/hud.js';
 import { tileToWorld } from './utils/mathUtils.js';
-import { WORLD_WIDTH, WORLD_HEIGHT, TILE_SIZE, AGENT_COUNT } from './utils/constants.js';
+import { WORLD_WIDTH, WORLD_HEIGHT, TILE_SIZE, AGENT_COUNT, FOUNDER_AGE } from './utils/constants.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -45,6 +46,7 @@ for (let i = 0; i < AGENT_COUNT; i++) {
     position: tileToWorld(spot.tx, spot.ty, TILE_SIZE),
     villageId: village.id,
     decisionTimer: world.rng.range(0, 0.5),
+    age: FOUNDER_AGE,
   });
 
   world.agents.push(agent);
@@ -81,8 +83,18 @@ const loop = createGameLoop({
       decayMemory(agent.memory, dt);
 
       updateNeeds(agent.needs, dt);
+      ageAgent(agent, dt);
+      checkDeath(agent, dt);
+      if (!agent.alive) continue;
+
       updateDecision(agent, world, dt);
     }
+
+    for (const v of world.villages) {
+      updateVillageReproduction(v, world, dt);
+    }
+
+    pruneDead(world);
   },
   render() {
     renderer.render(world, debugState);

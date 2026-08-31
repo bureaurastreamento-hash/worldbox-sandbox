@@ -106,7 +106,7 @@ src/
 
 - **`combat/combat.js`** — resolve engajamentos unidade a unidade; combate entra em `decision.js` como mais um tipo de ação candidata (engajar/fugir), e este módulo resolve o resultado.
 
-- **`lifecycle/lifecycle.js`** — envelhecimento, morte, reprodução. Lê `needs` (fome crítica), escreve em `village.population`.
+- **`lifecycle/lifecycle.js`** — `ageAgent`/`checkDeath` por agente (idade, saúde drenada por fome crítica, morte por saúde zerada ou idade máxima); `updateVillageReproduction` por vila (cooldown + elegibilidade + `village.demand.food` decidem se tenta reproduzir); `pruneDead` remove agentes mortos de `world.agents` e de `village.population`.
 
 - **`simulation/lod.js`** — classifica agentes/vilas em ativos (full-fidelity: needs+decision+perception todo tick) vs. simulados de forma agregada (fora da área relevante). Camada transversal que `gameLoop.js` consulta antes de decidir quais agentes atualizar em detalhe num dado tick.
 

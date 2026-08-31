@@ -50,6 +50,10 @@ export function createHud(container, timeState) {
       <span data-field="action">–</span>
     </div>
     <div class="hud-status-row">
+      <span class="hud-status-label">idade</span>
+      <span data-field="age">–</span>
+    </div>
+    <div class="hud-status-row">
       <span class="hud-status-label">fome</span>
       <div class="stat-bar"><div class="stat-bar-fill hunger" data-field="hunger"></div></div>
     </div>
@@ -57,18 +61,28 @@ export function createHud(container, timeState) {
       <span class="hud-status-label">sono</span>
       <div class="stat-bar"><div class="stat-bar-fill sleep" data-field="sleep"></div></div>
     </div>
+    <div class="hud-status-row">
+      <span class="hud-status-label">vida</span>
+      <div class="stat-bar"><div class="stat-bar-fill health" data-field="health"></div></div>
+    </div>
   `;
   container.appendChild(status);
 
   const actionEl = status.querySelector('[data-field="action"]');
+  const ageEl = status.querySelector('[data-field="age"]');
   const hungerFill = status.querySelector('[data-field="hunger"]');
   const sleepFill = status.querySelector('[data-field="sleep"]');
+  const healthFill = status.querySelector('[data-field="health"]');
+
+  const STAGE_LABELS = { child: 'criança', adult: 'adulto', elder: 'idoso' };
 
   function updateAgentStatus(agent) {
     if (!agent) return;
     actionEl.textContent = ACTION_LABELS[agent.currentAction] ?? '–';
+    ageEl.textContent = `${Math.floor(agent.age)} (${STAGE_LABELS[agent.lifeStage] ?? '–'})`;
     hungerFill.style.width = `${agent.needs.hunger}%`;
     sleepFill.style.width = `${agent.needs.sleep}%`;
+    healthFill.style.width = `${agent.health}%`;
   }
 
   return { updateAgentStatus };

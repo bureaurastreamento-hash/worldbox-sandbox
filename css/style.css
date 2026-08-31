@@ -84,6 +84,10 @@ html, body {
   background: #4a7fd9;
 }
 
+.stat-bar-fill.health {
+  background: #4caf50;
+}
+
 #hud button {
   background: rgba(20, 20, 20, 0.75);
   color: #fff;
