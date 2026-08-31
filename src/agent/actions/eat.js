@@ -5,13 +5,12 @@
 // a zero mesmo com fome alta, e ele precisa vagar até avistar uma).
 
 import { TILE_TYPES } from '../../world/tile.js';
-import { distance, lerp } from '../../utils/mathUtils.js';
-import { TILE_SIZE, AGENT_SPEED } from '../../utils/constants.js';
+import { TILE_SIZE } from '../../utils/constants.js';
 import { urgency, applyEffect } from '../needs.js';
 import { recallNearest } from '../memory.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
+import { moveToward, clearMovement } from '../movement.js';
 
-const ARRIVE_THRESHOLD = 4;
 const RESTORE_PER_SEC = 100 / 15;
 
 function isSafeGrass(world, agent) {
@@ -36,19 +35,12 @@ export function step(agent, world, dt) {
     if (!agent.target) return; // nenhuma grama conhecida; espera a próxima reconsideração
   }
 
-  const d = distance(agent.position, agent.target);
-  if (d > ARRIVE_THRESHOLD) {
-    const move = AGENT_SPEED * dt;
-    if (move >= d) {
-      agent.position.x = agent.target.x;
-      agent.position.y = agent.target.y;
-    } else {
-      const t = move / d;
-      agent.position.x = lerp(agent.position.x, agent.target.x, t);
-      agent.position.y = lerp(agent.position.y, agent.target.y, t);
-    }
+  const status = moveToward(agent, world, dt, agent.target);
+  if (status === 'unreachable') {
+    clearMovement(agent);
     return;
   }
-
-  applyEffect(agent.needs, 'hunger', RESTORE_PER_SEC * dt);
+  if (status === 'arrived') {
+    applyEffect(agent.needs, 'hunger', RESTORE_PER_SEC * dt);
+  }
 }

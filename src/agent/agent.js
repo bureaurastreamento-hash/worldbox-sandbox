@@ -6,6 +6,8 @@ export function createAgent({ id, position, villageId = null, decisionTimer = 0,
     id,
     position: { x: position.x, y: position.y },
     target: null, // alvo de movimento da ação corrente; null = precisa escolher um
+    path: null, // waypoints até target (agent/movement.js), calculado via pathfinding
+    pathTargetKey: null,
     villageId,
     carrying: 0, // unidades de recurso carregadas (gather.js/deliver.js)
     needs: createNeeds(),

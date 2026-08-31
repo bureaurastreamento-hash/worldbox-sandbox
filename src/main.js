@@ -98,8 +98,9 @@ const camera = createCamera({
 const renderer = createRenderer(canvas, camera);
 const timeState = createTimeState({ speed: 1 });
 const debugState = { showPerception: false };
+const uiState = { selectedAgentId: null };
 
-attachInputHandlers(canvas, camera, timeState, debugState);
+attachInputHandlers(canvas, { camera, timeState, debugState, world, uiState });
 const hud = createHud(document.getElementById('hud'), timeState);
 
 const loop = createGameLoop({
@@ -133,8 +134,15 @@ const loop = createGameLoop({
     pruneDead(world);
   },
   render() {
-    renderer.render(world, debugState);
-    hud.updateAgentStatus(world.agents[0]);
+    renderer.render(world, debugState, uiState.selectedAgentId);
+
+    let selectionState = 'none';
+    let selectedAgent = null;
+    if (uiState.selectedAgentId) {
+      selectedAgent = world.agents.find((a) => a.id === uiState.selectedAgentId) ?? null;
+      selectionState = selectedAgent ? 'alive' : 'dead';
+    }
+    hud.updateAgentStatus(selectedAgent, selectionState);
   },
 });
 

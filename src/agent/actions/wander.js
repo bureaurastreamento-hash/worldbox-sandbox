@@ -4,11 +4,9 @@
 // além do que o agente está vendo agora.
 
 import { isWalkable } from '../../world/tile.js';
-import { distance, lerp } from '../../utils/mathUtils.js';
-import { TILE_SIZE, AGENT_SPEED } from '../../utils/constants.js';
+import { TILE_SIZE } from '../../utils/constants.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
-
-const ARRIVE_THRESHOLD = 2;
+import { moveToward, clearMovement } from '../movement.js';
 
 export const BASE_SCORE = 0.05;
 
@@ -27,20 +25,11 @@ function pickTarget(agent, world) {
 }
 
 export function step(agent, world, dt) {
-  if (!agent.target || distance(agent.position, agent.target) < ARRIVE_THRESHOLD) {
+  if (!agent.target) {
     agent.target = pickTarget(agent, world);
     if (!agent.target) return;
   }
 
-  const d = distance(agent.position, agent.target);
-  const move = AGENT_SPEED * dt;
-
-  if (move >= d) {
-    agent.position.x = agent.target.x;
-    agent.position.y = agent.target.y;
-  } else {
-    const t = move / d;
-    agent.position.x = lerp(agent.position.x, agent.target.x, t);
-    agent.position.y = lerp(agent.position.y, agent.target.y, t);
-  }
+  const status = moveToward(agent, world, dt, agent.target);
+  if (status !== 'moving') clearMovement(agent); // chegou (ou não dá): escolhe outro alvo depois
 }

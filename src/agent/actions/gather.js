@@ -4,13 +4,11 @@
 // decidir isso de cima.
 
 import { TILE_TYPES } from '../../world/tile.js';
-import { distance, lerp } from '../../utils/mathUtils.js';
-import { TILE_SIZE, AGENT_SPEED, CARRY_CAPACITY, GATHER_RATE, GATHER_SCORE_WEIGHT } from '../../utils/constants.js';
+import { TILE_SIZE, CARRY_CAPACITY, GATHER_RATE, GATHER_SCORE_WEIGHT } from '../../utils/constants.js';
 import { recallNearest } from '../memory.js';
 import { getVillage } from '../../world/world.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
-
-const ARRIVE_THRESHOLD = 4;
+import { moveToward, clearMovement } from '../movement.js';
 
 function isSafeGrass(world, agent) {
   return (e) => e.type === TILE_TYPES.GRASS && !isHostileTerritory(world, agent, e.tx, e.ty);
@@ -37,22 +35,15 @@ export function step(agent, world, dt) {
     if (!agent.target) return; // nada de grama conhecida; espera a próxima reconsideração
   }
 
-  const d = distance(agent.position, agent.target);
-  if (d > ARRIVE_THRESHOLD) {
-    const move = AGENT_SPEED * dt;
-    if (move >= d) {
-      agent.position.x = agent.target.x;
-      agent.position.y = agent.target.y;
-    } else {
-      const t = move / d;
-      agent.position.x = lerp(agent.position.x, agent.target.x, t);
-      agent.position.y = lerp(agent.position.y, agent.target.y, t);
-    }
+  const status = moveToward(agent, world, dt, agent.target);
+  if (status === 'unreachable') {
+    clearMovement(agent);
     return;
   }
+  if (status !== 'arrived') return;
 
   agent.carrying = Math.min(CARRY_CAPACITY, agent.carrying + GATHER_RATE * dt);
   if (agent.carrying >= CARRY_CAPACITY) {
-    agent.target = null; // carga cheia; decision.js troca pra "deliver" na próxima reconsideração
+    clearMovement(agent); // carga cheia; decision.js troca pra "deliver" na próxima reconsideração
   }
 }

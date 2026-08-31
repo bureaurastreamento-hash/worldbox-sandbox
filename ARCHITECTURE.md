@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Worldbox Sandbox
 
-Estrutura de pastas/arquivos e como os módulos conversam entre si. Sem lógica de jogo ainda — todos os arquivos em `src/` são stubs com um comentário de responsabilidade e um `TODO` marcando em qual fatia (ver `DESIGN.md`, seção 5) a lógica entra.
+Estrutura de pastas/arquivos e como os módulos conversam entre si. Arquivos ainda não implementados (fatia 8+) continuam como stub com um comentário de responsabilidade e um `TODO` marcando em qual fatia (ver `DESIGN.md`, seção 5) a lógica entra.
 
 JavaScript vanilla, módulos ES nativos (`import`/`export`), sem bundler. `index.html` na raiz carrega `src/main.js` como `<script type="module">` — o navegador resolve os imports diretamente, então a árvore de pastas abaixo *é* a árvore de módulos real, não uma organização lógica que depois é achatada por um build.
 
@@ -10,6 +10,9 @@ JavaScript vanilla, módulos ES nativos (`import`/`export`), sem bundler. `index
 index.html
 css/
   style.css
+assets/
+  sprites/
+    human.png   (provisório — ver memória do projeto: será substituído aos poucos)
 src/
   main.js
 
@@ -21,6 +24,7 @@ src/
     world.js
     terrain.js
     tile.js
+    pathfinding.js
     spatialIndex.js
 
   render/
@@ -37,6 +41,7 @@ src/
     perception.js
     memory.js
     decision.js
+    movement.js
     actions/
       actionTypes.js
       wander.js
@@ -84,18 +89,20 @@ src/
 
 - **`world/world.js`** — o "banco de dados" central: tiles, agentes, vilas, clãs, tick atual. Outros módulos leem e escrevem aqui; a lógica de *como* o estado muda mora nos módulos donos de cada domínio, não em `world.js`.
 - **`world/terrain.js`** — geração procedural do grid a partir de uma seed (usa `utils/rng.js`). Só gera dados.
-- **`world/tile.js`** — tipos de tile e factory.
+- **`world/tile.js`** — tipos de tile, factory e `isWalkable` (água e montanha bloqueiam; é a única fonte de verdade sobre o que é andável — `pathfinding.js`, `perception.js` e a colocação inicial de vila/agente usam essa mesma função).
+- **`world/pathfinding.js`** — A* no grid de tiles; `agent/movement.js` é o único consumidor. Sem isso, o deslocamento em linha reta cortava direto por água/montanha sempre que o alvo estava do outro lado de um obstáculo.
 - **`world/spatialIndex.js`** — índice espacial (buckets) para consultas de proximidade; consumido por `agent/perception.js` e, mais tarde, `simulation/lod.js`.
 
 - **`render/camera.js`** — posição/zoom da câmera e transforms mundo↔tela. Consumido por todo o `render/` e por `input/inputHandler.js` (picking sob o cursor).
 - **`render/renderer.js`** — orquestra o desenho por frame: limpa canvas, chama `tileRenderer`, `agentRenderer`, `debugRenderer` (se ativo), nessa ordem. Só lê `world` e `camera`, nunca muta estado de jogo.
-- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera.
+- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera. `agentRenderer.js` desenha `assets/sprites/human.png` (com fallback pro círculo antigo enquanto a imagem carrega) e o anel de seleção do agente escolhido pelo jogador.
 
 - **`agent/agent.js`** — dados e factory do agente (posição, id; needs/traits/perception/memory se anexam aqui nas fatias 2-3).
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
 - **`agent/perception.js`** — varre o raio de visão via `spatialIndex`; produz o que o agente vê *agora*.
 - **`agent/memory.js`** — locais/relações conhecidos, com confiança que decai. `perception` alimenta `memory`; `decision` só considera o que está em `memory` ou na percepção atual — nunca o estado real do `world` que o agente não viu. Essa é a fronteira mais importante da arquitetura: **decision.js nunca lê `world` diretamente para saber "o que existe", só para executar uma ação já escolhida sobre um alvo já conhecido.**
 - **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
+- **`agent/movement.js`** — `moveToward(agent, world, dt, targetWorldPos)` compartilhado por toda ação que anda até um alvo: calcula o caminho uma vez (`world/pathfinding.js`) e segue os waypoints, devolvendo `'moving' | 'arrived' | 'unreachable'`. Nenhuma ação implementa movimento por conta própria.
 - **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar.
 
 - **`village/village.js`** — dados/factory da vila (estoque, população, território); `village.clanId` é atribuído por `clan/clan.js:addVillage`.
@@ -110,9 +117,9 @@ src/
 
 - **`simulation/lod.js`** — classifica agentes/vilas em ativos (full-fidelity: needs+decision+perception todo tick) vs. simulados de forma agregada (fora da área relevante). Camada transversal que `gameLoop.js` consulta antes de decidir quais agentes atualizar em detalhe num dado tick.
 
-- **`input/inputHandler.js`** — pan/zoom de câmera, pausar/mudar velocidade; depois seleção de entidade para o inspector.
-- **`ui/hud.js`** — controles de tempo, renderizado em `#hud` (DOM, fora do canvas).
-- **`ui/inspector.js`** — painel de inspeção da entidade selecionada (needs, ação atual e scores, estoque/demanda, tratados).
+- **`input/inputHandler.js`** — pan/zoom de câmera (arrastar/scroll), pausar/mudar velocidade, `[D]` toggle de debug. Clique (sem arrastar, distingue por distância percorrida desde o mousedown) seleciona o agente mais próximo do cursor em `uiState.selectedAgentId`; clicar fora de qualquer agente deseleciona.
+- **`ui/hud.js`** — controles de tempo, renderizado em `#hud` (DOM, fora do canvas). O painel de status mostra o agente selecionado (`uiState.selectedAgentId`, lido em `main.js`) em três estados: nada selecionado, vivo, ou morreu (evita o problema de antes: com painel sempre em `world.agents[0]`, a identidade mudava sozinha quando esse agente morria e era removido do array).
+- **`ui/inspector.js`** — painel de inspeção mais completo da entidade selecionada (scores das candidatas, estoque/demanda, tratados) — o essencial de "ver o que o agente selecionado está fazendo" já existe no `hud.js`; isto fica pra fatia 11.
 
 - **`utils/rng.js`**, **`mathUtils.js`**, **`constants.js`** — sem estado de jogo; helpers puros usados por qualquer módulo acima.
 
@@ -144,4 +151,4 @@ Abrir http://localhost:8000 — nenhum passo de build.
 
 ---
 
-Próximo passo: implementar a fatia 1 (mundo + render + loop de tempo + 1 agente andando aleatório) preenchendo os arquivos marcados `TODO (fatia 1)`.
+Status: fatias 1-7 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 8 (comércio entre vilas).

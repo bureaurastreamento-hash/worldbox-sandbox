@@ -1,14 +1,38 @@
 import { TIME_SPEEDS } from '../utils/constants.js';
 
-export function attachInputHandlers(canvas, camera, timeState, debugState) {
+const CLICK_MOVE_TOLERANCE = 5; // px de tela; abaixo disso um mouseup é clique, não arrasto
+const SELECT_RADIUS = 14; // px de tela
+
+function selectAgentAt(screenX, screenY, canvas, camera, world, uiState) {
+  let closest = null;
+  let closestDist = SELECT_RADIUS;
+
+  for (const agent of world.agents) {
+    const pos = camera.worldToScreen(agent.position.x, agent.position.y, canvas.width, canvas.height);
+    const d = Math.hypot(pos.x - screenX, pos.y - screenY);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = agent;
+    }
+  }
+
+  uiState.selectedAgentId = closest ? closest.id : null;
+}
+
+// context: { camera, timeState, debugState, world, uiState }
+export function attachInputHandlers(canvas, context) {
+  const { camera, timeState, debugState, world, uiState } = context;
+
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
+  let movedSinceDown = 0;
 
   canvas.addEventListener('mousedown', (e) => {
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
+    movedSinceDown = 0;
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -17,10 +41,15 @@ export function attachInputHandlers(canvas, camera, timeState, debugState) {
     const dy = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
+    movedSinceDown += Math.abs(dx) + Math.abs(dy);
     camera.pan(dx, dy);
   });
 
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (e) => {
+    if (dragging && movedSinceDown < CLICK_MOVE_TOLERANCE && world && uiState) {
+      const rect = canvas.getBoundingClientRect();
+      selectAgentAt(e.clientX - rect.left, e.clientY - rect.top, canvas, camera, world, uiState);
+    }
     dragging = false;
   });
   canvas.addEventListener('mouseleave', () => {

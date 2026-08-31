@@ -10,5 +10,5 @@ export function createTile(type) {
 }
 
 export function isWalkable(type) {
-  return type !== TILE_TYPES.WATER;
+  return type !== TILE_TYPES.WATER && type !== TILE_TYPES.MOUNTAIN;
 }

@@ -39,7 +39,7 @@ export function createHud(container, timeState) {
 
   const hint = document.createElement('div');
   hint.className = 'hud-hint';
-  hint.textContent = '[D] raio de percepção';
+  hint.textContent = '[D] raio de percepção · clique num personagem pra selecionar';
   container.appendChild(hint);
 
   const status = document.createElement('div');
@@ -76,8 +76,17 @@ export function createHud(container, timeState) {
 
   const STAGE_LABELS = { child: 'criança', adult: 'adulto', elder: 'idoso' };
 
-  function updateAgentStatus(agent) {
-    if (!agent) return;
+  // selectionState: 'none' (nada selecionado) | 'alive' | 'dead' (selecionado, mas morreu)
+  function updateAgentStatus(agent, selectionState) {
+    if (selectionState === 'none' || !agent) {
+      actionEl.textContent = '–';
+      ageEl.textContent = selectionState === 'dead' ? 'morreu' : 'clique num personagem';
+      hungerFill.style.width = '0%';
+      sleepFill.style.width = '0%';
+      healthFill.style.width = '0%';
+      return;
+    }
+
     actionEl.textContent = ACTION_LABELS[agent.currentAction] ?? '–';
     ageEl.textContent = `${Math.floor(agent.age)} (${STAGE_LABELS[agent.lifeStage] ?? '–'})`;
     hungerFill.style.width = `${agent.needs.hunger}%`;
