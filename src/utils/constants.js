@@ -24,6 +24,11 @@ export const PERCEPTION_RADIUS = 8; // tiles
 // direta sem mexer na lógica de decisão em si.
 export const AGENT_COUNT = 8;
 
+// Sorteado por agente (fundador ou nascido), fixo pra vida toda — só decide
+// qual sprite de guerreiro (render/agentRenderer.js) aparece durante `fight`;
+// não afeta gameplay, é puramente visual/cosmético.
+export const WARRIOR_TYPES = ['orc', 'elfo', 'cavaleiro'];
+
 export const CARRY_CAPACITY = 10; // unidades de recurso por viagem
 const GATHER_SECONDS = 8; // tempo pra encher a carga colhendo
 export const GATHER_RATE = CARRY_CAPACITY / GATHER_SECONDS;

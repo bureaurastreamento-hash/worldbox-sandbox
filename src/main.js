@@ -66,8 +66,7 @@ function spawnVillage({ id, name, tx, ty, specialization }) {
       // tempo de vida) — a causa real de população zerar era MAX_AGE curto
       // demais pra reprodução acompanhar, corrigido lá (utils/constants.js).
       age: FOUNDER_AGE + world.rng.range(0, 15),
-      skinTone: world.rng.next() < 0.5 ? 'light' : 'dark',
-      gender: world.rng.next() < 0.5 ? 'man' : 'woman',
+      rng: world.rng,
     });
 
     world.agents.push(agent);

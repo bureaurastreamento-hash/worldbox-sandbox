@@ -1,8 +1,19 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot de encerramento de sessão. Fatias 1-11 do roteiro (`DESIGN.md` §5) completas, mais três sistemas além do roteiro original: especialização de vila, diplomacia dinâmica entre clãs, e evolução da civilização (minério + construção). Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Tudo desta sessão está commitado e pushado.
+Snapshot de encerramento de sessão. Fatias 1-11 do roteiro (`DESIGN.md` §5) completas, mais três sistemas além do roteiro original: especialização de vila, diplomacia dinâmica entre clãs, e evolução da civilização (minério + construção + papéis visuais). Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Tudo desta sessão está commitado e pushado.
 
-## 1. O que foi implementado ou alterado nesta sessão
+## 0. Retomada desta sessão (papéis visuais por ação)
+
+Sessão retomada depois de uma pausa — leitura de `CLAUDE.md`/`DESIGN.md`/`ARCHITECTURE.md`/`STATUS.md` confirmou que o código batia com o documentado, sem divergência. Implementado o próximo passo já indicado (§5 item 1 da sessão anterior): **papéis visuais por ação**, integrando a leva de arte nova (`assets/Assets-testes-para-o-claude-testar/`) que só tinha sido commitada, não usada.
+
+Decisões perguntadas ao usuário antes de implementar (mapeamento sprite→ação não era 1:1 óbvio):
+- **Substitui de vez** as 4 variantes antigas de pele/gênero (não coexistem) — fora de combate todo agente é visualmente "Camponês".
+- Durante `fight`, o agente vira visualmente um guerreiro sorteado no nascimento (`agent.warriorType`: orc/elfo/cavaleiro, fixo pra vida toda, cosmético).
+- Ações sem pose específica na arte disponível (`eat`, `sleep`, `gather` de comida, `wander`, `flee`) caem no ciclo padrão parado/andando, sem aproximar com pose que não bate literalmente com a ação.
+
+Detalhe técnico completo em `DESIGN.md` §8 e `ARCHITECTURE.md` (`agent/agent.js`, `render/agentRenderer.js`). Testado subindo o servidor local e abrindo no Chrome: sprites carregam (nenhum fallback de círculo, o que já prova que os 9 arquivos novos existem com o nome certo), animação de andar alterna corretamente, população seguiu crescendo normalmente (60 comida, 9 população numa vila) sem erro no console. Não foi possível confirmar visualmente ao vivo cada pose específica (cortando árvore, minerando, guerreiro lutando) individualmente — selecionar um agente específico em movimento via automação de clique não deu certo em algumas tentativas (o agente já tinha se movido entre o clique e a leitura, mesmo pausado uma vez); a lógica de seleção de pose foi conferida lendo o código de cada action (`gatherWood.js`/`mine.js`/`build.js`/`fight.js`/`deliver.js`) pra confirmar que o gate `moving`/`currentAction` bate com o fluxo real de cada ação.
+
+## 1. O que foi implementado ou alterado na sessão anterior
 
 Nesta ordem:
 
@@ -36,12 +47,12 @@ Nesta ordem:
 | Life-cycle | ✅ Funcionando. Reprodução ajustada nesta sessão (ver §4) pra não zerar a população. |
 | Simulation LOD | ✅ Funcionando, corrigido pra escalar com zoom (era raio fixo, bug real). |
 | UI/HUD | ✅ HUD básico + inspetor completo (scores, vila, clã, seleção direta de vila). |
-| Sprites de agente | ✅ 4 variantes (pele clara/escura × homem/mulher), com animação de andar. |
-| Decoração do mapa | ⚠️ Placeholder geométrico funcionando. Arte real existe agora (`assets/Assets-testes-para-o-claude-testar/`) mas não está integrada. |
+| Sprites de agente | ✅ Pose por ação corrente (arte de `assets/Assets-testes-para-o-claude-testar/`), com animação de andar. Substituiu as 4 variantes antigas de pele/gênero. |
+| Decoração do mapa | ⚠️ Placeholder geométrico funcionando. Arte de terreno/decoração (água, arbustos, árvores) já existe na mesma leva mas ainda não está integrada — só a parte de agente (papéis visuais) foi. |
 | Especialização de vila | ✅ Funcionando (comida/madeira, sempre complementar). |
 | Minério (evolução) | ✅ Funcionando, mas mineração é lenta — depende de descoberta por acaso de depósito na percepção do agente. |
 | Construção (evolução) | ✅ Funcionando (mecânica testada isoladamente), mas **nunca observada completando** numa simulação de ~1h — pedra acumula devagar demais. |
-| Papéis visuais por ação | ❌ Não iniciado. Arte já existe (item 10 acima), falta decisão de mapeamento + integração no código. |
+| Papéis visuais por ação | ✅ Funcionando (ver §0). Camponês por ação (parado/andando/cortando árvore/minerando/construindo/levando tronco); guerreiro (orc/elfo/cavaleiro) durante `fight`. |
 | Ataque ofensivo/saque | ❌ Não iniciado. `village.raidTargetVillageId` já reservado em `village.js`. |
 | Animais no mapa | ❌ Não iniciado — decisão já tomada (decorativo simples primeiro, sem IA, só quando tiver arte). |
 
@@ -72,24 +83,24 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Papéis visuais por ação** (evolução da civilização, próximo passo confirmado com o usuário) — integrar a leva de arte em `assets/Assets-testes-para-o-claude-testar/`. Precisa de: (a) decidir com o usuário o mapeamento exato sprite→ação (ex.: `ComponesMineirando` quando `currentAction === 'mine'`, `ComponesConstruindo` quando `'build'`, `CavaleiroAtacando`/`ComponesAtacando` pra `fight`, etc. — nem toda ação tem uma pose 1:1 óbvia, perguntar antes de assumir); (b) decidir se isso substitui as 4 variantes atuais (`WMan`/`WGirl`/`BMan`/`BGirl`) ou coexiste com elas; (c) reaproveitar o padrão de recorte por alpha (`agentRenderer.js:computeContentBounds`) já existente.
+1. **Ataque ofensivo/saque** — guerra dinâmica ainda não tem efeito prático de tomar recurso à força. Implementar `agent/actions/raid.js`: agentes marcham deliberadamente até a vila inimiga (`village.raidTargetVillageId`, campo já reservado) e saqueiam estoque, reaproveitando `deliver.js` (genérico por `carryingType`) pro transporte de volta. Combate em rota emergiria sozinho do sistema `fight`/`flee` já existente.
 
-2. **Ataque ofensivo/saque** — guerra dinâmica ainda não tem efeito prático de tomar recurso à força. Implementar `agent/actions/raid.js`: agentes marcham deliberadamente até a vila inimiga (`village.raidTargetVillageId`, campo já reservado) e saqueiam estoque, reaproveitando `deliver.js` (genérico por `carryingType`) pro transporte de volta. Combate em rota emergiria sozinho do sistema `fight`/`flee` já existente.
+2. **Trocar o placeholder geométrico da decoração pela arte real** — a leva de arte nova (`assets/Assets-testes-para-o-claude-testar/`, já usada pros agentes desde §0) também inclui água/arbustos/palmeira/pinheiro/árvore pra decoração. Reescrever só `render/decorationRenderer.js` (dado de `world.decorations` não muda).
 
-3. **Trocar o placeholder geométrico da decoração pela arte real** — a leva de arte nova (item 1) já inclui água/arbustos/palmeira/pinheiro/árvore. Reescrever só `render/decorationRenderer.js` (dado de `world.decorations` não muda).
+3. **Confirmar a estabilidade populacional jogando de verdade** (não só simulação direta) — deixar o jogo rodando uma sessão real de 15-30+ minutos e observar se a população se mantém saudável nas 4 vilas, se alguma entra em colapso/extinção, e se o crescimento inicial rápido (32→69 em ~200s simulados nos testes) se estabiliza bem. Reportar o que acontecer antes de mexer em mais balanceamento.
 
-4. **Confirmar a estabilidade populacional jogando de verdade** (não só simulação direta) — deixar o jogo rodando uma sessão real de 15-30+ minutos e observar se a população se mantém saudável nas 4 vilas, se alguma entra em colapso/extinção, e se o crescimento inicial rápido (32→69 em ~200s simulados nos testes) se estabiliza bem. Reportar o que acontecer antes de mexer em mais balanceamento.
+4. **Ajustar ritmo de mineração/construção se parecer lento demais jogando** — considerar aumentar `PERCEPTION_RADIUS`, ou vilas nascerem mais perto de montanha, ou reduzir `HOUSE_STONE_COST`/`HOUSE_WOOD_COST`, dependendo do que a sessão de observação (item 3) mostrar.
 
-5. **Ajustar ritmo de mineração/construção se parecer lento demais jogando** — considerar aumentar `PERCEPTION_RADIUS`, ou vilas nascerem mais perto de montanha, ou reduzir `HOUSE_STONE_COST`/`HOUSE_WOOD_COST`, dependendo do que a sessão de observação (item 4) mostrar.
+5. **Ligar a fome individual do agente ao estoque da vila** — hoje `eat.js` sempre come direto do ambiente, então uma vila sem comida institucional nunca faz seus agentes passarem fome de verdade a nível individual. Mudança maior, mexe no loop de sobrevivência de todo agente — avaliar só depois dos itens acima estarem estáveis.
 
-6. **Ligar a fome individual do agente ao estoque da vila** — hoje `eat.js` sempre come direto do ambiente, então uma vila sem comida institucional nunca faz seus agentes passarem fome de verdade a nível individual. Mudança maior, mexe no loop de sobrevivência de todo agente — avaliar só depois dos itens acima estarem estáveis.
+6. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
 
-7. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
+7. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 3) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
 
-8. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 4) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
+8. **Considerar depois**: confirmar visualmente ao vivo (não só lendo o código) cada pose específica de ação dos papéis visuais (§0) — cortando árvore, minerando, construindo, guerreiro lutando — numa sessão de observação real; a automação de clique não conseguiu selecionar um agente específico em movimento pra checar isso durante o teste desta sessão.
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 
 - **Animais no mapa**: decoração parada por enquanto (mesmo tratamento de árvore/planta/casa); "vagando sem IA de utilidade" fica pra uma leva futura, só quando a arte estiver pronta. Não implementar comportamento de bicho ainda.
 - **Visuais em geral são provisórios** — o amigo do usuário vai substituindo a arte aos poucos, direto no disco (não via git). Registrado em `memory/art_pipeline.md` (memória do projeto, fora do repositório).
-- **A leva de arte nova** (`assets/Assets-testes-para-o-claude-testar/`) foi só commitada, não integrada — precisa de uma conversa sobre mapeamento sprite→ação/papel antes de mexer no código de renderização (ver §5, item 1).
+- **A leva de arte nova** (`assets/Assets-testes-para-o-claude-testar/`) já está integrada pro lado de agente (papéis visuais por ação, ver §0) — falta só o lado de decoração de mapa (água/arbustos/árvores, ver §5 item 2).

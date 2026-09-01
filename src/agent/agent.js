@@ -1,5 +1,6 @@
 import { createNeeds } from './needs.js';
 import { createMemory } from './memory.js';
+import { WARRIOR_TYPES } from '../utils/constants.js';
 
 export function createAgent({
   id,
@@ -7,14 +8,15 @@ export function createAgent({
   villageId = null,
   decisionTimer = 0,
   age = 0,
-  skinTone = 'light',
-  gender = 'man',
+  warriorType,
+  rng,
 }) {
   return {
     id,
     position: { x: position.x, y: position.y },
-    skinTone, // 'light' | 'dark' — escolhe o sprite (agentRenderer.js)
-    gender, // 'man' | 'woman' — escolhe o sprite (agentRenderer.js)
+    // 'orc' | 'elfo' | 'cavaleiro' — sprite de combate (render/agentRenderer.js),
+    // só aparece durante a ação `fight`. Sorteado se não vier explícito.
+    warriorType: warriorType ?? WARRIOR_TYPES[rng.int(0, WARRIOR_TYPES.length - 1)],
     target: null, // alvo de movimento da ação corrente; null = precisa escolher um
     path: null, // waypoints até target (agent/movement.js), calculado via pathfinding
     pathTargetKey: null,

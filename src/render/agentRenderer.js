@@ -1,31 +1,48 @@
-// Sprites provisórios do amigo do usuário — ver memória do projeto: isto vai
-// ser substituído aos poucos. Por variante (pele clara/escura x homem/mulher),
-// quadro 1 = parado, quadro 2 = passo de andar; alterna 1/2 enquanto o agente
-// se move de verdade, fica em 1 parado.
+// Sprites do amigo do usuário (assets/Assets-testes-para-o-claude-testar/) —
+// papel visual por AÇÃO corrente, não por facção/clã (ver DESIGN.md §8).
+// Substitui de vez as 4 variantes antigas de pele/gênero (WMan/WGirl/BMan/
+// BGirl, assets/sprites/) — decisão do usuário, perde aquela diversidade em
+// troca de refletir visualmente o que o agente está fazendo agora.
 //
-// As imagens são telas grandes com bastante espaço vazio ao redor do
-// personagem, e o conteúdo não fica no mesmo lugar/tamanho relativo em
-// todas — por isso o recorte do conteúdo real é calculado a partir do canal
-// alpha na hora de carregar, em vez de fixar coordenadas no código (isso
-// sobrevive à próxima troca de arte sem precisar mexer aqui).
-const VARIANT_FILE_PREFIX = {
-  'light-man': 'WMan',
-  'light-woman': 'WGirl',
-  'dark-man': 'BMan',
-  'dark-woman': 'BGirl',
-};
-const DEFAULT_VARIANT = 'light-man';
+// Fora de combate todo agente é "Camponês": pose dedicada quando a ação tem
+// uma óbvia (cortando árvore, minerando, construindo, levando tronco); ações
+// sem pose específica (comer, dormir, colher comida, vagar, fugir) caem no
+// ciclo padrão parado/andando. Durante `fight`, o agente vira visualmente o
+// guerreiro sorteado no nascimento (`agent.warriorType` — orc/elfo/cavaleiro,
+// fixo pra vida toda, ver agent/agent.js — é cosmético, não afeta combate).
+//
+// Mesmo tratamento de recorte por alpha de antes: as imagens têm espaço
+// vazio ao redor do personagem, calculado uma vez no load
+// (computeContentBounds), não fixado no código.
+const SPRITE_DIR = 'assets/Assets-testes-para-o-claude-testar';
 
-const spritesByVariant = {}; // variantKey -> [imgParado, imgAndando]
+const SPRITE_FILES = {
+  parado: 'ComponesParado',
+  andando: 'COmponesAndando',
+  cortandoArvore: 'ComponesCortandoArvore',
+  mineirando: 'ComponesMineirando',
+  construindo: 'ComponesConstruindo',
+  levandoTronco: 'ComponesLevandoOTroncoDaArvore',
+  orcAtacando: 'OrcAtacando',
+  elfoAtirando: 'ElfoAtirando',
+  cavaleiroAtacando: 'CavaleiroAtacando',
+};
+
+const WARRIOR_ATTACK_SPRITE_KEY = {
+  orc: 'orcAtacando',
+  elfo: 'elfoAtirando',
+  cavaleiro: 'cavaleiroAtacando',
+};
+
+const sprites = {}; // key -> Image
 let totalSprites = 0;
-for (const [variant, prefix] of Object.entries(VARIANT_FILE_PREFIX)) {
-  spritesByVariant[variant] = [1, 2].map((frame) => {
-    const img = new Image();
-    img.src = `assets/sprites/${prefix}${frame}.png`;
-    totalSprites++;
-    return img;
-  });
+for (const [key, file] of Object.entries(SPRITE_FILES)) {
+  const img = new Image();
+  img.src = `${SPRITE_DIR}/${file}.png`;
+  sprites[key] = img;
+  totalSprites++;
 }
+
 const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
 let spritesReady = 0;
 
@@ -59,13 +76,11 @@ function computeContentBounds(img) {
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-Object.values(spritesByVariant).forEach((frames) => {
-  frames.forEach((img) => {
-    img.onload = () => {
-      spriteBounds.set(img, computeContentBounds(img));
-      spritesReady++;
-    };
-  });
+Object.values(sprites).forEach((img) => {
+  img.onload = () => {
+    spriteBounds.set(img, computeContentBounds(img));
+    spritesReady++;
+  };
 });
 
 const WALK_FRAME_MS = 220; // troca de perna a cada tanto tempo, só enquanto anda
@@ -84,6 +99,26 @@ function isAgentMoving(agent) {
   const dx = agent.position.x - last.x;
   const dy = agent.position.y - last.y;
   return dx * dx + dy * dy > MOVE_EPSILON_SQ;
+}
+
+// Ação corrente (+ se está de fato se movendo agora) decide a pose. Ações
+// sem pose dedicada (eat, sleep, gather, wander, flee) caem no fallback
+// parado/andando no final — pedido explícito do usuário, sem aproximar com
+// poses que não batem literalmente com a ação.
+function pickSprite(agent, moving, walkFrame) {
+  if (agent.currentAction === 'fight') {
+    return sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]] ?? sprites.parado;
+  }
+  // Levando tronco cobre a viagem inteira de volta (não só parado entregando).
+  if (agent.currentAction === 'deliver' && agent.carryingType === 'wood') {
+    return sprites.levandoTronco;
+  }
+  if (!moving) {
+    if (agent.currentAction === 'gatherWood') return sprites.cortandoArvore;
+    if (agent.currentAction === 'mine') return sprites.mineirando;
+    if (agent.currentAction === 'build') return sprites.construindo;
+  }
+  return moving ? [sprites.parado, sprites.andando][walkFrame] : sprites.parado;
 }
 
 export function drawAgents(ctx, world, camera, selectedAgentId) {
@@ -106,9 +141,7 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
     }
 
     if (spritesLoaded) {
-      const variantKey = `${agent.skinTone}-${agent.gender}`;
-      const frames = spritesByVariant[variantKey] ?? spritesByVariant[DEFAULT_VARIANT];
-      const sprite = frames[moving ? walkFrame : 0];
+      const sprite = pickSprite(agent, moving, walkFrame);
       const bounds = spriteBounds.get(sprite);
       const h = (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom;
       const w = h * (bounds.w / bounds.h);

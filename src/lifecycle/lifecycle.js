@@ -51,8 +51,7 @@ export function tryReproduce(agentA, agentB, world, village) {
     villageId: village.id,
     decisionTimer: world.rng.range(0, 0.5),
     age: 0,
-    skinTone: world.rng.next() < 0.5 ? agentA.skinTone : agentB.skinTone,
-    gender: world.rng.next() < 0.5 ? 'man' : 'woman',
+    rng: world.rng,
   });
 
   world.agents.push(child);
