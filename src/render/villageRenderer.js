@@ -66,13 +66,22 @@ export function drawTerritories(ctx, world, camera) {
   }
 }
 
-export function drawVillages(ctx, world, camera) {
+export function drawVillages(ctx, world, camera, selectedVillageId) {
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
 
   for (const village of world.villages) {
     const pos = camera.worldToScreen(village.center.x, village.center.y, viewW, viewH);
     const size = Math.max(6, 10 * camera.zoom);
+
+    if (village.id === selectedVillageId) {
+      const ringR = Math.max(10, size * 0.9);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
 
     ctx.fillStyle = '#c9432b';
     ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);

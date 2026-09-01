@@ -1,8 +1,8 @@
-// Fatia 11: painel de inspeção do agente selecionado — mostra o score de
-// cada ação candidata (por que a decisão de utilidade escolheu a ação
-// atual), o estoque/demanda da vila dele e a postura/tratados do clã dele.
-// Não introduz seleção própria: reaproveita `uiState.selectedAgentId`
-// (input/inputHandler.js), o mesmo estado que já move o hud.js básico.
+// Fatia 11: painel de inspeção — mostra o score de cada ação candidata do
+// agente selecionado (por que a decisão de utilidade escolheu a ação
+// atual) e o estoque/demanda/postura/tratados da vila e do clã dele. Clicar
+// numa vila sem um agente selecionado (input/inputHandler.js) mostra só a
+// vila/clã, sem seção de agente.
 
 import { VILLAGE_POP_CAP } from '../utils/constants.js';
 import { getStance } from '../clan/clan.js';
@@ -22,9 +22,9 @@ const TREATY_LABELS = { alliance: 'aliança', defense_pact: 'pacto de defesa', n
 
 export function createInspector(container) {
   container.innerHTML = `
-    <div class="inspector-empty" data-field="empty">clique num personagem pra inspecionar</div>
+    <div class="inspector-empty" data-field="empty">clique num personagem ou numa vila pra inspecionar</div>
     <div class="inspector-body" data-field="body" hidden>
-      <div class="inspector-section">
+      <div class="inspector-section" data-field="agent-section">
         <div class="inspector-title">Agente — scores de decisão</div>
         <ul class="inspector-list" data-field="scores"></ul>
       </div>
@@ -43,6 +43,7 @@ export function createInspector(container) {
 
   const emptyEl = container.querySelector('[data-field="empty"]');
   const bodyEl = container.querySelector('[data-field="body"]');
+  const agentSectionEl = container.querySelector('[data-field="agent-section"]');
   const scoresEl = container.querySelector('[data-field="scores"]');
   const villageTitleEl = container.querySelector('[data-field="village-title"]');
   const villagePopEl = container.querySelector('[data-field="village-pop"]');
@@ -124,22 +125,29 @@ export function createInspector(container) {
     }
   }
 
-  // selectionState: 'none' | 'alive' | 'dead' — mesmo estado que hud.js usa.
-  function update(agent, selectionState, world) {
-    if (selectionState !== 'alive' || !agent) {
+  // selection: { agent, selectionState, village } — selectionState ('none' |
+  // 'alive' | 'dead') é sobre `agent`, o mesmo estado que hud.js usa;
+  // `village` vem de clique direto na vila (input/inputHandler.js), só
+  // preenchido quando não há agente selecionado (mutuamente exclusivos).
+  function update({ agent, selectionState, village: directVillage }, world) {
+    const hasAliveAgent = selectionState === 'alive' && !!agent;
+
+    if (!hasAliveAgent && !directVillage) {
       emptyEl.hidden = false;
-      emptyEl.textContent = selectionState === 'dead' ? 'personagem selecionado morreu' : 'clique num personagem pra inspecionar';
+      emptyEl.textContent =
+        selectionState === 'dead' ? 'personagem selecionado morreu' : 'clique num personagem ou numa vila pra inspecionar';
       bodyEl.hidden = true;
       return;
     }
 
     emptyEl.hidden = true;
     bodyEl.hidden = false;
+    agentSectionEl.hidden = !hasAliveAgent;
 
-    const village = world.villages.find((v) => v.id === agent.villageId) ?? null;
-    const clan = village ? world.clans.find((c) => c.id === village.clanId) ?? null : null;
+    const village = hasAliveAgent ? (world.villages.find((v) => v.id === agent.villageId) ?? null) : directVillage;
+    const clan = village ? (world.clans.find((c) => c.id === village.clanId) ?? null) : null;
 
-    renderScores(agent);
+    if (hasAliveAgent) renderScores(agent);
     renderVillage(village);
     renderClan(clan, world);
   }

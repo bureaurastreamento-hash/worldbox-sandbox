@@ -1,10 +1,14 @@
-import { TIME_SPEEDS } from '../utils/constants.js';
+import { TIME_SPEEDS, TILE_SIZE } from '../utils/constants.js';
 
 const CLICK_MOVE_TOLERANCE = 5; // px de tela; abaixo disso um mouseup é clique, não arrasto
 const SELECT_RADIUS = 14; // px de tela
 
-function selectAgentAt(screenX, screenY, canvas, camera, world, uiState) {
-  let closest = null;
+// Agente tem prioridade (clique mais específico); sem agente por perto,
+// clicar dentro do círculo de território de uma vila a seleciona — dá pra
+// inspecionar a vila/clã (ui/inspector.js) sem precisar de um agente vivo
+// selecionado. Os dois tipos de seleção são mutuamente exclusivos.
+function selectAt(screenX, screenY, canvas, camera, world, uiState) {
+  let closestAgent = null;
   let closestDist = SELECT_RADIUS;
 
   for (const agent of world.agents) {
@@ -12,11 +16,28 @@ function selectAgentAt(screenX, screenY, canvas, camera, world, uiState) {
     const d = Math.hypot(pos.x - screenX, pos.y - screenY);
     if (d < closestDist) {
       closestDist = d;
-      closest = agent;
+      closestAgent = agent;
     }
   }
 
-  uiState.selectedAgentId = closest ? closest.id : null;
+  if (closestAgent) {
+    uiState.selectedAgentId = closestAgent.id;
+    uiState.selectedVillageId = null;
+    return;
+  }
+
+  for (const village of world.villages) {
+    const pos = camera.worldToScreen(village.center.x, village.center.y, canvas.width, canvas.height);
+    const screenRadius = village.territory.radius * TILE_SIZE * camera.zoom;
+    if (Math.hypot(pos.x - screenX, pos.y - screenY) < screenRadius) {
+      uiState.selectedVillageId = village.id;
+      uiState.selectedAgentId = null;
+      return;
+    }
+  }
+
+  uiState.selectedAgentId = null;
+  uiState.selectedVillageId = null;
 }
 
 // context: { camera, timeState, debugState, world, uiState }
@@ -48,7 +69,7 @@ export function attachInputHandlers(canvas, context) {
   window.addEventListener('mouseup', (e) => {
     if (dragging && movedSinceDown < CLICK_MOVE_TOLERANCE && world && uiState) {
       const rect = canvas.getBoundingClientRect();
-      selectAgentAt(e.clientX - rect.left, e.clientY - rect.top, canvas, camera, world, uiState);
+      selectAt(e.clientX - rect.left, e.clientY - rect.top, canvas, camera, world, uiState);
     }
     dragging = false;
   });

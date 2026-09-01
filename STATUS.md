@@ -76,8 +76,6 @@ Todas as 11 fatias do `DESIGN.md` (seção 5) estão implementadas agora. O que 
 
 2. **Considerar depois** (não pedido ainda, mas decorre do que já existe): especialização de vila — é o que falta pro caso de design original ("guerreira depende de agrícola") ficar observável de verdade. Não é uma fatia própria no `DESIGN.md`; decidir com o usuário se/quando vira uma.
 
-3. **Considerar depois**: seleção direta de vila/clã (hoje o inspetor de vila/clã, §9, só aparece indiretamente via agente selecionado — clicar na vila/clã diretamente não é possível).
-
 ## 7. Sprites de variação integrados (feito nesta sessão)
 
 Consertado o bug crítico do fim da sessão anterior (`Human1.png`/`Human2.png` deletados sem substituição no código):
@@ -111,4 +109,5 @@ Painel novo, `#inspector` (topo direito, ao lado do HUD básico já existente no
   - Espelha os três estados do `hud.js` (nada selecionado / vivo / morreu).
 - `index.html`/`css/style.css`: div `#inspector` nova, painel fixo topo-direito, mesmo estilo visual do HUD (fundo escuro translúcido, borda cinza).
 - Testado ao vivo numa aba em primeiro plano: selecionado um agente colhendo recurso — painel mostrou `colhendo` no topo com 0.55, as outras 6 ações com score correto (a maioria 0.00), vila com `5/30` população e `food 0/100 · demanda 100%`, clã mostrando postura `guerra` com o clã vizinho e "nenhum tratado assinado". Deseleção (clique em área vazia) volta ao estado neutro corretamente. Sem erros de console.
-- Commitado e enviado pro `main` (site ao vivo já atualizado) — ver commit desta sessão.
+- **Seleção direta de vila** (adicionado na sequência, mesma sessão): clicar dentro do círculo de território de uma vila sem acertar um agente seleciona a vila (`uiState.selectedVillageId`), mostrando só as seções de vila/clã no inspetor (sem seção de agente); selecionar um agente depois limpa a seleção de vila e vice-versa (mutuamente exclusivos, `input/inputHandler.js:selectAt`). Anel de seleção branco no marcador da vila (`villageRenderer.js`), igual ao do agente. Testado ao vivo: clique num ponto vazio do território mostrou vila+clã sem seção de agente; clicar depois num agente trocou pra seleção de agente (com fallback "sem dados ainda" observado num agente sem `lastScores` ainda); clique fora de tudo deselecionou os dois. Sem erros de console em nenhum dos três casos.
+- Commitado e enviado pro `main` (site ao vivo já atualizado) — ver commits desta sessão.

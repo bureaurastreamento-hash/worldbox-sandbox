@@ -8,11 +8,11 @@ export function createRenderer(canvas, camera) {
   const ctx = canvas.getContext('2d');
 
   return {
-    render(world, debugState, selectedAgentId) {
+    render(world, debugState, selectedAgentId, selectedVillageId) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawTiles(ctx, world, camera);
       drawTerritories(ctx, world, camera);
-      drawVillages(ctx, world, camera);
+      drawVillages(ctx, world, camera, selectedVillageId);
       drawDecorations(ctx, world, camera);
       drawAgents(ctx, world, camera, selectedAgentId);
       if (debugState?.showPerception) drawPerceptionRadius(ctx, world, camera);

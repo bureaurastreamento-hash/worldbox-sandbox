@@ -127,7 +127,7 @@ window.addEventListener('resize', resizeCanvas);
 const renderer = createRenderer(canvas, camera);
 const timeState = createTimeState({ speed: 1 });
 const debugState = { showPerception: false };
-const uiState = { selectedAgentId: null };
+const uiState = { selectedAgentId: null, selectedVillageId: null };
 
 attachInputHandlers(canvas, { camera, timeState, debugState, world, uiState });
 const hud = createHud(document.getElementById('hud'), timeState);
@@ -175,7 +175,7 @@ const loop = createGameLoop({
     pruneDead(world);
   },
   render() {
-    renderer.render(world, debugState, uiState.selectedAgentId);
+    renderer.render(world, debugState, uiState.selectedAgentId, uiState.selectedVillageId);
 
     let selectionState = 'none';
     let selectedAgent = null;
@@ -183,8 +183,12 @@ const loop = createGameLoop({
       selectedAgent = world.agents.find((a) => a.id === uiState.selectedAgentId) ?? null;
       selectionState = selectedAgent ? 'alive' : 'dead';
     }
+    const selectedVillage = uiState.selectedVillageId
+      ? (world.villages.find((v) => v.id === uiState.selectedVillageId) ?? null)
+      : null;
+
     hud.updateAgentStatus(selectedAgent, selectionState);
-    inspector.update(selectedAgent, selectionState, world);
+    inspector.update({ agent: selectedAgent, selectionState, village: selectedVillage }, world);
   },
 });
 
