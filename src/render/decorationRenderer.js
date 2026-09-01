@@ -1,19 +1,22 @@
-// Árvore e planta usam arte real, quando existir (ver isSpriteReady abaixo)
-// — casa continua no placeholder geométrico até ter sprite de casa. A leva
-// de arte anterior (ArvoreComum/Pinheiro/Palmeira/Arbusto/ArbustoComida) foi
-// substituída durante a reorganização visual em andamento (ver STATUS.md) —
-// nenhuma variante nova foi selecionada ainda, então cai tudo no placeholder
-// por enquanto, de propósito. `world.decorations` (world/decorations.js) não
-// muda: cada entrada só tem { type, x, y }, então a variante de espécie é
-// escolhida na hora do desenho, determinística pela posição — mesma
-// decoração sempre cai na mesma variante entre frames, sem precisar guardar
-// isso nos dados.
+// Árvore e planta usam arte real do kenney_roguelike-rpg-pack (mesma fonte
+// da água/grama/areia, ver render/tileRenderer.js — mantém o traço
+// consistente no mapa inteiro). A leva anterior (ArvoreComum/Pinheiro/
+// Palmeira/Arbusto/ArbustoComida) foi substituída durante a reorganização
+// visual em andamento (ver STATUS.md): `ArvoreComum`/`Pinheiro` são os
+// mesmos nomes de arquivo de antes por coincidência de conceito, mas o
+// conteúdo é novo; `Palmeira` virou `ArvoreAzulada` (o pack não tinha
+// silhueta de palmeira, só uma variante de cor) e `ArbustoComida` virou
+// `Sebe` (não achamos arbusto com fruta, só uma 2ª silhueta de planta).
+// `world.decorations` (world/decorations.js) não muda: cada entrada só tem
+// { type, x, y }, então a variante de espécie é escolhida na hora do
+// desenho, determinística pela posição — mesma decoração sempre cai na
+// mesma variante entre frames, sem precisar guardar isso nos dados.
 
 // Pasta canônica de arte em uso — ver render/agentRenderer.js.
 const SPRITE_DIR = 'assets/sprites';
 
-const TREE_FILES = ['ArvoreComum', 'Pinheiro', 'Palmeira'];
-const PLANT_FILES = ['Arbusto', 'ArbustoComida'];
+const TREE_FILES = ['ArvoreComum', 'Pinheiro', 'ArvoreAzulada'];
+const PLANT_FILES = ['Arbusto', 'Sebe'];
 const VARIANTS_BY_TYPE = { tree: TREE_FILES, plant: PLANT_FILES };
 
 const sprites = {}; // filename -> Image
@@ -22,6 +25,18 @@ for (const file of [...TREE_FILES, ...PLANT_FILES]) {
   img.src = `${SPRITE_DIR}/${file}.png`;
   sprites[file] = img;
 }
+
+// Casa: sem sprite único disponível (o pack só tem casa em peças pra montar
+// construções maiores) — telhado + parede empilhados, mesma estrutura de 2
+// formas que o placeholder geométrico já usava (drawHousePlaceholder
+// abaixo), só que com pixel art de verdade em vez de cor lisa. Full-bleed
+// como água/grama/areia, sem padding — não precisa de recorte por alpha.
+const HOUSE_ROOF_FILE = 'CasaTelhado';
+const HOUSE_WALL_FILE = 'CasaParede';
+const houseRoofSprite = new Image();
+houseRoofSprite.src = `${SPRITE_DIR}/${HOUSE_ROOF_FILE}.png`;
+const houseWallSprite = new Image();
+houseWallSprite.src = `${SPRITE_DIR}/${HOUSE_WALL_FILE}.png`;
 
 const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
 
@@ -75,9 +90,8 @@ function pickVariant(list, x, y) {
   return list[Math.floor(h * list.length) % list.length];
 }
 
-// Placeholders geométricos: casa não tem sprite na leva de arte (fica assim
-// pra sempre); árvore/planta caem aqui só enquanto os sprites carregam, pra
-// não deixar o mapa vazio nos primeiros frames.
+// Placeholders geométricos: árvore/planta/casa caem aqui enquanto o sprite
+// real não carregou (ou não existe ainda) — não deixa o mapa vazio.
 function drawTreePlaceholder(ctx, x, y, size) {
   ctx.fillStyle = '#3b7a3b';
   ctx.beginPath();
@@ -97,7 +111,7 @@ function drawPlantPlaceholder(ctx, x, y, size) {
   ctx.fill();
 }
 
-function drawHouse(ctx, x, y, size) {
+function drawHousePlaceholder(ctx, x, y, size) {
   ctx.fillStyle = '#c8a366';
   ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size * 0.5);
   ctx.fillStyle = '#8a4b3b';
@@ -107,6 +121,15 @@ function drawHouse(ctx, x, y, size) {
   ctx.lineTo(x + size * 0.6, y - size * 0.5);
   ctx.closePath();
   ctx.fill();
+}
+
+// Telhado + parede empilhados, cada um esticado pro próprio tile (16x16
+// nativo, full-bleed) — mesma proporção 1:2 (altura:largura dobrada) que o
+// placeholder geométrico já usava.
+function drawHouseSprite(ctx, x, y, size) {
+  const half = size / 2;
+  ctx.drawImage(houseWallSprite, x - half, y - half, size, half);
+  ctx.drawImage(houseRoofSprite, x - half, y - size, size, half);
 }
 
 const PLACEHOLDER_BY_TYPE = { tree: drawTreePlaceholder, plant: drawPlantPlaceholder };
@@ -120,6 +143,7 @@ export function drawDecorations(ctx, world, camera) {
   const topLeft = camera.screenToWorld(0, 0, viewW, viewH);
   const bottomRight = camera.screenToWorld(viewW, viewH, viewW, viewH);
   const margin = 64;
+  ctx.imageSmoothingEnabled = false;
 
   for (const deco of world.decorations) {
     if (
@@ -135,7 +159,11 @@ export function drawDecorations(ctx, world, camera) {
     const size = (BASE_SIZE_BY_TYPE[deco.type] ?? 16) * camera.zoom;
 
     if (deco.type === 'house') {
-      drawHouse(ctx, pos.x, pos.y, size);
+      if (isSpriteReady(houseRoofSprite) && isSpriteReady(houseWallSprite)) {
+        drawHouseSprite(ctx, pos.x, pos.y, size);
+      } else {
+        drawHousePlaceholder(ctx, pos.x, pos.y, size);
+      }
       continue;
     }
 
@@ -149,7 +177,6 @@ export function drawDecorations(ctx, world, camera) {
 
     const h = size;
     const w = h * (bounds.w / bounds.h);
-    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(sprite, bounds.x, bounds.y, bounds.w, bounds.h, pos.x - w / 2, pos.y - h, w, h);
   }
 }

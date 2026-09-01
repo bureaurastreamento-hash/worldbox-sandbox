@@ -88,6 +88,16 @@ function isSpriteReady(img) {
   return !!img && img.complete && img.naturalWidth > 0;
 }
 
+// `sprite ?? fallback` não funciona aqui: toda entrada de `sprites` já é um
+// objeto Image (criado no load loop acima, mesmo pra arquivo que não existe
+// ainda) — nunca é null/undefined, só "carregado" ou "quebrado". Sem essa
+// checagem, uma pose sem arte nesta rodada (ex.: cortando árvore, minerando
+// — de propósito não incluídas ainda) caía direto no círculo de fallback em
+// vez de voltar pro ciclo parado/andando como devia.
+function orFallback(sprite, fallback) {
+  return isSpriteReady(sprite) ? sprite : fallback;
+}
+
 function computeContentBounds(img) {
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth;
@@ -176,19 +186,19 @@ function pickSprite(agent, moving, walkFrame) {
     // mesmo padrão de 2 quadros que Parado/Andando já usam pra caminhada —
     // em vez de virar um guerreiro de fantasia igual a quem foi de fato
     // designado pra lutar.
-    if (agent.role === 'warrior') return sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]] ?? sprites.parado;
-    return [sprites.atacandoCivil, sprites.defendendoCivil][walkFrame] ?? sprites.parado;
+    if (agent.role === 'warrior') return orFallback(sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]], sprites.parado);
+    return orFallback([sprites.atacandoCivil, sprites.defendendoCivil][walkFrame], sprites.parado);
   }
-  if (agent.currentAction === 'flee') return sprites.correndo ?? sprites.andando;
+  if (agent.currentAction === 'flee') return orFallback(sprites.correndo, sprites.andando);
   // Levando tronco cobre a viagem inteira de volta (não só parado entregando).
   if (agent.currentAction === 'deliver' && agent.carryingType === 'wood') {
-    return sprites.levandoTronco;
+    return orFallback(sprites.levandoTronco, sprites.parado);
   }
   if (!moving) {
-    if (agent.currentAction === 'gatherWood') return sprites.cortandoArvore;
-    if (agent.currentAction === 'mine') return sprites.mineirando;
-    if (agent.currentAction === 'fish') return sprites.pescando;
-    if (agent.currentAction === 'build') return sprites.construindo;
+    if (agent.currentAction === 'gatherWood') return orFallback(sprites.cortandoArvore, sprites.parado);
+    if (agent.currentAction === 'mine') return orFallback(sprites.mineirando, sprites.parado);
+    if (agent.currentAction === 'fish') return orFallback(sprites.pescando, sprites.parado);
+    if (agent.currentAction === 'build') return orFallback(sprites.construindo, sprites.parado);
   }
   // Guerreiro designado (agent.role, ver clan/clanDecision.js) mostra o
   // warriorType parado/andando em vez do ciclo padrão de Camponês, mesmo
@@ -196,7 +206,7 @@ function pickSprite(agent, moving, walkFrame) {
   // específica (checagem acima já retornou nesse caso).
   if (agent.role === 'warrior') {
     const key = moving ? WARRIOR_WALK_SPRITE_KEY[agent.warriorType] : WARRIOR_IDLE_SPRITE_KEY[agent.warriorType];
-    return sprites[key] ?? sprites.parado;
+    return orFallback(sprites[key], sprites.parado);
   }
   return moving ? [sprites.parado, sprites.andando][walkFrame] : sprites.parado;
 }

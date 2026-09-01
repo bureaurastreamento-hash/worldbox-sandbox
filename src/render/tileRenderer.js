@@ -8,6 +8,44 @@ const TILE_COLORS = {
   mountain: '#8a8a8a',
 };
 
+// Pasta canônica de arte em uso — ver render/agentRenderer.js.
+const SPRITE_DIR = 'assets/sprites';
+
+function isSpriteReady(img) {
+  return !!img && img.complete && img.naturalWidth > 0;
+}
+
+// Água/grama/areia: textura de tile inteiro (kenney_roguelike-rpg-pack),
+// desenhada de borda a borda por cima da cor de base — ao contrário dos
+// sprites de personagem/decoração, esses vêm de um tileset de verdade, sem
+// padding ao redor (conferido pixel a pixel antes de usar: bbox de alpha
+// bate exatamente com os 16x16 do arquivo), então não precisam do recorte
+// por alpha que o resto do jogo usa. Água anima entre 2 variantes bem
+// parecidas, bem devagar — é ambiente, não deve chamar atenção. Floresta e
+// montanha ainda não têm textura aprovada, ficam na cor lisa.
+const WATER_FRAME_MS = 900;
+const TERRAIN_TILE_FILES = {
+  water: ['Agua1', 'Agua2'],
+  grass: ['Grama'],
+  sand: ['Areia'],
+};
+
+const terrainSprites = {}; // tileType -> Image[]
+for (const [type, files] of Object.entries(TERRAIN_TILE_FILES)) {
+  terrainSprites[type] = files.map((file) => {
+    const img = new Image();
+    img.src = `${SPRITE_DIR}/${file}.png`;
+    return img;
+  });
+}
+
+function terrainSpriteFor(tileType) {
+  const frames = terrainSprites[tileType];
+  if (!frames) return null;
+  if (frames.length === 1) return frames[0];
+  return frames[Math.floor(performance.now() / WATER_FRAME_MS) % frames.length];
+}
+
 // Tile de montanha era uma cor lisa, sem nenhuma pista visual de qual dos 4
 // minérios tem ali — jogador só descobria pelo estoque da vila depois de um
 // agente já ter minerado. Ícone pequeno centralizado no tile, mesmo arquivo
@@ -16,15 +54,14 @@ const TILE_COLORS = {
 // escolhida por hash determinístico da posição do tile, mesmo padrão de
 // `decorationRenderer.js:pickVariant` pra árvore/planta.
 //
-// Reorganização visual em andamento (ver STATUS.md): montanha/minério
-// ficaram sem arte nova nesta rodada, de propósito — os arquivos abaixo não
-// existem ainda. isSpriteReady() trata isso graciosamente por tile.
-const RESOURCE_SPRITE_DIR = 'assets/sprites'; // pasta canônica de arte em uso, ver agentRenderer.js
+// Reorganização visual em andamento (ver STATUS.md): minério ficou sem arte
+// nova nesta rodada, de propósito — os arquivos abaixo não existem ainda.
+// isSpriteReady() trata isso graciosamente por tile.
 const RESOURCE_ICON_FILES = {
-  stone: [{ file: 'Pedra1', dir: RESOURCE_SPRITE_DIR }],
-  coal: [{ file: 'Carvao', dir: RESOURCE_SPRITE_DIR }],
-  iron: [{ file: 'Ferro', dir: RESOURCE_SPRITE_DIR }],
-  gold: [{ file: 'Ouro', dir: RESOURCE_SPRITE_DIR }],
+  stone: [{ file: 'Pedra1', dir: SPRITE_DIR }],
+  coal: [{ file: 'Carvao', dir: SPRITE_DIR }],
+  iron: [{ file: 'Ferro', dir: SPRITE_DIR }],
+  gold: [{ file: 'Ouro', dir: SPRITE_DIR }],
 };
 
 const resourceSprites = {}; // resource -> Image[]
@@ -34,10 +71,6 @@ for (const [resource, variants] of Object.entries(RESOURCE_ICON_FILES)) {
     img.src = `${dir}/${file}.png`;
     return img;
   });
-}
-
-function isSpriteReady(img) {
-  return !!img && img.complete && img.naturalWidth > 0;
 }
 
 // Mesmo hash de `decorationRenderer.js:pickVariant` — determinístico pela
@@ -83,22 +116,6 @@ Object.values(resourceSprites).flat().forEach((img) => {
   img.onload = () => resourceSpriteBounds.set(img, computeContentBounds(img));
 });
 
-// Água: cor lisa até ter um sprite aprovado nesta reorganização (nenhum
-// selecionado ainda). Quando tiver, recortar por alpha e desenhar por cima
-// da cor de base, igual ao ícone de minério acima — achado da leva anterior:
-// esticar o sprite pro tile inteiro sem recortar cria um grid preto feio nas
-// bordas (os sprites desse jogo têm padding, não são textura full-bleed).
-const WATER_FRAME_MS = 900; // troca de frame bem lenta quando houver mais de 1 variante — é ambiente, não deve chamar atenção
-const waterSprites = ['Agua1', 'Agua2', 'Agua3'].map((file) => {
-  const img = new Image();
-  img.src = `${RESOURCE_SPRITE_DIR}/${file}.png`;
-  return img;
-});
-const waterSpriteBounds = new Map(); // Image -> { x, y, w, h }
-waterSprites.forEach((img) => {
-  img.onload = () => waterSpriteBounds.set(img, computeContentBounds(img));
-});
-
 export function drawTiles(ctx, world, camera) {
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
@@ -112,24 +129,19 @@ export function drawTiles(ctx, world, camera) {
   const maxTy = Math.min(world.height - 1, Math.ceil(bottomRight.y / TILE_SIZE) + 1);
 
   const size = TILE_SIZE * camera.zoom;
-  const waterFrame = waterSprites[Math.floor(performance.now() / WATER_FRAME_MS) % waterSprites.length];
+  ctx.imageSmoothingEnabled = false;
 
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       const tile = world.tiles[ty][tx];
       const screenPos = camera.worldToScreen(tx * TILE_SIZE, ty * TILE_SIZE, viewW, viewH);
 
-      ctx.fillStyle = TILE_COLORS[tile.type] || '#000';
-      ctx.fillRect(screenPos.x, screenPos.y, size + 1, size + 1);
-
-      if (tile.type === 'water' && isSpriteReady(waterFrame)) {
-        const bounds = waterSpriteBounds.get(waterFrame);
-        const iconH = size * 0.85;
-        const iconW = iconH * (bounds.w / bounds.h);
-        const cx = screenPos.x + size / 2;
-        const cy = screenPos.y + size / 2;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(waterFrame, bounds.x, bounds.y, bounds.w, bounds.h, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
+      const terrainSprite = terrainSpriteFor(tile.type);
+      if (isSpriteReady(terrainSprite)) {
+        ctx.drawImage(terrainSprite, screenPos.x, screenPos.y, size + 1, size + 1);
+      } else {
+        ctx.fillStyle = TILE_COLORS[tile.type] || '#000';
+        ctx.fillRect(screenPos.x, screenPos.y, size + 1, size + 1);
       }
 
       if (tile.resource) {
@@ -140,7 +152,6 @@ export function drawTiles(ctx, world, camera) {
           const iconW = iconH * (bounds.w / bounds.h);
           const cx = screenPos.x + size / 2;
           const cy = screenPos.y + size / 2;
-          ctx.imageSmoothingEnabled = false;
           ctx.drawImage(sprite, bounds.x, bounds.y, bounds.w, bounds.h, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
         }
       }
