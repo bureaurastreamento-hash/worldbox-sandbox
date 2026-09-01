@@ -17,6 +17,10 @@ Em seguida, próximo passo já indicado pela sessão anterior (§5 item 1 de lá
 
 **Testado ao vivo desta vez** (não só leitura de código): subi o servidor local, deixei rodar a 4x até uma guerra escalar de verdade (Vila 1 × Vila 4, por desespero de comida/madeira sustentado). Confirmado visualmente: rótulo da vila mudou pra "· guerra", painel do clã mostrou "Clã da Vila 4: guerra". Vila 1 não tinha nenhum tratado de comércio assinado (`"nenhum tratado assinado"` no painel) e mesmo assim o `distress` de food e wood ficou resetando repetidamente pra "há 1s" ao longo de ~150s reais (~600s simulados) de observação, em vez de subir continuamente — como não havia comércio pra explicar reposição de estoque, é o sinal indireto mais forte possível de que o saque estava de fato completando o ciclo (marchar → saquear → `deliver.js` → `addStock`), interrompendo o déficit sustentado. Sem erro no console durante todo o teste. Não consegui confirmar 100% via seleção direta de um agente em ação de `raid` — a automação de clique não conseguiu selecionar um agente específico em movimento nesta sessão (mesma limitação já registrada em §0 pros papéis visuais), então essa é evidência indireta, não uma leitura direta de `agent.currentAction === 'raid'`.
 
+Por último, próximo passo indicado (§5 item 2 de então): **trocar o placeholder geométrico da decoração pela arte real**. `render/decorationRenderer.js` reescrito: árvore usa uma de 3 espécies (`ArvoreComum`/`Pinheiro`/`Palmeira`) e planta uma de 2 (`Arbusto`/`ArbustoComida`), variante escolhida por um hash determinístico da posição de cada decoração (não guardado em `world/decorations.js`, que continua sem mudar — mesmo padrão do resto do sistema). Casa **não** ganhou arte — a leva de `assets/Assets-testes-para-o-claude-testar/` não trouxe nenhum sprite de casa, então `drawHouse` (geométrico) continua sendo o único jeito de desenhá-la; documentado como limite conhecido, não pendência esquecida.
+
+Achado de processo, não do jogo: o primeiro teste ao vivo desta parte mostrou tela **totalmente preta** — a causa foi um `cd` de sessões anteriores (checando dimensão de arquivo) que deixou o diretório de trabalho do terminal dentro de `assets/Assets-testes-para-o-claude-testar/`, então o servidor local subiu servindo aquele diretório em vez da raiz do projeto. Depois de corrigir isso, um segundo problema apareceu: o Chrome manteve em cache uma versão antiga do módulo `decorationRenderer.js` entre navegações (o `python -m http.server` não manda `Cache-Control`), mascarada porque `read_console_messages`/`read_network_requests` desta sessão de automação não capturaram nem os `console.error` nem os pedidos de imagem de forma confiável — só um hard reload (`Ctrl+Shift+R`) resolveu e confirmou a arte de verdade na tela. Vale lembrar disso em testes futuros: depois de editar um arquivo servido por `http.server` e já ter aberto a página antes no mesmo Chrome, sempre hard-reload, não confiar só em "sem erro no console" como prova de que o código novo rodou.
+
 ## 1. O que foi implementado ou alterado na sessão anterior
 
 Nesta ordem:
@@ -52,7 +56,7 @@ Nesta ordem:
 | Simulation LOD | ✅ Funcionando, corrigido pra escalar com zoom (era raio fixo, bug real). |
 | UI/HUD | ✅ HUD básico + inspetor completo (scores, vila, clã, seleção direta de vila). |
 | Sprites de agente | ✅ Pose por ação corrente (arte de `assets/Assets-testes-para-o-claude-testar/`), com animação de andar. Substituiu as 4 variantes antigas de pele/gênero. |
-| Decoração do mapa | ⚠️ Placeholder geométrico funcionando. Arte de terreno/decoração (água, arbustos, árvores) já existe na mesma leva mas ainda não está integrada — só a parte de agente (papéis visuais) foi. |
+| Decoração do mapa | ✅ Árvore e planta com arte real (3 espécies de árvore, 2 de planta, variante por hash da posição). Casa continua no placeholder geométrico — sem sprite de casa na leva de arte. |
 | Especialização de vila | ✅ Funcionando (comida/madeira, sempre complementar). |
 | Minério (evolução) | ✅ Funcionando, mas mineração é lenta — depende de descoberta por acaso de depósito na percepção do agente. |
 | Construção (evolução) | ✅ Funcionando (mecânica testada isoladamente), mas **nunca observada completando** numa simulação de ~1h — pedra acumula devagar demais. |
@@ -89,17 +93,17 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 1. **Confirmar o saque com uma leitura direta de agente, não só evidência indireta** — o teste desta sessão (ver §0) já observou uma guerra real escalar e o `distress` resetar repetidamente sem comércio ativo (evidência forte de saque funcionando), mas não uma seleção direta de um agente com `currentAction === 'raid'` nem visualização de população zerando numa vila saqueada até o fim. Também falta checar se `RAID_SCORE` está bem calibrado numa sessão mais longa (nem esvazia a economia toda vez que há guerra, nem é ignorado).
 
-2. **Trocar o placeholder geométrico da decoração pela arte real** — a leva de arte nova (`assets/Assets-testes-para-o-claude-testar/`, já usada pros agentes desde §0) também inclui água/arbustos/palmeira/pinheiro/árvore pra decoração. Reescrever só `render/decorationRenderer.js` (dado de `world.decorations` não muda).
+2. **Confirmar a estabilidade populacional jogando de verdade** (não só simulação direta) — deixar o jogo rodando uma sessão real de 15-30+ minutos e observar se a população se mantém saudável nas 4 vilas, se alguma entra em colapso/extinção, e se o crescimento inicial rápido (32→69 em ~200s simulados nos testes) se estabiliza bem. Reportar o que acontecer antes de mexer em mais balanceamento.
 
-3. **Confirmar a estabilidade populacional jogando de verdade** (não só simulação direta) — deixar o jogo rodando uma sessão real de 15-30+ minutos e observar se a população se mantém saudável nas 4 vilas, se alguma entra em colapso/extinção, e se o crescimento inicial rápido (32→69 em ~200s simulados nos testes) se estabiliza bem. Reportar o que acontecer antes de mexer em mais balanceamento.
+3. **Ajustar ritmo de mineração/construção se parecer lento demais jogando** — considerar aumentar `PERCEPTION_RADIUS`, ou vilas nascerem mais perto de montanha, ou reduzir `HOUSE_STONE_COST`/`HOUSE_WOOD_COST`, dependendo do que a sessão de observação (item 2) mostrar.
 
-4. **Ajustar ritmo de mineração/construção se parecer lento demais jogando** — considerar aumentar `PERCEPTION_RADIUS`, ou vilas nascerem mais perto de montanha, ou reduzir `HOUSE_STONE_COST`/`HOUSE_WOOD_COST`, dependendo do que a sessão de observação (item 3) mostrar.
+4. **Ligar a fome individual do agente ao estoque da vila** — hoje `eat.js` sempre come direto do ambiente, então uma vila sem comida institucional nunca faz seus agentes passarem fome de verdade a nível individual. Mudança maior, mexe no loop de sobrevivência de todo agente — avaliar só depois dos itens acima estarem estáveis.
 
-5. **Ligar a fome individual do agente ao estoque da vila** — hoje `eat.js` sempre come direto do ambiente, então uma vila sem comida institucional nunca faz seus agentes passarem fome de verdade a nível individual. Mudança maior, mexe no loop de sobrevivência de todo agente — avaliar só depois dos itens acima estarem estáveis.
+5. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
 
-6. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
+6. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 2) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
 
-7. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 3) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
+7. **Considerar depois**: casa não tem sprite na leva de arte atual — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js` (mesmo padrão de árvore/planta).
 
 8. **Considerar depois**: confirmar visualmente ao vivo (não só lendo o código) cada pose específica de ação dos papéis visuais (§0) — cortando árvore, minerando, construindo, guerreiro lutando — numa sessão de observação real; a automação de clique não conseguiu selecionar um agente específico em movimento pra checar isso durante o teste desta sessão.
 
@@ -107,4 +111,4 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 - **Animais no mapa**: decoração parada por enquanto (mesmo tratamento de árvore/planta/casa); "vagando sem IA de utilidade" fica pra uma leva futura, só quando a arte estiver pronta. Não implementar comportamento de bicho ainda.
 - **Visuais em geral são provisórios** — o amigo do usuário vai substituindo a arte aos poucos, direto no disco (não via git). Registrado em `memory/art_pipeline.md` (memória do projeto, fora do repositório).
-- **A leva de arte nova** (`assets/Assets-testes-para-o-claude-testar/`) já está integrada pro lado de agente (papéis visuais por ação, ver §0) — falta só o lado de decoração de mapa (água/arbustos/árvores, ver §5 item 2).
+- **A leva de arte nova** (`assets/Assets-testes-para-o-claude-testar/`) já está integrada pro lado de agente (papéis visuais por ação) e pro lado de decoração de mapa (árvore/planta, ver §0) — falta só casa, que não tem sprite nessa leva (ver §5 item 7).
