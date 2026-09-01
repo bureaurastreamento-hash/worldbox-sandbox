@@ -79,16 +79,29 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
     (otherVillage.demand[distress.resource] ?? 0) <= TRADE_SURPLUS_DEMAND_MAX
   ) {
     setStance(clan, other, 'war');
+    village.raidTargetVillageId = otherVillage.id; // dá efeito prático à guerra, ver agent/actions/raid.js
     return;
   }
 
   // 2. Guerra que não é mais alimentada por desespero — propõe paz de volta.
   if (stance === 'war' && (!distress || distress.seconds < DISTRESS_WAR_THRESHOLD_SECONDS / 2)) {
     setStance(clan, other, 'neutral');
+    if (village.raidTargetVillageId === otherVillage.id) village.raidTargetVillageId = null;
     return;
   }
 
-  if (stance === 'war' || stance === 'tense' || stance === 'allied') return; // sem diplomacia econômica nesses casos
+  // Guerra que continua (não escalou nem esfriou agora): garante que exista
+  // um alvo de saque, mesmo se este par não foi quem acabou de declará-la
+  // (ex.: guerra reativada em outra reconsideração). Simplificação: só um
+  // alvo por vez, mesmo se em guerra com mais de um clã (mundo tem N vilas/
+  // clãs, mas raidTargetVillageId é singular, mesmo espírito de "1 vila por
+  // clã" já assumido no resto deste arquivo).
+  if (stance === 'war') {
+    if (!village.raidTargetVillageId) village.raidTargetVillageId = otherVillage.id;
+    return;
+  }
+
+  if (stance === 'tense' || stance === 'allied') return; // sem diplomacia econômica nesses casos
 
   // 3. Ainda não comercia com esse clã, precisa de um recurso que ele tem
   //    de sobra — propõe comércio.

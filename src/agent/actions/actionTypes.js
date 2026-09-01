@@ -8,7 +8,8 @@ import * as build from './build.js';
 import * as deliver from './deliver.js';
 import * as fight from './fight.js';
 import * as flee from './flee.js';
+import * as raid from './raid.js';
 
 // Cada módulo de ação exporta score(agent, world) e step(agent, world, dt).
 // decision.js consulta este registro para gerar/pontuar/executar candidatas.
-export const ACTION_TYPES = { wander, eat, sleep, gather, gatherWood, mine, build, deliver, fight, flee };
+export const ACTION_TYPES = { wander, eat, sleep, gather, gatherWood, mine, build, deliver, fight, flee, raid };

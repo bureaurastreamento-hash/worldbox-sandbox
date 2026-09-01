@@ -13,6 +13,10 @@ Decisões perguntadas ao usuário antes de implementar (mapeamento sprite→aç�
 
 Detalhe técnico completo em `DESIGN.md` §8 e `ARCHITECTURE.md` (`agent/agent.js`, `render/agentRenderer.js`). Testado subindo o servidor local e abrindo no Chrome: sprites carregam (nenhum fallback de círculo, o que já prova que os 9 arquivos novos existem com o nome certo), animação de andar alterna corretamente, população seguiu crescendo normalmente (60 comida, 9 população numa vila) sem erro no console. Não foi possível confirmar visualmente ao vivo cada pose específica (cortando árvore, minerando, guerreiro lutando) individualmente — selecionar um agente específico em movimento via automação de clique não deu certo em algumas tentativas (o agente já tinha se movido entre o clique e a leitura, mesmo pausado uma vez); a lógica de seleção de pose foi conferida lendo o código de cada action (`gatherWood.js`/`mine.js`/`build.js`/`fight.js`/`deliver.js`) pra confirmar que o gate `moving`/`currentAction` bate com o fluxo real de cada ação.
 
+Em seguida, próximo passo já indicado pela sessão anterior (§5 item 1 de lá): **ataque ofensivo/saque** (`agent/actions/raid.js`, novo). `clan/clanDecision.js` agora seta `village.raidTargetVillageId` quando escala pra guerra (limpa quando volta pra paz, ou garante um alvo se a guerra já estava rolando sem um setado ainda); agentes elegíveis (mesmo gate de `fight.js`: sem crianças, sem vida abaixo do limiar) marcham até o centro da vila inimiga e saqueiam o recurso com mais estoque de lá, reaproveitando `deliver.js` (genérico por `carryingType`) pro transporte de volta — nenhuma lógica de combate própria, `fight.js`/`flee.js` continuam cobrindo isso sozinhos com prioridade maior (`RAID_SCORE` fica abaixo de `FIGHT_SCORE`/`FLEE_SCORE`, acima do teto de `gather`/`mine`/`build`). Simplificação: só um alvo de saque por vez, mesmo em guerra com mais de um clã — mesmo espírito de "1 vila por clã" já assumido em `clanDecision.js`. Sem pose visual dedicada (cai no ciclo parado/andando padrão do Camponês, já que `raid` não fazia parte da leva de arte discutida em §0 acima). Detalhe técnico completo em `DESIGN.md` §7 e `ARCHITECTURE.md`.
+
+**Testado ao vivo desta vez** (não só leitura de código): subi o servidor local, deixei rodar a 4x até uma guerra escalar de verdade (Vila 1 × Vila 4, por desespero de comida/madeira sustentado). Confirmado visualmente: rótulo da vila mudou pra "· guerra", painel do clã mostrou "Clã da Vila 4: guerra". Vila 1 não tinha nenhum tratado de comércio assinado (`"nenhum tratado assinado"` no painel) e mesmo assim o `distress` de food e wood ficou resetando repetidamente pra "há 1s" ao longo de ~150s reais (~600s simulados) de observação, em vez de subir continuamente — como não havia comércio pra explicar reposição de estoque, é o sinal indireto mais forte possível de que o saque estava de fato completando o ciclo (marchar → saquear → `deliver.js` → `addStock`), interrompendo o déficit sustentado. Sem erro no console durante todo o teste. Não consegui confirmar 100% via seleção direta de um agente em ação de `raid` — a automação de clique não conseguiu selecionar um agente específico em movimento nesta sessão (mesma limitação já registrada em §0 pros papéis visuais), então essa é evidência indireta, não uma leitura direta de `agent.currentAction === 'raid'`.
+
 ## 1. O que foi implementado ou alterado na sessão anterior
 
 Nesta ordem:
@@ -38,12 +42,12 @@ Nesta ordem:
 | Perception | ✅ Funcionando (tiles + recurso de montanha + agentes, via índice espacial). |
 | Memory | ✅ Funcionando. |
 | Needs | ⚠️ Parcial. Só fome e sono das 5 necessidades originais do pitch. Fome é sempre do ambiente direto, nunca do estoque da vila (ver §6, item de fatia futura). |
-| Utility AI / Decision | ✅ Funcionando. 10 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `mine`, `build`, `deliver`, `fight`, `flee`. |
+| Utility AI / Decision | ✅ Funcionando. 11 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `mine`, `build`, `deliver`, `fight`, `flee`, `raid`. |
 | Pathfinding | ✅ Funcionando (A*). Montanha não é andável — ações que envolvem depósito de montanha miram o tile andável adjacente. |
 | Village (estoque/demanda/população) | ✅ Funcionando. 6 recursos (food/wood/stone/coal/iron/gold). Teto de população dinâmico via `getPopulationCap` (base + bônus por casa construída). |
 | Clan/Diplomacy | ✅ Funcionando e **dinâmico**: guerra/paz/comércio/troca de parceiro reavaliados periodicamente por clã, reagindo à economia real. N vilas/clãs (hoje 4), não mais só 2. |
 | Trade/Economy | ✅ Observável — especialização faz a demanda divergir de verdade; diplomacia dinâmica propõe/rompe tratados sozinha, não só no setup inicial. |
-| Combat | ⚠️ Parcial. Engajar/fugir/dano/morte funcionam. Só reativo (sem ataque ofensivo deliberado) — guerra pode ser declarada dinamicamente por desespero, mas sem efeito de saque. |
+| Combat | ✅ Engajar/fugir/dano/morte reativos + ataque ofensivo deliberado (`agent/actions/raid.js`): guerra declarada por desespero agora tem efeito prático de saque via `village.raidTargetVillageId`. |
 | Life-cycle | ✅ Funcionando. Reprodução ajustada nesta sessão (ver §4) pra não zerar a população. |
 | Simulation LOD | ✅ Funcionando, corrigido pra escalar com zoom (era raio fixo, bug real). |
 | UI/HUD | ✅ HUD básico + inspetor completo (scores, vila, clã, seleção direta de vila). |
@@ -53,12 +57,12 @@ Nesta ordem:
 | Minério (evolução) | ✅ Funcionando, mas mineração é lenta — depende de descoberta por acaso de depósito na percepção do agente. |
 | Construção (evolução) | ✅ Funcionando (mecânica testada isoladamente), mas **nunca observada completando** numa simulação de ~1h — pedra acumula devagar demais. |
 | Papéis visuais por ação | ✅ Funcionando (ver §0). Camponês por ação (parado/andando/cortando árvore/minerando/construindo/levando tronco); guerreiro (orc/elfo/cavaleiro) durante `fight`. |
-| Ataque ofensivo/saque | ❌ Não iniciado. `village.raidTargetVillageId` já reservado em `village.js`. |
+| Ataque ofensivo/saque | ✅ Funcionando (ver §0). `village.raidTargetVillageId` setado/limpo por `clanDecision.js`; agentes marcham e saqueiam via `raid.js`. Testado ao vivo (guerra real escalou, evidência indireta forte de saque completando o ciclo); falta confirmação direta por seleção de agente. |
 | Animais no mapa | ❌ Não iniciado — decisão já tomada (decorativo simples primeiro, sem IA, só quando tiver arte). |
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
 
-1. **Combate é só reativo** — vilas em guerra só brigam se territórios se cruzarem organicamente. Guerra declarada dinamicamente por desespero econômico não tem efeito prático de saque/invasão ainda.
+1. ~~Combate é só reativo~~ **Resolvido nesta sessão** (ver §0) — `agent/actions/raid.js` dá efeito prático de saque à guerra declarada dinamicamente; testado ao vivo com uma guerra real escalando (evidência indireta forte de que o ciclo saque→entrega funciona, ver §0), mas sem confirmação direta por seleção de agente ainda.
 2. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa (diplomacia dinâmica reage a cada 20-30s por clã) — funciona corretamente, não crasha, mas pode precisar de mais amortecimento (histerese) se parecer caótico demais jogando de verdade.
 3. **Vilas com população zerada continuam participando da diplomacia** como se tivessem gente (propõem/recebem tratados, podem entrar em guerra) — não crasha, mas é uma inconsistência observável.
 4. **Mineração e construção são lentas** — minério depende de descoberta por acaso de um tile de montanha do tipo certo; em ~1h simulada de teste, nenhuma casa chegou a ser construída em nenhuma vila (pedra nunca acumulou o suficiente por tempo suficiente). Funciona, mas pode ser insatisfatório numa sessão de jogo real.
@@ -83,7 +87,7 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Ataque ofensivo/saque** — guerra dinâmica ainda não tem efeito prático de tomar recurso à força. Implementar `agent/actions/raid.js`: agentes marcham deliberadamente até a vila inimiga (`village.raidTargetVillageId`, campo já reservado) e saqueiam estoque, reaproveitando `deliver.js` (genérico por `carryingType`) pro transporte de volta. Combate em rota emergiria sozinho do sistema `fight`/`flee` já existente.
+1. **Confirmar o saque com uma leitura direta de agente, não só evidência indireta** — o teste desta sessão (ver §0) já observou uma guerra real escalar e o `distress` resetar repetidamente sem comércio ativo (evidência forte de saque funcionando), mas não uma seleção direta de um agente com `currentAction === 'raid'` nem visualização de população zerando numa vila saqueada até o fim. Também falta checar se `RAID_SCORE` está bem calibrado numa sessão mais longa (nem esvazia a economia toda vez que há guerra, nem é ignorado).
 
 2. **Trocar o placeholder geométrico da decoração pela arte real** — a leva de arte nova (`assets/Assets-testes-para-o-claude-testar/`, já usada pros agentes desde §0) também inclui água/arbustos/palmeira/pinheiro/árvore pra decoração. Reescrever só `render/decorationRenderer.js` (dado de `world.decorations` não muda).
 

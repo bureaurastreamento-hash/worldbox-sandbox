@@ -176,6 +176,13 @@ export const FIGHT_SCORE = 0.85;
 export const FLEE_SCORE = 0.9; // foge tem prioridade um pouco maior que lutar
 export const FLEE_HEALTH_THRESHOLD = 35; // abaixo disso (%), foge em vez de lutar
 
+// Ordem institucional de saque (village.raidTargetVillageId, ver
+// clan/clanDecision.js e agent/actions/raid.js) — abaixo de FIGHT_SCORE/
+// FLEE_SCORE de propósito, pra combate reativo real sempre poder interromper
+// a marcha; acima de gather/mine/build (mesmo no pico de demanda), pra
+// guerra puxar gente de verdade da economia enquanto durar.
+export const RAID_SCORE = 0.65;
+
 // Índice espacial: tamanho de célula igual ao raio de percepção garante que
 // uma busca por vizinhos só precise olhar a célula do agente + as 8 ao redor.
 export const SPATIAL_CELL_SIZE = PERCEPTION_RADIUS * TILE_SIZE;
