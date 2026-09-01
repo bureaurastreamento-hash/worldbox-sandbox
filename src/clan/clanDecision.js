@@ -17,10 +17,39 @@ import {
   DISTRESS_WAR_THRESHOLD_SECONDS,
   TRADE_SURPLUS_DEMAND_MAX,
   PARTNER_SWITCH_MARGIN,
+  WARRIOR_ROLE_FRACTION,
 } from '../utils/constants.js';
 
 function getClanVillage(world, clan) {
   return world.villages.find((v) => v.clanId === clan.id) ?? null;
+}
+
+function isClanAtWar(clan) {
+  return Object.values(clan.stanceByClan).includes('war');
+}
+
+// Atribui/revoga agent.role = 'warrior' pra uma fração dos adultos elegíveis
+// da vila — ver WARRIOR_ROLE_FRACTION. Chamado nas transições de postura
+// (escalar pra guerra / voltar pra paz) e a cada reconsideração enquanto a
+// guerra continua (topa quem cresceu — filho virou adulto — sem mexer em
+// quem já é guerreiro, evitando flicker de papel a cada chamada).
+function updateWarriorRoles(village, world, atWar) {
+  const members = village.population.map((id) => world.agents.find((a) => a.id === id)).filter((a) => a?.alive);
+
+  if (!atWar) {
+    for (const agent of members) agent.role = 'civilian';
+    return;
+  }
+
+  const eligible = members.filter((a) => a.lifeStage !== 'child');
+  const target = Math.round(eligible.length * WARRIOR_ROLE_FRACTION);
+  const alreadyWarriors = eligible.filter((a) => a.role === 'warrior').length;
+  if (alreadyWarriors >= target) return;
+
+  const candidates = world.rng.shuffle(eligible.filter((a) => a.role !== 'warrior'));
+  for (let i = 0; i < candidates.length && alreadyWarriors + i < target; i++) {
+    candidates[i].role = 'warrior';
+  }
 }
 
 // Recurso mais desesperado da vila agora ({ resource, seconds }), ou null
@@ -88,6 +117,7 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
   ) {
     setStance(clan, other, 'war');
     village.raidTargetVillageId = otherVillage.id; // dá efeito prático à guerra, ver agent/actions/raid.js
+    updateWarriorRoles(village, world, true);
     return;
   }
 
@@ -95,6 +125,9 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
   if (stance === 'war' && (!distress || distress.seconds < DISTRESS_WAR_THRESHOLD_SECONDS / 2)) {
     setStance(clan, other, 'neutral');
     if (village.raidTargetVillageId === otherVillage.id) village.raidTargetVillageId = null;
+    // Postura com ESSE clã virou paz, mas o clã pode seguir em guerra com um
+    // terceiro — só desmobiliza de vez se não sobrou nenhuma guerra.
+    updateWarriorRoles(village, world, isClanAtWar(clan));
     return;
   }
 
@@ -106,6 +139,7 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
   // clã" já assumido no resto deste arquivo).
   if (stance === 'war') {
     if (!village.raidTargetVillageId) village.raidTargetVillageId = otherVillage.id;
+    updateWarriorRoles(village, world, true); // topa quem cresceu virou adulto desde a última vez
     return;
   }
 

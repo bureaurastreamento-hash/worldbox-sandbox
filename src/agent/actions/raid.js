@@ -9,7 +9,7 @@
 // parado/andando, igual toda ação sem uma óbvia — decisão já tomada pra
 // papéis visuais (DESIGN.md §8), raid.js não fazia parte daquela leva.
 
-import { CARRY_CAPACITY, GATHER_RATE, RAID_SCORE, FLEE_HEALTH_THRESHOLD } from '../../utils/constants.js';
+import { CARRY_CAPACITY, GATHER_RATE, RAID_SCORE, FLEE_HEALTH_THRESHOLD, WARRIOR_ROLE_SCORE_BONUS } from '../../utils/constants.js';
 import { getVillage } from '../../world/world.js';
 import { addStock } from '../../village/stock.js';
 import { moveToward, clearMovement } from '../movement.js';
@@ -20,7 +20,7 @@ export function score(agent, world) {
   const village = getVillage(world, agent.villageId);
   if (!village || !village.raidTargetVillageId) return 0;
   if (!getVillage(world, village.raidTargetVillageId)) return 0; // alvo sumiu
-  return RAID_SCORE;
+  return agent.role === 'warrior' ? RAID_SCORE + WARRIOR_ROLE_SCORE_BONUS : RAID_SCORE;
 }
 
 // Recurso com mais estoque na vila alvo agora — sem preferência por tipo,

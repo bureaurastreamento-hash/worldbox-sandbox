@@ -84,6 +84,17 @@ export const EAT_RESTORE_PER_FOOD = 100 / 15 / EAT_FOOD_PER_SEC;
 // comunitário antes de virar crítica (ver agent/actions/gather.js).
 export const GATHER_SCORE_WEIGHT = 0.55;
 
+// Pesca (agent/actions/fish.js): universal, como mineração — qualquer vila
+// pesca em água, sem gate de especialização. Pedido do usuário: atenuar
+// (não substituir) a dependência de comércio de uma vila madeireira, que
+// hoje não produz comida própria de nenhuma outra forma. Peso menor que
+// GATHER_SCORE_WEIGHT de propósito — pra uma vila agrícola, colher grama
+// (produção "de verdade" da especialização) ainda deve vencer pescar na
+// maioria das situações; pesca fica como complemento/fallback, não
+// substitui `village/trade.js` como via principal de alívio pra quem não
+// produz comida.
+export const FISH_SCORE_WEIGHT = 0.4;
+
 // Minérios: universais (qualquer vila colhe, sem gate de especialização como
 // food/wood) — material de construção, não recurso de sobrevivência. Por
 // isso ficam fora de CRITICAL_RESOURCES (utils/constants.js): não alimentam
@@ -106,6 +117,13 @@ export const MOUNTAIN_RESOURCE_WEIGHTS = { stone: 0.6, coal: 0.2, iron: 0.15, go
 // (clan/clanDecision.js, village/stock.js) — é sobre sobrevivência (pilar 4
 // do design), não sobre minério de construção.
 export const CRITICAL_RESOURCES = ['food', 'wood'];
+
+// Segundos de tempo simulado que um agente morto continua em `world.agents`
+// (mas fora da simulação — checkDeath já não faz nada com `alive: false`)
+// antes de `lifecycle.js:pruneDead` remover de vez. Sem isso, o agente
+// sumia da tela no mesmo tick da morte — não dava tempo nenhum de mostrar
+// o sprite de morto (render/agentRenderer.js).
+export const DEATH_LINGER_SECONDS = 3;
 
 // Construção (agent/actions/build.js): casa consome madeira+pedra do
 // estoque comunitário e aumenta o teto de população da vila que a construiu
@@ -218,6 +236,24 @@ export const CHAOS_NEEDS_DECAY_MULTIPLIER = 1.6; // fome/sono decaem mais rápid
 // pelo menos isso mais alta que a do parceiro atual — evita ficar trocando
 // de parceiro a cada reconsideração por uma diferença mínima.
 export const PARTNER_SWITCH_MARGIN = 0.2;
+
+// Papel de guerreiro (agent.role — fecha uma lacuna do modelo de dados
+// original do DESIGN.md, que já previa `role: farmer | warrior | builder`
+// nunca implementado). Emergente pela demanda de defesa da vila, mesmo
+// espírito de especialização de vila: quando o clã entra em guerra
+// (clan/clanDecision.js), uma fração dos adultos elegíveis vira guerreiro —
+// visualmente permanente (render/agentRenderer.js mostra o sprite parado/
+// andando do warriorType sorteado no nascimento, não só durante `fight`) e
+// com um pequeno bônus de prioridade pra combate/saque (ver
+// WARRIOR_ROLE_SCORE_BONUS). Reverte pra civil quando a paz volta.
+export const WARRIOR_ROLE_FRACTION = 0.3;
+// Somado a FIGHT_SCORE/RAID_SCORE só pra quem tem role 'warrior' — pequeno
+// de propósito, é prioridade extra pra quem já foi designado, não uma
+// reescrita do equilíbrio entre economia e combate (RAID_SCORE já fica
+// deliberadamente entre FIGHT_SCORE/FLEE_SCORE e o teto de gather/mine/
+// build, ver comentário ali). flee.js não ganha bônus — já é score 0 pra
+// qualquer adulto saudável, papel nenhum deveria sobrepor autopreservação.
+export const WARRIOR_ROLE_SCORE_BONUS = 0.1;
 
 export const COMBAT_DAMAGE_PER_SEC = 6; // dano mútuo por segundo em combate corpo a corpo
 export const MELEE_RANGE = TILE_SIZE * 1.2; // px de mundo pra contar como "adjacente"

@@ -227,7 +227,7 @@ const loop = createGameLoop({
       updateVillageReproduction(v, world, dt);
     }
 
-    pruneDead(world);
+    pruneDead(world, dt);
   },
   render() {
     renderer.render(world, debugState, uiState.selectedAgentId, uiState.selectedVillageId);
@@ -235,7 +235,10 @@ const loop = createGameLoop({
     let selectionState = 'none';
     let selectedAgent = null;
     if (uiState.selectedAgentId) {
-      selectedAgent = world.agents.find((a) => a.id === uiState.selectedAgentId) ?? null;
+      // Agente morto continua em world.agents durante o "linger" da animação
+      // de morte (lifecycle.js:pruneDead) — sem o `a.alive`, o inspetor/HUD
+      // achava que ele ainda tava vivo até o corpo sumir de vez.
+      selectedAgent = world.agents.find((a) => a.id === uiState.selectedAgentId && a.alive) ?? null;
       selectionState = selectedAgent ? 'alive' : 'dead';
     }
     const selectedVillage = uiState.selectedVillageId

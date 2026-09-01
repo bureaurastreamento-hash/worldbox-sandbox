@@ -35,5 +35,7 @@ export function createAgent({
     lifeStage: 'child', // corrigido pelo primeiro ageAgent() do tick, ver lifecycle.js
     alive: true,
     health: 100,
+    deathLinger: 0, // segundos desde a morte; ver DEATH_LINGER_SECONDS e lifecycle.js:pruneDead
+    role: 'civilian', // 'civilian' | 'warrior' — emergente pela demanda de defesa, ver clan/clanDecision.js
   };
 }

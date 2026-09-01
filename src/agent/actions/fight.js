@@ -3,13 +3,14 @@
 // ainda mais alto.
 
 import { distance, tileToWorld, worldToTile } from '../../utils/mathUtils.js';
-import { TILE_SIZE, MELEE_RANGE, FIGHT_SCORE, FLEE_HEALTH_THRESHOLD } from '../../utils/constants.js';
+import { TILE_SIZE, MELEE_RANGE, FIGHT_SCORE, FLEE_HEALTH_THRESHOLD, WARRIOR_ROLE_SCORE_BONUS } from '../../utils/constants.js';
 import { findNearestEnemy, resolveEngagement } from '../../combat/combat.js';
 import { moveToward } from '../movement.js';
 
 export function score(agent, world) {
   if (agent.lifeStage === 'child' || agent.health < FLEE_HEALTH_THRESHOLD) return 0;
-  return findNearestEnemy(agent, world) ? FIGHT_SCORE : 0;
+  if (!findNearestEnemy(agent, world)) return 0;
+  return agent.role === 'warrior' ? FIGHT_SCORE + WARRIOR_ROLE_SCORE_BONUS : FIGHT_SCORE;
 }
 
 export function step(agent, world, dt) {

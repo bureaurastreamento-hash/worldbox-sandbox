@@ -6,11 +6,13 @@ const ACTION_LABELS = {
   sleep: 'dormindo',
   gather: 'colhendo',
   gatherWood: 'colhendo madeira',
+  fish: 'pescando',
   mine: 'minerando',
   build: 'construindo',
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',
+  raid: 'saqueando',
 };
 
 export function createHud(container, timeState) {
@@ -92,7 +94,8 @@ export function createHud(container, timeState) {
       return;
     }
 
-    actionEl.textContent = ACTION_LABELS[agent.currentAction] ?? '–';
+    const roleSuffix = agent.role === 'warrior' ? ' (guerreiro)' : '';
+    actionEl.textContent = (ACTION_LABELS[agent.currentAction] ?? '–') + roleSuffix;
     ageEl.textContent = `${Math.floor(agent.age)} (${STAGE_LABELS[agent.lifeStage] ?? '–'})`;
     hungerFill.style.width = `${agent.needs.hunger}%`;
     sleepFill.style.width = `${agent.needs.sleep}%`;

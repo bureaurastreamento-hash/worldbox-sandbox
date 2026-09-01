@@ -4,12 +4,18 @@
 // BGirl, assets/sprites/) — decisão do usuário, perde aquela diversidade em
 // troca de refletir visualmente o que o agente está fazendo agora.
 //
-// Fora de combate todo agente é "Camponês": pose dedicada quando a ação tem
-// uma óbvia (cortando árvore, minerando, construindo, levando tronco); ações
-// sem pose específica (comer, dormir, colher comida, vagar, fugir) caem no
-// ciclo padrão parado/andando. Durante `fight`, o agente vira visualmente o
-// guerreiro sorteado no nascimento (`agent.warriorType` — orc/elfo/cavaleiro,
-// fixo pra vida toda, ver agent/agent.js — é cosmético, não afeta combate).
+// Um civil (`agent.role === 'civilian'`, a maioria) é "Camponês" fora de
+// combate: pose dedicada quando a ação tem uma óbvia (cortando árvore,
+// minerando, construindo, levando tronco, pescando); ações sem pose
+// específica (comer, dormir, colher comida, vagar, fugir) caem no ciclo
+// padrão parado/andando. Um guerreiro designado (`agent.role === 'warrior'`,
+// ver clan/clanDecision.js — emergente pela demanda de defesa da vila, não
+// fixo) mostra o warriorType sorteado no nascimento (`agent.warriorType` —
+// orc/elfo/cavaleiro, fixo pra vida toda) parado/andando o tempo todo nesse
+// papel, não só durante `fight` — mesmas poses de trabalho ainda têm
+// prioridade quando aplicável (um guerreiro que também está minerando
+// mostra minerando). Morto (`!agent.alive`) sempre mostra o sprite de
+// corpo, independente de papel ou última ação — ver DEATH_LINGER_SECONDS.
 //
 // Mesmo tratamento de recorte por alpha de antes: as imagens têm espaço
 // vazio ao redor do personagem, calculado uma vez no load
@@ -23,10 +29,27 @@ const SPRITE_FILES = {
   mineirando: 'ComponesMineirando',
   construindo: 'ComponesConstruindo',
   levandoTronco: 'ComponesLevandoOTroncoDaArvore',
+  pescando: 'ComponesPescando',
+  morto: 'ComponesMorto',
   orcAtacando: 'OrcAtacando',
   elfoAtirando: 'ElfoAtirando',
   cavaleiroAtacando: 'CavaleiroAtacando',
+  orcParado: 'OrcParado',
+  orcAndando: 'OrcAndando',
+  elfoParado: 'ElfoParado',
+  elfoAndando: 'ElfoAndando',
+  cavaleiroParado: 'CavaleiroParado',
+  cavaleiroCorrendo: 'CavaleiroCorrendo',
 };
+
+// Papel de guerreiro (agent.role, ver clan/clanDecision.js) fora de fight:
+// mostra o warriorType sorteado no nascimento parado/andando, em vez do
+// ciclo padrão de Camponês — permanente enquanto durar o papel, não só
+// durante o combate em si (isso já é o WARRIOR_ATTACK_SPRITE_KEY abaixo).
+// Cavaleiro não tem um "Andando" na leva de arte, só "Correndo" — mesmo
+// papel visual, nome de arquivo diferente.
+const WARRIOR_IDLE_SPRITE_KEY = { orc: 'orcParado', elfo: 'elfoParado', cavaleiro: 'cavaleiroParado' };
+const WARRIOR_WALK_SPRITE_KEY = { orc: 'orcAndando', elfo: 'elfoAndando', cavaleiro: 'cavaleiroCorrendo' };
 
 const WARRIOR_ATTACK_SPRITE_KEY = {
   orc: 'orcAtacando',
@@ -127,6 +150,9 @@ function isAgentMoving(agent) {
 // parado/andando no final — pedido explícito do usuário, sem aproximar com
 // poses que não batem literalmente com a ação.
 function pickSprite(agent, moving, walkFrame) {
+  // Corpo durante o "linger" antes de pruneDead remover de vez (ver
+  // DEATH_LINGER_SECONDS, lifecycle.js) — sem pose por ação, já morreu.
+  if (!agent.alive) return sprites.morto;
   if (agent.currentAction === 'fight') {
     return sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]] ?? sprites.parado;
   }
@@ -137,7 +163,16 @@ function pickSprite(agent, moving, walkFrame) {
   if (!moving) {
     if (agent.currentAction === 'gatherWood') return sprites.cortandoArvore;
     if (agent.currentAction === 'mine') return sprites.mineirando;
+    if (agent.currentAction === 'fish') return sprites.pescando;
     if (agent.currentAction === 'build') return sprites.construindo;
+  }
+  // Guerreiro designado (agent.role, ver clan/clanDecision.js) mostra o
+  // warriorType parado/andando em vez do ciclo padrão de Camponês, mesmo
+  // fora de fight — mas só quando não há uma pose de trabalho mais
+  // específica (checagem acima já retornou nesse caso).
+  if (agent.role === 'warrior') {
+    const key = moving ? WARRIOR_WALK_SPRITE_KEY[agent.warriorType] : WARRIOR_IDLE_SPRITE_KEY[agent.warriorType];
+    return sprites[key] ?? sprites.parado;
   }
   return moving ? [sprites.parado, sprites.andando][walkFrame] : sprites.parado;
 }
