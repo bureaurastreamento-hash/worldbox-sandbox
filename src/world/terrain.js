@@ -5,6 +5,7 @@
 
 import { createRng } from '../utils/rng.js';
 import { TILE_TYPES, createTile } from './tile.js';
+import { MOUNTAIN_RESOURCE_WEIGHTS } from '../utils/constants.js';
 
 const NOISE_SCALE = 18; // tiles por "feature" de terreno
 const OCTAVES = 5;
@@ -71,6 +72,19 @@ function elevationToType(elevation) {
   return TILE_TYPES.MOUNTAIN;
 }
 
+// Recurso de um tile de montanha, determinístico por posição (mesmo padrão
+// dos outros geradores aqui: função pura de coordenada + seed, sem consumir
+// uma sequência de rng por tile). Cumulativo sobre MOUNTAIN_RESOURCE_WEIGHTS.
+function resourceForMountain(tx, ty, seed) {
+  const roll = hash2D(tx, ty, seed + 911);
+  let acc = 0;
+  for (const [resource, weight] of Object.entries(MOUNTAIN_RESOURCE_WEIGHTS)) {
+    acc += weight;
+    if (roll < acc) return resource;
+  }
+  return 'stone';
+}
+
 // 1 no interior do mapa, cai suavemente pra 0 perto da borda mais próxima.
 function edgeFalloff(tx, ty, width, height) {
   const marginTiles = Math.floor(Math.min(width, height) * EDGE_MARGIN_FRACTION);
@@ -91,7 +105,10 @@ export function generateTerrain({ seed, width, height }) {
     for (let tx = 0; tx < width; tx++) {
       const rawElevation = fractalNoise(tx / NOISE_SCALE, ty / NOISE_SCALE, noiseSeed);
       const elevation = rawElevation * edgeFalloff(tx, ty, width, height);
-      row.push(createTile(elevationToType(elevation)));
+      const type = elevationToType(elevation);
+      const tile = createTile(type);
+      if (type === TILE_TYPES.MOUNTAIN) tile.resource = resourceForMountain(tx, ty, noiseSeed);
+      row.push(tile);
     }
     tiles.push(row);
   }

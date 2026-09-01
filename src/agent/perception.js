@@ -21,7 +21,7 @@ export function scanPerception(agent, world) {
       const tx = curTx + dx;
       const ty = curTy + dy;
       const tile = getTileAt(world, tx, ty);
-      if (tile) tiles.push({ tx, ty, type: tile.type });
+      if (tile) tiles.push({ tx, ty, type: tile.type, resource: tile.resource });
     }
   }
 

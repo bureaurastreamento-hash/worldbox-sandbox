@@ -13,6 +13,7 @@ const ACTION_LABELS = {
   sleep: 'dormindo',
   gather: 'colhendo',
   gatherWood: 'colhendo madeira',
+  mine: 'minerando',
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',

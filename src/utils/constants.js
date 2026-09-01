@@ -29,6 +29,22 @@ export const VILLAGE_WOOD_CAPACITY = 100;
 // comunitário antes de virar crítica (ver agent/actions/gather.js).
 export const GATHER_SCORE_WEIGHT = 0.55;
 
+// Minérios: universais (qualquer vila colhe, sem gate de especialização como
+// food/wood) — material de construção, não recurso de sobrevivência. Por
+// isso ficam fora de CRITICAL_RESOURCES (utils/constants.js): não alimentam
+// distress/guerra/colapso da diplomacia dinâmica (clan/clanDecision.js,
+// village/stock.js), só o comércio genérico e a construção (fatia seguinte).
+export const MINING_RESOURCES = ['stone', 'coal', 'iron', 'gold'];
+export const VILLAGE_MINERAL_CAPACITY = 50;
+// Proporção de cada minério nos tiles de montanha (world/terrain.js) —
+// cumulativo: stone até 0.6, coal até 0.8, iron até 0.95, gold o resto.
+export const MOUNTAIN_RESOURCE_WEIGHTS = { stone: 0.6, coal: 0.2, iron: 0.15, gold: 0.05 };
+
+// Únicos recursos que contam pra desespero/guerra/colapso institucional
+// (clan/clanDecision.js, village/stock.js) — é sobre sobrevivência (pilar 4
+// do design), não sobre minério de construção.
+export const CRITICAL_RESOURCES = ['food', 'wood'];
+
 // Idades em segundos de tempo simulado (mesmo relógio dos needs), não anos —
 // pra dar pra observar uma vida inteira numa sessão de teste.
 export const CHILD_ADULT_AGE = 20;

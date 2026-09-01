@@ -6,6 +6,8 @@ export const TILE_TYPES = {
   MOUNTAIN: 'mountain',
 };
 
+// `resource` é opcional — só tiles de montanha ganham um (stone/coal/iron/
+// gold), atribuído por world/terrain.js:resourceForMountain na geração.
 export function createTile(type) {
   return { type };
 }
