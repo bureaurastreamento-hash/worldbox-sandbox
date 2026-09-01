@@ -15,19 +15,23 @@ function isSpriteReady(img) {
   return !!img && img.complete && img.naturalWidth > 0;
 }
 
-// Água/grama/areia: textura de tile inteiro (kenney_roguelike-rpg-pack),
-// desenhada de borda a borda por cima da cor de base — ao contrário dos
-// sprites de personagem/decoração, esses vêm de um tileset de verdade, sem
-// padding ao redor (conferido pixel a pixel antes de usar: bbox de alpha
-// bate exatamente com os 16x16 do arquivo), então não precisam do recorte
-// por alpha que o resto do jogo usa. Água anima entre 2 variantes bem
-// parecidas, bem devagar — é ambiente, não deve chamar atenção. Floresta e
-// montanha ainda não têm textura aprovada, ficam na cor lisa.
+// Água/grama/areia/floresta/montanha: textura de tile inteiro
+// (kenney_roguelike-rpg-pack), desenhada de borda a borda por cima da cor
+// de base — ao contrário dos sprites de personagem/decoração, esses vêm de
+// um tileset de verdade, sem padding ao redor (conferido pixel a pixel
+// antes de usar: bbox de alpha bate exatamente com os 16x16 do arquivo),
+// então não precisam do recorte por alpha que o resto do jogo usa. Água
+// anima entre 2 variantes bem parecidas, bem devagar — é ambiente, não deve
+// chamar atenção. Floresta usa um padrão com textura cinza pra ficar
+// inequivocamente diferente da grama de relance (uma opção de verde só
+// ligeiramente mais escuro foi descartada por ficar sutil demais).
 const WATER_FRAME_MS = 900;
 const TERRAIN_TILE_FILES = {
   water: ['Agua1', 'Agua2'],
   grass: ['Grama'],
   sand: ['Areia'],
+  forest: ['Floresta'],
+  mountain: ['Montanha'],
 };
 
 const terrainSprites = {}; // tileType -> Image[]
@@ -52,11 +56,9 @@ function terrainSpriteFor(tileType) {
 // que ui/inspector.js usa pro estoque. Cada recurso é uma lista de
 // variantes (hoje sempre 1, estrutura pronta pra mais quando aprovado) —
 // escolhida por hash determinístico da posição do tile, mesmo padrão de
-// `decorationRenderer.js:pickVariant` pra árvore/planta.
-//
-// Reorganização visual em andamento (ver STATUS.md): minério ficou sem arte
-// nova nesta rodada, de propósito — os arquivos abaixo não existem ainda.
-// isSpriteReady() trata isso graciosamente por tile.
+// `decorationRenderer.js:pickVariant` pra árvore/planta. Ícones do mesmo
+// kenney_roguelike-rpg-pack usado pro terreno (gold é pepitas, não a gema
+// facetada — mantém o estilo "minério bruto" consistente com os outros 3).
 const RESOURCE_ICON_FILES = {
   stone: [{ file: 'Pedra1', dir: SPRITE_DIR }],
   coal: [{ file: 'Carvao', dir: SPRITE_DIR }],

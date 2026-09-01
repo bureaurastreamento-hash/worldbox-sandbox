@@ -1,6 +1,6 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do estado atual. Sessão iniciada depois da pausa registrada em `034a2dc`. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Commits desta sessão: `76503cf`..`205077b` (14 commits) — commitados, push ainda pendente desta última leva. Contexto de antes desta sessão (fatias 1-11 do roteiro, especialização de vila, diplomacia dinâmica, minério/construção, papéis visuais, decoração com arte real, fome ligada ao estoque) não é repetido em detalhe aqui — ver `DESIGN.md` e o histórico de commits até `034a2dc`.
+Snapshot do estado atual. Sessão iniciada depois da pausa registrada em `034a2dc`. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Commits desta sessão: `76503cf`..HEAD (16 commits, todos pushados). Contexto de antes desta sessão (fatias 1-11 do roteiro, especialização de vila, diplomacia dinâmica, minério/construção, papéis visuais, decoração com arte real, fome ligada ao estoque) não é repetido em detalhe aqui — ver `DESIGN.md` e o histórico de commits até `034a2dc`.
 
 ## 1. O que foi implementado ou alterado nesta sessão
 
@@ -24,13 +24,19 @@ Nesta ordem:
     - **Personagem base** (substitui Camponês): `Swordsman_lvl1` (mesma família do Cavaleiro, nível mais fraco/menos blindado pra diferenciar civil de guerreiro) — parado, andando, civil-em-combate (ataque/defesa alternando, sem virar guerreiro de fantasia), fuga, morto.
     - **Elfo**: sem arte, decisão aceita — cai no guerreiro genérico (mesmo comportamento de antes de qualquer arte de guerreiro existir), pendência bloqueada por falta de asset, mesmo padrão que já valia pra casa.
     - Bug real corrigido durante o processo: o gate de "sprites carregados" em `agentRenderer.js`/`decorationRenderer.js`/`tileRenderer.js` era global — um único sprite nunca carregando travava **todos** os agentes/decorações no fallback geométrico pra sempre, mesmo os com arte nova pronta. Trocado por checagem individual (`isSpriteReady`). Depois, achado um segundo bug relacionado: `sprite ?? fallback` nunca funcionava pra pose sem arte nesta rodada (cortando árvore, minerando, pescando, construindo, levando tronco), porque toda entrada de `sprites` já é um objeto `Image` (nunca `null`/`undefined`) — corrigido com `orFallback()` baseado em `isSpriteReady()` de verdade.
-    - **Apanhado geral contra a lista original de 8 categorias** (terreno, recurso/minério, personagem base, guerreiros, civil em combate, fuga, morto, decoração de mapa): a reorganização **não está 100% completa** — ver §3 item 1 pra a lista exata do que sobrou.
+    - **Apanhado geral contra a lista original de 8 categorias** (terreno, recurso/minério, personagem base, guerreiros, civil em combate, fuga, morto, decoração de mapa) entregue ao usuário: sobrava floresta (nunca proposta), montanha e ícone de minério (adiados por decisão explícita) e elfo (idem). Usuário decidiu fechar floresta/montanha/minério agora (item 13) e manter só elfo como pendência aceita.
+13. **Floresta, montanha e ícones de minério fechados** (implementado, testado ao vivo): mesmo `kenney_roguelike-rpg-pack` dos itens anteriores.
+    - **Floresta** (`Floresta.png`): padrão de quadrados cinza sobre verde — escolhido em vez de uma opção de verde só ligeiramente mais escuro que a grama, que ficava sutil demais pra diferenciar de relance (confirmado por comparação de RGB médio antes de perguntar ao usuário).
+    - **Montanha** (`Montanha.png`): cinza-azulado claro com textura sutil, mesma linha do spritesheet que grama/areia.
+    - **Ícones de minério** (`Pedra1`/`Carvao`/`Ferro`/`Ouro.png`): pedra cinza, rocha escura com brasa, pedrinhas prateadas, pepitas de ouro (escolhidas em vez de uma gema facetada, pra manter o estilo "minério bruto" consistente com os outros 3) — sobrepostos no tile de montanha, mesmo padrão de recorte-por-alpha já usado.
+    - `render/tileRenderer.js`: `TERRAIN_TILE_FILES` ganha `forest`/`mountain`; `RESOURCE_ICON_FILES` já apontava pros nomes de arquivo certos (preparado numa rodada anterior), só faltavam os arquivos.
+    - **Reorganização visual encerrada por ora** (decisão do usuário) — só elfo (guerreiro) segue como pendência de arte aceita, ver `ROADMAP.md` §2.4.
 
 ## 2. Estado atual por sistema
 
 | Sistema | Estado |
 |---|---|
-| World/Terrain | ✅ Funcionando. Água/grama/areia com textura real; floresta/montanha ainda cor lisa. |
+| World/Terrain | ✅ Funcionando. Água/grama/areia/floresta/montanha, todos com textura real. |
 | Time loop | ✅ Funcionando. |
 | Camera/Render | ✅ Funcionando. Zoom mínimo "contain". |
 | Perception | ✅ Funcionando (raio 12 tiles). |
@@ -45,11 +51,11 @@ Nesta ordem:
 | Life-cycle | ✅ Funcionando. Morte tem instante de corpo visível antes de sumir. |
 | Simulation LOD | ✅ Funcionando, escala com zoom. |
 | UI/HUD | ✅ HUD + inspetor + feed de eventos (guerra/paz/comércio/morte/nascimento/casa). Ícone de minério na lista de estoque; sufixo "(guerreiro)" na ação. |
-| Sprites de agente | ✅ Reorganização visual completa (item 12): personagem base + guerreiro Cavaleiro/Orc novos, offset anti-empilhamento, morto, papel permanente. Elfo pendente (sem arte, aceito). |
+| Sprites de agente | ✅ Reorganização visual completa (itens 12-13): personagem base + guerreiro Cavaleiro/Orc novos, offset anti-empilhamento, morto, papel permanente. Elfo pendente (sem arte, aceito, única pendência de arte restante). |
 | Decoração do mapa | ✅ Árvore (3)/planta (2)/casa, arte nova (`kenney_roguelike-rpg-pack`). |
 | Água | ✅ Textura de tile animada (2 quadros), arte nova. |
 | Especialização de vila | ✅ Funcionando. |
-| Minério (evolução) | ✅ Mecânica funcionando; ícone visual **pendente** (sem arte nesta reorganização, decisão explícita de adiar). |
+| Minério (evolução) | ✅ Mecânica funcionando; ícone visual também pronto (item 13). |
 | Construção (evolução) | ✅ Mecânica funcionando, custo reduzido; casa agora com arte real. Ainda sem confirmação de uma casa completando de ponta a ponta numa sessão real. |
 | Pesca | ✅ Funcionando — score/seleção de ação confirmados ao vivo; entrega completa não observada diretamente. |
 | Papel de guerreiro | ⚠️ Implementado, não confirmado numa guerra real ao vivo. |
@@ -60,7 +66,7 @@ Nesta ordem:
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
 
-1. **Reorganização visual incompleta contra a lista original de 8 categorias** — sobrou: **floresta** (tile de terreno — nunca chegou a ser proposto, diferente de montanha/minério que foram adiados por decisão explícita); **montanha** (tile de terreno, decisão explícita de adiar); **minério** (ícone de recurso, decisão explícita de adiar); **elfo** (guerreiro, decisão explícita de adiar, pendência aceita). Ver `ROADMAP.md` §2.4 pro detalhe.
+1. **Elfo sem arte própria** — cai no guerreiro genérico, decisão explícita aceita (mesmo padrão que a casa já teve enquanto não tinha sprite). Única categoria visual da lista original de 8 que ainda não tem arte nova — ver `ROADMAP.md` §2.4.
 2. **Orc destoa visualmente do resto do jogo** (sprite de perfil, resto é visto de cima/frente) — aceito por enquanto, guerra tem pouco tempo de tela; considerar trocar se incomodar numa sessão real.
 3. **Papel de guerreiro e animação de morte não foram confirmados numa guerra/morte real ao vivo** — nenhum dos dois eventos ocorreu nas janelas de teste automatizado disponíveis.
 4. **Pesca confirmada só por score/seleção de ação, não pela entrega completa**.
@@ -81,14 +87,31 @@ Nesta ordem:
 - **Elfo sem arte, mesmo tratamento que casa já tinha** (pendência bloqueada por asset, não decisão de design) — usuário aceitou explicitamente, cai no guerreiro genérico.
 - **`Swordsman_lvl1` pro personagem base (civil), `lvl3` reservado pro Cavaleiro** — decisão do usuário: mesma família de personagem, mas nível de equipamento diferencia civil de guerreiro sem trocar de pack.
 - **`orFallback()` com `isSpriteReady()` em vez de `??`** — decisão do Claude dentro do escopo aprovado, necessária pra "sem pose específica cai no ciclo parado/andando" funcionar de verdade (sem isso, mostrava o círculo de fallback).
+- **Floresta com padrão de textura em vez de verde escuro sutil** — usuário escolheu entre as duas opções apresentadas depois que o Claude sinalizou o risco (RGB médio só ~12% mais escuro que a grama) de a opção "mais fiel ao conceito" ficar imperceptível de relance.
+- **Ícone de ouro como pepitas em vez de gema facetada** — usuário escolheu a opção recomendada pelo Claude, por manter o estilo "minério bruto" consistente com stone/coal/iron (todos formato pedra/nugget, não joia).
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Fechar o que sobrou da reorganização visual, se o usuário quiser continuar**: floresta, montanha, minério, elfo (ver §3 item 1) — nenhum tem candidato aprovado ainda.
-2. **Retomar o brainstorm de features** (`ROADMAP.md` §2.3) quando o visual estiver considerado redondo o suficiente.
-3. **Jogar uma sessão real de 15-30+ minutos** — confirmar papel de guerreiro numa guerra real, corpo numa morte real, pesca enchendo o estoque, uma casa completando, e agora também avaliar o visual novo por inteiro (inclusive se o Orc incomoda).
-4. **Recalibrar a frequência/amortecimento de troca guerra↔paz** se uma sessão real mostrar isso como problema de sensação de jogo.
-5. **Confirmar visualmente saque e o indicador `💀 extinta`** numa sessão real.
+1. **Sessão de jogo real do usuário, 15-30+ minutos, 4 vilas visíveis** — próximo passo imediato, ver checklist dedicado abaixo (item 1.1). Cobre tanto as confirmações mecânicas pendentes (guerreiro/morte/pesca/casa) quanto uma avaliação honesta do visual novo por inteiro, incluindo o Orc destoando.
+2. **Retomar o brainstorm de features** (`ROADMAP.md` §2.3) só depois dessa sessão — combinado com o usuário, pausado até lá.
+3. **Recalibrar a frequência/amortecimento de troca guerra↔paz** se a sessão real mostrar isso como problema de sensação de jogo.
+4. **Elfo** — só retomar a busca de arte se o usuário pedir; por ora é pendência aceita.
+
+### 5.1 Checklist pra sessão de observação do usuário
+
+Confirmações mecânicas pendentes (implementadas, nunca vistas ao vivo numa sessão longa de verdade):
+- **Guerra real**: um clã escala pra guerra de verdade; guerreiros designados aparecem com o sprite de guerreiro (Cavaleiro/Orc) mesmo fora do combate; o Orc aparecendo lá — ele destoa visualmente na prática (perfil vs. resto de cima/frente) tanto quanto pareceu na prévia estática, ou é menos perceptível em movimento?
+- **Morte**: um agente morre e o corpo (`ComponesMorto`) fica visível por ~3s antes de sumir, em vez de desaparecer instantaneamente.
+- **Pesca**: o estoque de comida (`food`) de uma vila madeireira sobe especificamente por pesca (não só por comércio).
+- **Construção**: uma casa completa de ponta a ponta (`village.buildings` ganha uma entrada), teto de população sobe.
+- **Saque**: um agente em `raid` sendo visto direto no inspetor, estoque da vila saqueada caindo.
+- **Indicador `💀 extinta`**: aparece no mapa se alguma vila for a zero de população.
+
+Avaliação honesta do visual novo por inteiro (primeira vez sendo visto numa sessão de jogo de verdade, não só em prévia estática):
+- Terreno (água/grama/areia/floresta/montanha) lido com clareza à distância, em zoom normal de jogo — floresta se distingue de grama sem precisar aproximar?
+- Ícones de minério (stone/coal/iron/gold) legíveis no tile de montanha durante o jogo real.
+- Cavaleiro/Orc/personagem-base coerentes entre si andando pelo mapa — e o Orc especificamente: incomoda na prática ou passa despercebido?
+- Decoração (árvore/planta/casa) e o conjunto todo junto, impressão geral: "visualmente pobre" (como estava antes desta rodada) ainda se aplica, ou já resolveu o suficiente?
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 
