@@ -35,4 +35,10 @@ Then open http://localhost:8000
 
 ## Status
 
-Repositório em fase de planejamento — ver `DESIGN.md` e `ARCHITECTURE.md` (quando existirem) para o design do jogo e a estrutura de módulos. Atualize esta seção conforme o código for adicionado.
+Jogável, com o núcleo comportamental completo (fatias 1-12 do roteiro, mais evolução além dele — ver `DESIGN.md`). Quatro documentos vivos, cada um com um papel diferente:
+- `DESIGN.md` — design e o raciocínio por trás de cada decisão.
+- `ARCHITECTURE.md` — estrutura de módulos e como conversam entre si.
+- `STATUS.md` — snapshot da sessão mais recente: o que mudou, bugs conhecidos, próximos passos concretos.
+- `ROADMAP.md` — lista consolidada de tudo que já foi feito e tudo que está planejado, pra visão de conjunto sem precisar juntar os outros três.
+
+Mantenha os quatro atualizados conforme o código muda.
