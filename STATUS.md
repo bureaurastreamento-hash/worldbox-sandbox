@@ -25,6 +25,16 @@ Por fim, o usuário pediu explicitamente pra avançar direto pro item 4 da lista
 
 **Testado ao vivo**: ~9 minutos simulados a 4x (servidor subido do diretório correto desta vez, aba nova + hard reload, lição do teste anterior aplicada). Checei duas vilas — Vila 1 (agrícola) com `comendo` aparecendo certinho na lista de scores do inspetor de agente, estoque de comida estável (40/100); Vila 3 (guerreira, em guerra com a Vila 4, nunca produz comida própria) também com 40/100 ainda intacto, população 8/30 sem nenhuma morte nas duas. Sem erro no console durante todo o teste. **Não deu tempo de confirmar o cenário mais importante**: ver o estoque inicial da guerreira se esgotar de verdade e uma morte por fome individual acontecer como esperado — 9 minutos simulados não foi suficiente pra isso acontecer organicamente; fica como item novo em §5.
 
+## 0.1. Sessão de observação pedida pelo usuário — achado real e correção
+
+Usuário pediu explicitamente: "roda, analisa, a gente corrige o que tiver pra corrigir, e depois implementa mais". Rodei uma sessão de observação mais longa (~200s reais / ~800s simulados a 4x) focada exatamente na pergunta em aberto do item anterior.
+
+**Achado: extinção total por fome.** A Vila 1 (guerreira, especializada em madeira, nunca produz comida) chegou a **população 0/30** — colapso interno (`💥 EM COLAPSO INTERNO` no inspetor), `desespero` de comida em 403s e subindo. Não foi bug no `eat.js` nem no `STARTING_FOOD_STOCK` em si — os dois fizeram exatamente o que deviam. A causa raiz estava em `clan/clanDecision.js`: essa vila nasceu com postura **`tense`** (não `war`, não `allied`) com o único outro clã que produzia comida, e o código pulava a etapa de *propor comércio* sempre que a postura já era `tense` ou `allied` — tratando as duas como "não precisa fazer nada". Pra `allied` faz sentido (comércio já flui livre via `canTrade`), mas pra `tense` não: `canTrade` (`clan/diplomacy.js`) nunca exigiu postura branda, só um tratado `trade` assinado — a *decisão* de propor é que recusava sem necessidade real. Como os outros dois clãs dessa vila (aliados) também não produziam comida (coincidência do sorteio independente de especialização × postura inicial), a vila ficou sem nenhum caminho institucional de alívio: comércio recusado (tense pulado), guerra não escalava sozinha a tempo, e mesmo que escalasse, `raid.js` (sessão anterior) precisa de população viva pra funcionar — round trip fechado, sem saída.
+
+**Corrigido**: `clan/clanDecision.js` agora só pula a proposta de comércio quando a postura é `allied` — `tense` (e `neutral`, como já era) continuam elegíveis. Uma linha de mudança, causa raiz bem delimitada.
+
+**Testado de novo**: mundo novo (seed nova), mesmo perfil de risco (vila guerreira, tense com um clã) — ~300s reais / ~1200s simulados (20 minutos simulados, bem além dos ~400s onde a extinção anterior aconteceu). População estável em 8/30 o tempo todo, comida nunca zerou, sem erro no console. Não dá pra provar que a correção elimina 100% o risco (o sorteio de posturas iniciais ainda pode gerar combinações ruins, e comércio recém-habilitado ainda leva tempo real pra se estabelecer), mas fecha o buraco identificado — o próximo passo é continuar observando sessões futuras de olho nisso. Detalhe técnico completo em `DESIGN.md` §7/§8 e `ARCHITECTURE.md` (`clan/clanDecision.js`).
+
 ## 1. O que foi implementado ou alterado na sessão anterior
 
 Nesta ordem:
@@ -95,7 +105,7 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Confirmar que fome ligada ao estoque não reabre a espiral de extinção** — a mudança mais arriscada desta sessão (ver §0): 9 minutos simulados não foram suficientes pra ver o `STARTING_FOOD_STOCK` de uma vila guerreira se esgotar de verdade nem uma morte por fome individual acontecer. Prioridade alta — deixar rodando bem mais tempo (30+ minutos reais) e observar particularmente vilas guerreiras/em guerra, que são o caso mais exposto (nunca produzem comida própria). Se aparecer extinção, o histórico de investigação em §1 item 9 é o ponto de partida.
+1. **Continuar observando extinção por fome mesmo depois da correção** (ver §0.1) — achado real (vila guerreira zerou população por ficar `tense` sem caminho de comércio) já corrigido e re-testado por 20 minutos simulados sem repetir, mas o sorteio de posturas iniciais ainda pode gerar outras combinações ruins não cobertas por esse teste único. Prioridade alta — seguir de olho em sessões futuras, particularmente vilas guerreiras/em guerra.
 
 2. **Confirmar o saque com uma leitura direta de agente, não só evidência indireta** — o teste desta sessão (ver §0) já observou uma guerra real escalar e o `distress` resetar repetidamente sem comércio ativo (evidência forte de saque funcionando), mas não uma seleção direta de um agente com `currentAction === 'raid'` nem visualização de população zerando numa vila saqueada até o fim. Também falta checar se `RAID_SCORE` está bem calibrado numa sessão mais longa (nem esvazia a economia toda vez que há guerra, nem é ignorado).
 

@@ -101,7 +101,15 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
     return;
   }
 
-  if (stance === 'tense' || stance === 'allied') return; // sem diplomacia econômica nesses casos
+  // 'allied' já comercia livremente sem tratado (canTrade, diplomacy.js) —
+  // nada a propor. 'tense' continua elegível pra propor comércio abaixo:
+  // achado ao vivo nesta sessão — uma vila podia nascer "tensa" com o único
+  // outro clã que produz o recurso que ela não produz, e presa nisso pra
+  // sempre (proposta de comércio pulada aqui, guerra só escala se o outro
+  // lado tiver sobra — nem sempre verdade), morrendo de fome individual sem
+  // nenhum caminho institucional de saída. canTrade não bloqueia por tensão,
+  // só decisão de propor — motivo nenhum real pra recusar aqui.
+  if (stance === 'allied') return;
 
   // 3. Ainda não comercia com esse clã, precisa de um recurso que ele tem
   //    de sobra — propõe comércio.
