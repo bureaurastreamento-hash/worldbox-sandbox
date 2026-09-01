@@ -1,74 +1,92 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do estado atual. Sessão em andamento, iniciada depois da pausa registrada em `034a2dc`. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Commits desta sessão até agora: `76503cf`..`fc2e5d7` (4 commits) — só commitados localmente, ainda não passei `git push`. Contexto de antes desta sessão (fatias 1-11 do roteiro, especialização de vila, diplomacia dinâmica, minério/construção, papéis visuais, decoração com arte real, fome ligada ao estoque) não é repetido em detalhe aqui — ver `DESIGN.md` e o histórico de commits até `034a2dc`.
+Snapshot do estado atual. Sessão iniciada depois da pausa registrada em `034a2dc`. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Commits desta sessão: `76503cf`..`c03ff2a` (8 commits) — só commitados localmente, ainda não passei `git push`. Contexto de antes desta sessão (fatias 1-11 do roteiro, especialização de vila, diplomacia dinâmica, minério/construção, papéis visuais, decoração com arte real, fome ligada ao estoque) não é repetido em detalhe aqui — ver `DESIGN.md` e o histórico de commits até `034a2dc`.
 
 ## 1. O que foi implementado ou alterado nesta sessão
 
-1. **Extinção quase-instantânea das 4 vilas — achado real jogando, e corrigido**: o usuário reportou que, jogando de verdade (não em simulação em lote), as 4 vilas de um mundo novo se extinguiam em menos de 5 minutos reais — bem antes de qualquer janela de diplomacia/comércio ter chance de agir. Causa raiz: todo fundador nascia com `needs.hunger=100` fixo (`agent/needs.js`), então os 8 de cada vila cruzavam o limiar de "comer" praticamente no mesmo instante simulado, convergiam juntos pro centro da vila e drenavam `STARTING_FOOD_STOCK` (então 40) numa rajada só (8 agentes × `EAT_FOOD_PER_SEC=1` ≫ o estoque disponível). Sem estoque, `eat.js:score` retorna 0 pra todo mundo — nem produção nem comércio conseguem repor a tempo contra 8 bocas famintas de uma vez — e a vila inteira morre de fome em ~70-80s de tempo simulado do nascimento. Acontecia igual nas 4 vilas porque a sincronia inicial é a mesma em todas, independente de especialização ou sorte diplomática (diferente do achado de extinção da sessão anterior, que dependia de postura `tense` sem comércio). Ver `DESIGN.md` §6 pro relato completo.
-2. **Correção**: fome inicial de cada fundador agora é sorteada entre `FOUNDER_HUNGER_MIN=50` e `FOUNDER_HUNGER_MAX=100` (`utils/constants.js`, aplicado em `main.js:spawnVillage`) em vez de sempre 100 — espalha o instante em que cada fundador decide ir comer, evitando a rajada simultânea. `STARTING_FOOD_STOCK` subiu de 40 para 60 como margem extra.
-3. **Testado ao vivo pelo Claude, em duas rodadas** (navegador real, velocidade 4x): primeira rodada ~2 minutos, população estável em 8/8, estoque de comida oscilando saudável (59-65/100). Segunda rodada, mais longa (~4,5 minutos reais, batida na parede de throttling de tooling perto do fim — ver §3 item 7), população de outra vila foi de 8 pra **9** (primeira reprodução confirmada com a fome dessincronizada em jogo), sem mortes, sem erro no console. Ainda não é a sessão longa de 15-30 min jogada pelo usuário recomendada abaixo (§5 item 1), mas dá mais confiança do que só o primeiro teste.
-4. **Ritmo de mineração/construção — ajustado e confirmado funcionando numa sessão ao vivo**: a pedido direto do usuário ("não estou vendo evolução notável"), investiguei a causa provável (`mine.js` só considera depósito já visto pela percepção do agente; `wander.js` só explora tiles já visíveis, sem viés de busca — descoberta de montanha por acaso é lenta). `PERCEPTION_RADIUS` 8→12; `HOUSE_WOOD_COST`/`HOUSE_STONE_COST` 30/20→20/12. Numa sessão de teste seguinte, uma vila nasceu encostada numa cadeia de montanha — selecionando um agente direto, confirmei `AÇÃO: minerando`, e o estoque de `stone` da vila passou de 0/50 pra 1/50 pouco depois: o ciclo descobrir→minerar→entregar funciona de ponta a ponta. Não cobre o caso de vila que nasce longe de montanha (ainda depende de sorte no wander), mas confirma que o ajuste ataca a causa certa.
-5. **Sprites de agentes empilhados sem offset — achado e corrigido**: quando vários convergiam pro centro da vila, ficavam desenhados na posição exata, sobrepostos, parecendo que agentes tinham sumido (população real no inspetor não mudava, só o desenho). Corrigido em `render/agentRenderer.js` — cada agente ganha um pequeno deslocamento determinístico (hash do `agent.id`) só no desenho em tela, nunca em `agent.position`. Testado ao vivo: grupo antes ilegível agora aparece espalhado corretamente.
+Nesta ordem:
+
+1. **Extinção quase-instantânea das 4 vilas — achado real jogando, e corrigido**: o usuário reportou que, jogando de verdade, as 4 vilas de um mundo novo se extinguiam em menos de 5 minutos reais. Causa raiz: todo fundador nascia com `needs.hunger=100` fixo, então os 8 de cada vila cruzavam o limiar de "comer" praticamente juntos, convergiam pro centro da vila e drenavam `STARTING_FOOD_STOCK` (então 40) numa rajada só — sem estoque, ninguém mais comia, e a vila inteira morria de fome em ~70-80s simulados. Acontecia igual nas 4 vilas, independente de especialização ou diplomacia. **Corrigido**: fome inicial de cada fundador agora é sorteada entre `FOUNDER_HUNGER_MIN=50` e `FOUNDER_HUNGER_MAX=100` (não mais sempre 100), espalhando o instante em que cada um decide comer; `STARTING_FOOD_STOCK` subiu de 40 para 60. Ver `DESIGN.md` §6.
+2. **Ritmo de mineração/construção — ajustado e confirmado funcionando ao vivo**: a pedido do usuário ("não estou vendo evolução notável"), `PERCEPTION_RADIUS` subiu de 8 para 12 (achar montanha por acaso era um passeio aleatório lento) e `HOUSE_WOOD_COST`/`HOUSE_STONE_COST` desceram de 30/20 para 20/12. Confirmado ao vivo numa vila colada em montanha: agente selecionado mostrou `AÇÃO: minerando`, e `stone` da vila foi de 0/50 pra 1/50 — ciclo completo funcionando.
+3. **Sprites de agentes empilhados sem offset — achado e corrigido**: vários agentes convergindo pro centro da vila ficavam desenhados exatamente na mesma posição, parecendo que tinham sumido. `render/agentRenderer.js` agora aplica um deslocamento pequeno e determinístico por `agent.id` só no desenho em tela.
+4. **Correção de inconsistências nos `.md`**: as edições incrementais dos itens 1-3 deixaram um item do STATUS.md se contradizendo (dizia "não corrigido" pro que o item seguinte dizia que tinha sido corrigido), um hash de commit citado desatualizado, e um parágrafo do DESIGN.md §8 se contradizendo dentro dele mesmo. Corrigido depois de revisão pedida pelo usuário ("nos arquivos md não tem mais nada a ser feito?").
+5. **Sessão de jogo real do usuário (20 min, velocidade 4x)**: relatou as 4 vilas vivas, nada quebrado, bom padrão — mas sem "evolução" visível ainda (nem a IA nem o jogador têm muito o que fazer). Confirma que a correção do item 1 se sustenta numa sessão de verdade, não só nos testes curtos do Claude.
+6. **Questionário de features, baseado num levantamento dos assets sem uso** (`assets/Assets-testes-para-o-claude-testar/`): o usuário pediu um questionário de sugestões pra completar o jogo. O Claude auditou a pasta de assets e achou vários sprites nunca usados no código (não só o Carvão que o usuário já tinha notado) — `Carvao`/`Ferro`/`Ouro`/`Pedra1`/`Pedra2` (ícones de minério), `Agua1`/`2`/`3` (água), `ComponesMorto`, `ComponesPescando`, `ElfoParado`/`Andando`, `OrcParado`/`Andando`, `CavaleiroParado`/`Correndo`. Perguntas feitas via `AskUserQuestion`, decisões do usuário:
+   - Ícone de minério no HUD **e** textura de montanha por recurso (ambos).
+   - Água: animação leve entre as 3 variantes.
+   - Guerreiro permanente: emergente pela demanda de defesa da vila (não fixo no nascimento, não só memória visual de combate recente).
+   - Pesca (universal, como mineração) + animação de morte, entre as 4 poses soltas restantes.
+7. **Ícone de minério + textura de montanha** (implementado): `ui/inspector.js` mostra o ícone do recurso antes do nome na lista de estoque; `render/tileRenderer.js` desenha o ícone do minério centralizado por cima do tile de montanha.
+8. **Água animada** (implementado): `render/tileRenderer.js` — ícone recortado por alpha (não é textura full-bleed; a primeira tentativa esticou o sprite pro tile inteiro e criou um grid preto feio, corrigido), trocando de frame devagar entre as 3 variantes.
+9. **Pesca universal** (implementado): `agent/actions/fish.js`, novo — produz `food` em qualquer vila (sem gate de especialização), peso abaixo de `gather.js` de propósito (atenua, não substitui, a dependência de comércio de uma vila madeireira).
+10. **Animação de morte** (implementado): `lifecycle.js:pruneDead` só remove o agente `DEATH_LINGER_SECONDS` (3s simulados) depois da morte, mostrando `ComponesMorto` nesse meio-tempo. Corrigido de quebra: `main.js` só checava presença em `world.agents` pra decidir se o agente selecionado "tá vivo", sem checar `alive` — HUD/inspetor achavam o corpo lingerindo ainda vivo.
+11. **Papel de guerreiro permanente** (implementado): `agent.role` (`'civilian'`/`'warrior'`) fecha uma lacuna do modelo de dados original do DESIGN.md (`role: farmer/warrior/builder`, nunca implementado). `clan/clanDecision.js:updateWarriorRoles` designa uma fração dos adultos (`WARRIOR_ROLE_FRACTION=0.3`) como guerreiro quando o clã entra em guerra, desmobiliza quando a paz volta de vez. Pequeno bônus de score em `fight.js`/`raid.js` pra quem é guerreiro. Visual: guerreiro designado mostra o `warriorType` sorteado no nascimento parado/andando sempre, não só durante `fight`.
 
 ## 2. Estado atual por sistema
 
 | Sistema | Estado |
 |---|---|
-| World/Terrain | ✅ Funcionando. 5 tipos de tile + recurso de minério em montanha. |
+| World/Terrain | ✅ Funcionando. 5 tipos de tile + recurso de minério em montanha (agora com ícone visual). |
 | Time loop | ✅ Funcionando. |
-| Camera/Render | ✅ Funcionando. Zoom mínimo "contain" (mapa inteiro cabe na tela). |
-| Perception | ✅ Funcionando (tiles + recurso de montanha + agentes, via índice espacial). |
+| Camera/Render | ✅ Funcionando. Zoom mínimo "contain". |
+| Perception | ✅ Funcionando (raio subiu 8→12 pra acelerar descoberta de recursos). |
 | Memory | ✅ Funcionando. |
-| Needs | ⚠️ Parcial. Só fome e sono das 5 necessidades originais do pitch. Fome vem do estoque da vila; fundadores agora nascem com fome dessincronizada (item 1 acima) pra evitar rajada de consumo simultânea. |
-| Utility AI / Decision | ✅ Funcionando. 11 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `mine`, `build`, `deliver`, `fight`, `flee`, `raid`. |
-| Pathfinding | ✅ Funcionando (A*). Montanha não é andável — ações que envolvem depósito de montanha miram o tile andável adjacente. |
-| Village (estoque/demanda/população) | ✅ Funcionando. 6 recursos (food/wood/stone/coal/iron/gold). Teto de população dinâmico via `getPopulationCap` (base + bônus por casa construída). |
-| Clan/Diplomacy | ✅ Funcionando e dinâmico: guerra/paz/comércio/troca de parceiro reavaliados periodicamente por clã. Vila extinta não decide nem é alvo. |
-| Trade/Economy | ✅ Observável — especialização faz a demanda divergir de verdade; diplomacia dinâmica propõe/rompe tratados sozinha. Não comercia com vila extinta. |
-| Combat | ✅ Engajar/fugir/dano/morte reativos + ataque ofensivo deliberado (`raid.js`). |
-| Life-cycle | ✅ Funcionando. Fome inicial dos fundadores agora dessincronizada (item 1/2 acima) — não deveria mais causar extinção quase-instantânea. |
+| Needs | ⚠️ Parcial. Só fome e sono das 5 originais do pitch. Fundadores nascem com fome dessincronizada (item 1). |
+| Utility AI / Decision | ✅ Funcionando. 12 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `fish`, `mine`, `build`, `deliver`, `fight`, `flee`, `raid`. |
+| Pathfinding | ✅ Funcionando (A*). |
+| Village (estoque/demanda/população) | ✅ Funcionando. 6 recursos. |
+| Clan/Diplomacy | ✅ Funcionando e dinâmico. Agora também designa/desmobiliza guerreiros nas transições de guerra/paz (item 11). |
+| Trade/Economy | ✅ Observável. Vila madeireira agora tem uma segunda via de comida própria (pesca, item 9), além de comércio. |
+| Combat | ✅ Engajar/fugir/dano/morte reativos + ataque ofensivo deliberado. Guerreiro designado tem prioridade extra pra lutar/saquear (item 11) — não confirmado ao vivo (ver §3). |
+| Life-cycle | ✅ Funcionando. Morte agora tem um instante de corpo visível antes de sumir (item 10) — não confirmado ao vivo. |
 | Simulation LOD | ✅ Funcionando, escala com zoom. |
-| UI/HUD | ✅ HUD básico + inspetor completo (scores, vila, clã, seleção direta de vila). |
-| Sprites de agente | ✅ Pose por ação corrente, com animação de andar. Offset determinístico por agente evita sobreposição total quando vários convergem pro mesmo ponto (item 5 acima). |
-| Decoração do mapa | ✅ Árvore e planta com arte real (3 espécies de árvore, 2 de planta). Casa no placeholder geométrico — sem sprite de casa na leva de arte. |
-| Especialização de vila | ✅ Funcionando (comida/madeira, sempre complementar). |
-| Minério (evolução) | ✅ Funcionando, confirmado ao vivo nesta sessão (descobrir→minerar→entregar). Raio de percepção subiu (8→12) — vila longe de montanha ainda depende de sorte no wander (ver §1 item 4). |
-| Construção (evolução) | ✅ Funcionando. Custo de casa reduzido (30/20→20/12 madeira/pedra) — ainda sem confirmação de uma casa completando de ponta a ponta numa sessão real (ver §1 item 4). |
-| Papéis visuais por ação | ✅ Funcionando. Camponês por ação; guerreiro (orc/elfo/cavaleiro) durante `fight`. |
-| Ataque ofensivo/saque | ✅ Funcionando (evidência indireta forte); falta confirmação direta por seleção de agente. |
-| Fome ligada ao estoque | ✅ Funcionando, e agora sem o risco de rajada simultânea no nascimento da vila (ver item 1/2). |
-| Animais no mapa | ❌ Não iniciado — decisão já tomada (decorativo simples primeiro, sem IA, só quando tiver arte). |
+| UI/HUD | ✅ HUD + inspetor completo. Ícone de minério na lista de estoque; sufixo "(guerreiro)" na ação do HUD. |
+| Sprites de agente | ✅ Pose por ação corrente (agora inclui pescando), offset anti-empilhamento, morto, e guerreiro permanente. |
+| Decoração do mapa | ✅ Árvore/planta com arte real. Casa no placeholder — sem sprite de casa na leva de arte. |
+| Água | ✅ Ícone animado (era cor lisa) — item 8. |
+| Especialização de vila | ✅ Funcionando. |
+| Minério (evolução) | ✅ Funcionando, confirmado ao vivo. Ícone visual no tile e no HUD (itens 2, 7). |
+| Construção (evolução) | ✅ Funcionando (mecânica), custo reduzido — ainda sem confirmação de uma casa completando de ponta a ponta numa sessão real. |
+| Pesca (novo) | ✅ Funcionando — score/seleção de ação confirmados ao vivo; entrega completa (estoque de comida subindo por pesca) não observada diretamente. |
+| Papel de guerreiro (novo) | ⚠️ Implementado, não confirmado ao vivo — nenhuma guerra ocorreu nas sessões de teste desta parte. |
+| Animação de morte (novo) | ⚠️ Implementado, não confirmado ao vivo — nenhuma morte ocorreu nas sessões de teste desta parte. |
+| Papéis visuais por ação | ✅ Funcionando. Camponês por ação; guerreiro (orc/elfo/cavaleiro) durante `fight` e agora também como papel permanente. |
+| Ataque ofensivo/saque | ✅ Funcionando (evidência indireta); falta confirmação direta. |
+| Fome ligada ao estoque | ✅ Funcionando, sem risco de rajada simultânea no nascimento (item 1). |
+| Animais no mapa | ❌ Não iniciado — decorativo simples, só quando tiver arte. |
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
 
-1. **Mineração confirmada funcionando ao vivo, mas construção (casa completa) ainda não foi vista de ponta a ponta** — a sessão de teste achou uma vila colada em montanha (caso favorável); não testei o suficiente pra ver `HOUSE_STONE_COST`/`HOUSE_WOOD_COST` completos e uma casa sendo adicionada a `village.buildings`. Se depois de uma sessão real mais longa mineração ainda estiver lenta em vilas longe de montanha, os candidatos não tentados são: vilas nascerem mais perto de montanha, ou dar viés de exploração pro `wander.js` (hoje só escolhe entre tiles já visíveis agora, sem tendência a se afastar).
-2. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa — funciona corretamente, não crasha, mas pode precisar de mais amortecimento (histerese) se parecer caótico demais jogando de verdade.
-3. **A correção da espiral de extinção populacional por reprodução** (sessão bem anterior) nunca foi confirmada numa sessão de jogo real ao vivo por tempo longo, só em simulação em lote.
-4. **A dessincronização da fome inicial (correção desta sessão) foi confirmada em duas rodadas curtas (~2min e ~4,5min reais), não na sessão longa de verdade** — a segunda rodada incluiu uma reprodução bem-sucedida, o que dá mais confiança, mas ainda são só minutos, não os 15-30+ recomendados. Ainda vale jogar a sessão longa recomendada em §5 item 1 pra ter mais confiança, inclusive olhando as 4 vilas, não só uma.
-5. **Ataque ofensivo/saque nunca foi confirmado por leitura direta de um agente** (`agent.currentAction === 'raid'`) — só por evidência indireta. Automação de clique não consegue selecionar agente em movimento de forma confiável.
+1. **Papel de guerreiro e animação de morte não foram confirmados numa guerra/morte real ao vivo** — as sessões de teste não conseguiram forçar nenhum dos dois eventos na janela curta disponível (mesma limitação de tooling: automação não sustenta sessão longa nem eventos raros de forma confiável). Vale conferir isso numa sessão real jogada pelo usuário.
+2. **Pesca confirmada só por score/seleção de ação, não pela entrega completa** (estoque de `food` subindo por causa de pesca especificamente, isolado de outras fontes).
+3. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa — funciona corretamente, não crasha, mas pode precisar de mais amortecimento (histerese).
+4. **A correção da espiral de extinção populacional por reprodução** (sessão bem anterior) nunca foi confirmada numa sessão de jogo real ao vivo por tempo longo, só em simulação em lote.
+5. **Ataque ofensivo/saque nunca foi confirmado por leitura direta de um agente** — só por evidência indireta.
 6. **Indicador visual `💀 extinta`** nunca foi visto aparecer ao vivo.
-7. **Testes automatizados de sessão longa esbarram em throttling de `requestAnimationFrame` em aba de segundo plano do Chrome** — limitação de tooling confirmada, não bug do jogo. Sessões longas precisam ser jogadas pelo usuário em primeiro plano.
-8. **Crescimento populacional inicial rápido** (32→69 agentes em ~200s simulados, achado em sessão anterior) — não confirmado se estabiliza numa sessão muito mais longa.
+7. **Testes automatizados de sessão longa esbarram em throttling de `requestAnimationFrame`** mesmo na aba tecnicamente ativa, depois de ~100s de puros `wait` sem interação — limitação de tooling confirmada, não bug do jogo.
+8. **Crescimento populacional inicial rápido** (achado em sessão anterior) — não confirmado se estabiliza numa sessão muito mais longa.
+9. **Nenhuma casa foi vista completando de ponta a ponta** numa sessão real, mesmo com o custo reduzido.
 
 ## 4. Decisões técnicas e o motivo
 
-Decisões desta sessão:
-
-- **Corrigir a extinção quase-instantânea dessincronizando a fome inicial dos fundadores (opção "a"), combinado com aumentar `STARTING_FOOD_STOCK` como margem extra (opção "d")** — usuário escolheu essa combinação entre as opções propostas (as outras eram só aumentar o estoque sem mexer na sincronização, ou limitar quantos agentes comem ao mesmo tempo). Ataca a causa raiz (sincronização) em vez de só adiar o sintoma.
-- **`FOUNDER_HUNGER_MIN=50`** (não mais baixo) — evita fundadores nascerem já em fome crítica por azar do sorteio, o que poderia matar gente antes mesmo da vila ter uma chance real.
-- **`STARTING_FOOD_STOCK` 40→60** (não um valor muito maior) — margem extra sem tornar a pressão de fome irrelevante logo no início (demanda inicial de comida ainda fica em 40%, acima do que seria considerado "excedente" pra comércio).
-- **Ritmo de mineração/construção: escolhi `PERCEPTION_RADIUS` + custo de casa entre os candidatos, não mexi na proximidade de spawn com montanha** — usuário pediu pra seguir com o que eu preferisse. Escolhi os dois ajustes mais surgicais/reversíveis (constantes, sem mudar lógica de ninguém) antes de considerar mudar a lógica de spawn de vila ou o comportamento de exploração do `wander.js`, que são mudanças maiores e mais arriscadas de calibrar.
+- **Corrigir a extinção quase-instantânea dessincronizando a fome inicial dos fundadores + aumentar `STARTING_FOOD_STOCK`** — usuário escolheu essa combinação entre as opções propostas, ataca a causa raiz em vez de só adiar o sintoma.
+- **Ritmo de mineração/construção: `PERCEPTION_RADIUS` + custo de casa, não mexer em spawn de vila** — usuário pediu pra seguir com o que o Claude preferisse; escolhidos os ajustes mais cirúrgicos/reversíveis antes de mudanças maiores de lógica.
+- **Pesca universal (não restrita a vila madeireira, não substitui `gather.js`)** — usuário escolheu entre as três opções do questionário; atenua a dependência de comércio sem eliminar o pilar 4 do design.
+- **Guerreiro emergente pela demanda de defesa (não fixo no nascimento, não só memória visual)** — usuário escolheu; fecha a lacuna do campo `role` já previsto no modelo de dados original. Bônus de score deliberadamente pequeno (`WARRIOR_ROLE_SCORE_BONUS=0.1`) — prioridade extra, não reescrita do equilíbrio economia/combate; `flee.js` não ganha bônus, autopreservação não deveria ser sobreposta por papel.
+- **`FISH_SCORE_WEIGHT=0.4`, abaixo de `GATHER_SCORE_WEIGHT=0.55`** — decisão do Claude dentro do escopo aprovado: pra uma vila agrícola, colher grama ainda deve vencer a maior parte do tempo.
+- **`DEATH_LINGER_SECONDS=3`** — decisão do Claude, tempo curto o bastante pra não atrasar a extinção de vila nem população.length de forma perceptível, longo o bastante pro sprite de morto aparecer.
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Jogar uma sessão real (não automatizada) de 15-30+ minutos, olhando as 4 vilas** — o item mais importante em aberto; os testes desta sessão cobriram só alguns minutos reais por vez, numa vila por vez. Observar: (a) se a correção da fome inicial se mantém com mais tempo; (b) se alguma casa chega a completar (mineração já confirmada, construção ainda não); (c) se dá pra ver saque durante uma guerra; (d) qualquer coisa visualmente estranha.
-2. **Se mineração ainda estiver lenta numa vila que nasce longe de montanha**: tentar os candidatos não usados ainda — vilas nascerem mais perto de montanha, ou dar viés de exploração ao `wander.js`.
-3. **Recalibrar a frequência/amortecimento de troca guerra↔paz** se uma sessão real mostrar isso como problema de sensação de jogo (ver §3 item 2).
-4. **Casa não tem sprite na leva de arte atual** — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js`.
-5. **Confirmar visualmente saque e o indicador `💀 extinta`** numa sessão real (automação de clique não seleciona agentes em movimento de forma confiável).
+1. **Jogar uma sessão real de 15-30+ minutos, olhando as 4 vilas** — confirmar em especial: papel de guerreiro aparecendo numa guerra de verdade, corpo aparecendo numa morte, pesca de fato enchendo o estoque de comida, alguma casa completando.
+2. **Se mineração ainda estiver lenta numa vila que nasce longe de montanha**: vilas nascerem mais perto de montanha, ou dar viés de exploração ao `wander.js`.
+3. **Recalibrar a frequência/amortecimento de troca guerra↔paz** se uma sessão real mostrar isso como problema de sensação de jogo.
+4. **Casa não tem sprite na leva de arte atual** — se o amigo do usuário adicionar um, trocar `drawHouse` em `render/decorationRenderer.js`.
+5. **Confirmar visualmente saque e o indicador `💀 extinta`** numa sessão real.
+6. **Considerar mais funções do usuário** — o pedido original mencionava "funções que quero adicionar" além dos assets; só o levantamento de assets foi coberto nesta rodada de questionário, vale perguntar se sobrou alguma ideia não citada.
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 
 - **Animais no mapa**: decoração parada por enquanto; comportamento vagando sem IA de utilidade fica pra leva futura, só quando a arte estiver pronta.
 - **Visuais em geral são provisórios** — o amigo do usuário vai substituindo a arte aos poucos, direto no disco. Registrado em `memory/art_pipeline.md` (memória do projeto, fora do repositório).
-- **A leva de arte nova** já está integrada pro lado de agente e decoração de mapa — falta só casa, que não tem sprite nessa leva.
+- **A leva de arte nova** está quase toda integrada agora (agente por ação + papel permanente, decoração de mapa, minério, água) — falta só casa, que não tem sprite nessa leva.
