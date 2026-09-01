@@ -62,25 +62,27 @@ Lista completa e detalhada de tudo que já foi implementado e tudo que está pla
 - Engajar/fugir por utility AI: crianças e feridos graves só fogem, o resto prioriza lutar mas foge se a vida cair demais — reavaliado a cada reconsideração.
 - Dano mútuo corpo a corpo por tick de combate.
 - **Ataque ofensivo/saque** (`raid.js`): guerra declarada por desespero tem efeito prático — agentes elegíveis marcham até a vila inimiga e saqueiam o recurso com mais estoque de lá.
-- Papéis visuais de combate: sprite de guerreiro (orc/elfo/cavaleiro, sorteado no nascimento, fixo pra vida toda) durante a luta — e agora, com o papel permanente, também fora dela.
+- Papéis visuais de combate: sprite de guerreiro (orc/elfo/cavaleiro, sorteado no nascimento, fixo pra vida toda) durante a luta — e agora, com o papel permanente, também fora dela. Elfo ainda sem arte própria (ver §2.4), cai no guerreiro genérico enquanto isso.
 
 ### 1.9 Escala — Simulation LOD (fatia 10)
 - Agentes fora da viewport atual (checado em espaço de tela, escala com zoom) rodam em modo agregado: sem percepção/decisão/pathfinding, necessidades empurradas de volta pra perto do topo (a vila "se vira sozinha" fora de vista). Idade e morte por idade continuam normais pra todos.
 
 ### 1.10 UI de observação (fatia 11, evoluída depois)
 - HUD: controles de tempo, status do agente selecionado (ação, idade, fome, sono, vida).
-- Inspetor: score de cada ação candidata na última reconsideração (por que a IA escolheu o que escolheu), estoque/demanda/desespero da vila (com ícone de minério), população/casas/especialização, postura e tratados do clã.
+- Inspetor: score de cada ação candidata na última reconsideração (por que a IA escolheu o que escolheu), estoque/demanda/desespero da vila, população/casas/especialização, postura e tratados do clã.
 - Seleção direta de vila (sem precisar de um agente) pra inspecionar estoque/clã.
 - Raio de percepção visualizável (`[D]`).
 
 ### 1.11 Decoração e arte visual
 - Decoração do mapa (árvore/planta/casa) gerada uma vez, puramente visual, sem afetar pathfinding/percepção.
-- Árvore (3 espécies) e planta (2 variantes) com arte real, variante escolhida por hash determinístico da posição — mesma decoração sempre cai na mesma variante.
-- Papéis visuais por AÇÃO corrente do agente (não por facção): Camponês com pose dedicada (cortando árvore, minerando, construindo, levando tronco, pescando) quando a ação tem uma óbvia; guerreiro (orc/elfo/cavaleiro) durante a luta e, agora, também como papel permanente.
-- **Ícone de minério** no HUD/inspetor e como textura no tile de montanha (antes: texto puro e cor cinza lisa, sem pista visual nenhuma).
-- **Água animada** — ícone com troca de frame lenta, em vez de cor lisa.
+- Papéis visuais por AÇÃO corrente do agente (não por facção): Camponês com pose dedicada (cortando árvore, minerando, construindo, levando tronco, pescando) quando a ação tem uma óbvia; guerreiro durante a luta e, agora, também como papel permanente.
 - **Offset anti-empilhamento**: agentes convergindo pro mesmo ponto não ficam mais desenhados exatamente sobrepostos (dava impressão de terem sumido).
-- Casa continua no placeholder geométrico — sem sprite de casa na leva de arte do amigo do usuário.
+- **Reorganização visual completa** (sessão posterior, substitui a leva de arte anterior de ponta a ponta — ver `STATUS.md` e `DESIGN.md` §8/§9 pro histórico do que a leva anterior ensinou): `assets/sprites/` é a pasta canônica; matéria-prima bruta (packs craftpix.net + `kenney_roguelike-rpg-pack`, ~51MB/2091 arquivos) fica em `assets/Assets-testes-para-o-claude-testar/`, ignorada no git — só o recortado/aprovado entra no repositório.
+  - **Terreno**: água (2 quadros animados), grama, areia — textura de tile inteiro, sem recorte por alpha (`render/tileRenderer.js`). Floresta e montanha ainda em cor lisa (ver §2.4).
+  - **Decoração**: 3 espécies de árvore, 2 de planta, casa (telhado+parede empilhados — o pack não tem casa de peça única).
+  - **Personagem base** (substitui Camponês): parado/andando/civil-em-combate (ataque/defesa alternando)/fuga/morto, todos do craftpix `Swordsman_lvl1`.
+  - **Guerreiros**: Cavaleiro (craftpix `Swordsman_lvl3`) e Orc (craftpix `Orc_Warrior`) com arte própria parado/andando/atacando. Orc é sprite de perfil (resto do jogo é visto de cima/frente) — destoa um pouco, aceito por enquanto por ter pouco tempo de tela (só guerra). Elfo segue **sem arte própria** (ver §2.4), cai no guerreiro genérico.
+  - Bugs de infraestrutura de renderização corrigidos durante o processo: gate global de "sprites carregados" (um sprite faltando travava todos os outros no fallback geométrico) trocado por checagem individual por sprite; `sprite ?? fallback` nunca disparava o fallback de verdade (todo `Image` é um objeto truthy mesmo sem carregar) — trocado por `orFallback()` baseado em `isSpriteReady()`.
 
 ### 1.12 Correções de bugs relevantes já resolvidas
 - **Extinção por reprodução/velhice**: população inteira morrendo de velhice antes da reprodução repor os fundadores — corrigido subindo `MAX_AGE` e `AGENT_COUNT` (5→8), entre outros ajustes de balanceamento.
@@ -114,7 +116,10 @@ Lista completa e detalhada de tudo que já foi implementado e tudo que está pla
 - **Conectar `defense_pact`** (ver 2.2) — mencionado aqui de novo porque é tanto uma lacuna quanto uma sugestão de evolução natural pro sistema de diplomacia já existente.
 
 ### 2.4 Bloqueado externamente (depende de arte que ainda não existe)
-- **Sprite de casa** — a leva de arte do amigo do usuário não trouxe um; continua no placeholder geométrico. Trocar é trivial (`render/decorationRenderer.js:drawHouse`) assim que o sprite existir.
+- **Terreno de floresta** — nunca chegou a ser proposto em nenhuma rodada de seleção da reorganização visual (diferente de montanha/minério abaixo, que foram considerados e adiados por decisão explícita); ainda em cor lisa. Achado ao fazer o apanhado geral pós-reorganização, não uma escolha deliberada — vale revisitar se o usuário quiser fechar essa categoria.
+- **Terreno de montanha** — considerado e adiado por decisão explícita durante a reorganização visual; ainda em cor lisa (`render/tileRenderer.js:TILE_COLORS`).
+- **Ícone de recurso mineral** (`stone`/`coal`/`iron`/`gold`) — a leva de arte anterior tinha um ícone pra isso, mas foi substituída; a reorganização visual atual não trouxe um novo (decisão explícita de adiar). `render/tileRenderer.js:RESOURCE_ICON_FILES` já referencia os nomes de arquivo esperados (`Pedra1`/`Carvao`/`Ferro`/`Ouro`) — os arquivos simplesmente não existem em `assets/sprites/` ainda; `isSpriteReady()` trata isso graciosamente (cai sem ícone, sem quebrar nada).
+- **Elfo** — sem arte própria em nenhum pack baixado até agora; decisão explícita aceita, cai no guerreiro genérico (mesmo padrão que a casa já teve enquanto não tinha sprite). Trocar é trivial em `render/agentRenderer.js:WARRIOR_*_SPRITE_KEY` assim que houver um candidato.
 - **Animais no mapa** — decisão já tomada: decorativo simples primeiro (mesmo tratamento visual de árvore/planta/casa, sem IA), comportamento "vagando sem IA de utilidade" (tipo `wander.js`, mas sem fome/vila/decisão) só numa leva futura, quando a arte estiver pronta. Não é um NPC de verdade, é ambiente.
 
 ### 2.5 Item aberto do usuário
