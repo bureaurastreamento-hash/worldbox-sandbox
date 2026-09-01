@@ -11,17 +11,39 @@ const TILE_COLORS = {
 // Tile de montanha era uma cor lisa, sem nenhuma pista visual de qual dos 4
 // minérios tem ali — jogador só descobria pelo estoque da vila depois de um
 // agente já ter minerado. Ícone pequeno centralizado no tile, mesmo arquivo
-// que ui/inspector.js usa pro estoque.
+// que ui/inspector.js usa pro estoque. `stone` tem 2 variantes (Pedra1/2),
+// escolhida por hash determinístico da posição do tile — mesmo padrão de
+// `decorationRenderer.js:pickVariant` pra árvore/planta, dá um pouco de
+// variedade visual sem guardar nada a mais nos dados do tile.
 const RESOURCE_SPRITE_DIR = 'assets/Assets-testes-para-o-claude-testar';
-const RESOURCE_ICON_FILES = { stone: 'Pedra1', coal: 'Carvao', iron: 'Ferro', gold: 'Ouro' };
+const NEW_SPRITE_DIR = 'assets/sprites'; // pasta canônica daqui pra frente, ver agentRenderer.js
+const RESOURCE_ICON_FILES = {
+  stone: [
+    { file: 'Pedra1', dir: RESOURCE_SPRITE_DIR },
+    { file: 'Pedra2', dir: NEW_SPRITE_DIR },
+  ],
+  coal: [{ file: 'Carvao', dir: RESOURCE_SPRITE_DIR }],
+  iron: [{ file: 'Ferro', dir: RESOURCE_SPRITE_DIR }],
+  gold: [{ file: 'Ouro', dir: RESOURCE_SPRITE_DIR }],
+};
 
-const resourceSprites = {}; // resource -> Image
+const resourceSprites = {}; // resource -> Image[]
 let resourceSpritesReady = 0;
-const totalResourceSprites = Object.keys(RESOURCE_ICON_FILES).length;
-for (const [resource, file] of Object.entries(RESOURCE_ICON_FILES)) {
-  const img = new Image();
-  img.src = `${RESOURCE_SPRITE_DIR}/${file}.png`;
-  resourceSprites[resource] = img;
+let totalResourceSprites = 0;
+for (const [resource, variants] of Object.entries(RESOURCE_ICON_FILES)) {
+  resourceSprites[resource] = variants.map(({ file, dir }) => {
+    const img = new Image();
+    img.src = `${dir}/${file}.png`;
+    totalResourceSprites++;
+    return img;
+  });
+}
+
+// Mesmo hash de `decorationRenderer.js:pickVariant` — determinístico pela
+// posição do tile, não consome a sequência de rng do mundo.
+function pickResourceVariant(list, tx, ty) {
+  const h = Math.abs(Math.sin(tx * 12.9898 + ty * 78.233) * 43758.5453) % 1;
+  return list[Math.floor(h * list.length) % list.length];
 }
 
 const resourceSpriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
@@ -56,7 +78,7 @@ function computeContentBounds(img) {
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-Object.values(resourceSprites).forEach((img) => {
+Object.values(resourceSprites).flat().forEach((img) => {
   img.onload = () => {
     resourceSpriteBounds.set(img, computeContentBounds(img));
     resourceSpritesReady++;
@@ -121,7 +143,7 @@ export function drawTiles(ctx, world, camera) {
       }
 
       if (tile.resource && resourceSpritesLoaded) {
-        const sprite = resourceSprites[tile.resource];
+        const sprite = pickResourceVariant(resourceSprites[tile.resource], tx, ty);
         const bounds = resourceSpriteBounds.get(sprite);
         const iconH = size * 0.55;
         const iconW = iconH * (bounds.w / bounds.h);

@@ -7,15 +7,19 @@
 // Um civil (`agent.role === 'civilian'`, a maioria) é "Camponês" fora de
 // combate: pose dedicada quando a ação tem uma óbvia (cortando árvore,
 // minerando, construindo, levando tronco, pescando); ações sem pose
-// específica (comer, dormir, colher comida, vagar, fugir) caem no ciclo
-// padrão parado/andando. Um guerreiro designado (`agent.role === 'warrior'`,
-// ver clan/clanDecision.js — emergente pela demanda de defesa da vila, não
-// fixo) mostra o warriorType sorteado no nascimento (`agent.warriorType` —
-// orc/elfo/cavaleiro, fixo pra vida toda) parado/andando o tempo todo nesse
-// papel, não só durante `fight` — mesmas poses de trabalho ainda têm
-// prioridade quando aplicável (um guerreiro que também está minerando
-// mostra minerando). Morto (`!agent.alive`) sempre mostra o sprite de
-// corpo, independente de papel ou última ação — ver DEATH_LINGER_SECONDS.
+// específica (comer, dormir, colher comida, vagar) caem no ciclo padrão
+// parado/andando. `flee` sempre mostra o sprite de corrida dedicado. Durante
+// `fight`, um guerreiro designado (`agent.role === 'warrior'`, ver
+// clan/clanDecision.js — emergente pela demanda de defesa da vila, não fixo)
+// mostra o warriorType sorteado no nascimento (`agent.warriorType` —
+// orc/elfo/cavaleiro, fixo pra vida toda); um civil forçado a lutar alterna
+// entre atacando/defendendo (2 quadros, mesmo padrão de parado/andando) em
+// vez de virar um guerreiro de fantasia que ele não é. Fora de `fight`, o
+// guerreiro designado mostra o warriorType parado/andando o tempo todo
+// nesse papel — mesmas poses de trabalho ainda têm prioridade quando
+// aplicável (um guerreiro que também está minerando mostra minerando).
+// Morto (`!agent.alive`) sempre mostra o sprite de corpo, independente de
+// papel ou última ação — ver DEATH_LINGER_SECONDS.
 //
 // Mesmo tratamento de recorte por alpha de antes: as imagens têm espaço
 // vazio ao redor do personagem, calculado uma vez no load
@@ -42,6 +46,18 @@ const SPRITE_FILES = {
   cavaleiroCorrendo: 'CavaleiroCorrendo',
 };
 
+// assets/sprites/ é a pasta canônica de arte aprovada daqui pra frente —
+// assets/Assets-testes-para-o-claude-testar/ continua sendo só a pasta de
+// testes onde o resto da arte já integrada ainda mora (decisão do usuário,
+// sem migração retroativa por enquanto, ver STATUS.md).
+const NEW_SPRITE_DIR = 'assets/sprites';
+
+const NEW_SPRITE_FILES = {
+  atacandoCivil: 'ComponesAtacando',
+  defendendoCivil: 'ComponesDefendendoAtaque',
+  correndo: 'COrrendo',
+};
+
 // Papel de guerreiro (agent.role, ver clan/clanDecision.js) fora de fight:
 // mostra o warriorType sorteado no nascimento parado/andando, em vez do
 // ciclo padrão de Camponês — permanente enquanto durar o papel, não só
@@ -62,6 +78,12 @@ let totalSprites = 0;
 for (const [key, file] of Object.entries(SPRITE_FILES)) {
   const img = new Image();
   img.src = `${SPRITE_DIR}/${file}.png`;
+  sprites[key] = img;
+  totalSprites++;
+}
+for (const [key, file] of Object.entries(NEW_SPRITE_FILES)) {
+  const img = new Image();
+  img.src = `${NEW_SPRITE_DIR}/${file}.png`;
   sprites[key] = img;
   totalSprites++;
 }
@@ -146,7 +168,7 @@ function isAgentMoving(agent) {
 }
 
 // Ação corrente (+ se está de fato se movendo agora) decide a pose. Ações
-// sem pose dedicada (eat, sleep, gather, wander, flee) caem no fallback
+// sem pose dedicada (eat, sleep, gather, wander) caem no fallback
 // parado/andando no final — pedido explícito do usuário, sem aproximar com
 // poses que não batem literalmente com a ação.
 function pickSprite(agent, moving, walkFrame) {
@@ -154,8 +176,16 @@ function pickSprite(agent, moving, walkFrame) {
   // DEATH_LINGER_SECONDS, lifecycle.js) — sem pose por ação, já morreu.
   if (!agent.alive) return sprites.morto;
   if (agent.currentAction === 'fight') {
-    return sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]] ?? sprites.parado;
+    // Guerreiro designado (agent.role, ver clan/clanDecision.js) vira o
+    // warriorType de fantasia sorteado no nascimento. Um civil forçado a se
+    // defender (a maioria, fora de guerra) alterna Atacando/Defendendo —
+    // mesmo padrão de 2 quadros que Parado/Andando já usam pra caminhada —
+    // em vez de virar um guerreiro de fantasia igual a quem foi de fato
+    // designado pra lutar.
+    if (agent.role === 'warrior') return sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]] ?? sprites.parado;
+    return [sprites.atacandoCivil, sprites.defendendoCivil][walkFrame] ?? sprites.parado;
   }
+  if (agent.currentAction === 'flee') return sprites.correndo ?? sprites.andando;
   // Levando tronco cobre a viagem inteira de volta (não só parado entregando).
   if (agent.currentAction === 'deliver' && agent.carryingType === 'wood') {
     return sprites.levandoTronco;

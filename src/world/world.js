@@ -16,6 +16,8 @@ export function createWorld({ seed, width, height }) {
     clans: [],
     decorations: [], // preenchido por world/decorations.js depois de as vilas existirem
     rng,
+    events: [], // feed de eventos institucionais, ver world/eventLog.js
+    elapsedSeconds: 0, // tempo simulado total, incrementado em main.js — só usado pra registrar quando um evento aconteceu
   };
 }
 

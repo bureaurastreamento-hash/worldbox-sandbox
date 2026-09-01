@@ -8,6 +8,7 @@ import { HOUSE_WOOD_COST, HOUSE_STONE_COST, BUILD_WORK_SECONDS, BUILD_SCORE_WEIG
 import { getVillage } from '../../world/world.js';
 import { getPopulationCap } from '../../village/village.js';
 import { addStock } from '../../village/stock.js';
+import { pushEvent } from '../../world/eventLog.js';
 import { moveToward, clearMovement } from '../movement.js';
 
 function hasEnoughResources(village) {
@@ -57,5 +58,6 @@ export function step(agent, world, dt) {
     village.buildings.push({ type: 'house' });
     agent.buildProgress = 0;
     clearMovement(agent);
+    pushEvent(world, `${village.name} terminou uma casa`);
   }
 }

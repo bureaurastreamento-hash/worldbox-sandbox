@@ -11,6 +11,7 @@
 
 import { getStance, setStance } from './clan.js';
 import { proposeTreaty, signTreaty, hasTreaty, breakTreaty } from './diplomacy.js';
+import { pushEvent } from '../world/eventLog.js';
 import {
   CLAN_RECONSIDER_INTERVAL_MIN,
   CLAN_RECONSIDER_INTERVAL_MAX,
@@ -118,6 +119,7 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
     setStance(clan, other, 'war');
     village.raidTargetVillageId = otherVillage.id; // dá efeito prático à guerra, ver agent/actions/raid.js
     updateWarriorRoles(village, world, true);
+    pushEvent(world, `${clan.name} declarou guerra a ${other.name}`);
     return;
   }
 
@@ -128,6 +130,7 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
     // Postura com ESSE clã virou paz, mas o clã pode seguir em guerra com um
     // terceiro — só desmobiliza de vez se não sobrou nenhuma guerra.
     updateWarriorRoles(village, world, isClanAtWar(clan));
+    pushEvent(world, `${clan.name} fez as pazes com ${other.name}`);
     return;
   }
 
@@ -158,6 +161,7 @@ function reconsiderRelationship(world, clan, other, village, otherVillage) {
   if (!hasTreaty(clan, other, 'trade') && distress && (otherVillage.demand[distress.resource] ?? 0) <= TRADE_SURPLUS_DEMAND_MAX) {
     const treaty = proposeTreaty(clan, other, 'trade');
     signTreaty(treaty, clan, other, world.tick ?? 0);
+    pushEvent(world, `${clan.name} assinou um tratado de comércio com ${other.name}`);
     return;
   }
 

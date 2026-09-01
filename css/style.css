@@ -181,3 +181,34 @@ html, body {
   opacity: 0.5;
   font-style: italic;
 }
+
+#event-feed {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 320px;
+  margin: 8px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: sans-serif;
+  font-size: 11px;
+}
+
+.event-feed-line {
+  padding: 3px 8px;
+  background: rgba(20, 20, 20, 0.65);
+  border-radius: 3px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* mais recente (primeiro filho) sempre cheio; some gradualmente até a mais antiga visível */
+.event-feed-line:nth-child(2) { opacity: 0.85; }
+.event-feed-line:nth-child(3) { opacity: 0.7; }
+.event-feed-line:nth-child(4) { opacity: 0.55; }
+.event-feed-line:nth-child(5) { opacity: 0.4; }
+.event-feed-line:nth-child(6) { opacity: 0.25; }

@@ -21,6 +21,7 @@ import { createRenderer } from './render/renderer.js';
 import { attachInputHandlers } from './input/inputHandler.js';
 import { createHud } from './ui/hud.js';
 import { createInspector } from './ui/inspector.js';
+import { createEventFeed } from './ui/eventFeed.js';
 import { clamp, tileToWorld } from './utils/mathUtils.js';
 import {
   WORLD_WIDTH,
@@ -180,11 +181,13 @@ const uiState = { selectedAgentId: null, selectedVillageId: null };
 attachInputHandlers(canvas, { camera, timeState, debugState, world, uiState });
 const hud = createHud(document.getElementById('hud'), timeState);
 const inspector = createInspector(document.getElementById('inspector'));
+const eventFeed = createEventFeed(document.getElementById('event-feed'));
 
 const loop = createGameLoop({
   timeState,
   update(dt) {
     if (dt <= 0) return;
+    world.elapsedSeconds += dt;
 
     for (const v of world.villages) {
       computeDemand(v);
@@ -247,6 +250,7 @@ const loop = createGameLoop({
 
     hud.updateAgentStatus(selectedAgent, selectionState);
     inspector.update({ agent: selectedAgent, selectionState, village: selectedVillage }, world);
+    eventFeed.update(world.events);
   },
 });
 

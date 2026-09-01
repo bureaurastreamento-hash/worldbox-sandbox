@@ -2,6 +2,7 @@ import { clamp } from '../utils/mathUtils.js';
 import { createAgent } from '../agent/agent.js';
 import { addResident, getPopulationCap } from '../village/village.js';
 import { findNearestEnemy } from '../combat/combat.js';
+import { pushEvent } from '../world/eventLog.js';
 import {
   CHILD_ADULT_AGE,
   ADULT_ELDER_AGE,
@@ -36,6 +37,16 @@ export function checkDeath(agent, world, dt) {
 
   if (agent.health <= 0 || agent.age >= MAX_AGE) {
     agent.alive = false;
+
+    // village.population só é filtrado em pruneDead (bem depois, dado o
+    // "linger" da animação de morte) — nesse instante ainda inclui quem tá
+    // morrendo agora, então length === 1 significa "esse era o último".
+    const village = world.villages.find((v) => v.id === agent.villageId);
+    if (village) {
+      const cause = agent.age >= MAX_AGE ? 'velhice' : agent.needs.hunger <= 0 ? 'fome' : 'combate';
+      pushEvent(world, `${village.name} perdeu um morador de ${cause}`);
+      if (village.population.length === 1) pushEvent(world, `${village.name} foi extinta`);
+    }
   }
 }
 
@@ -57,6 +68,7 @@ export function tryReproduce(agentA, agentB, world, village) {
 
   world.agents.push(child);
   addResident(village, child.id);
+  pushEvent(world, `${village.name} teve um nascimento`);
   return child;
 }
 
