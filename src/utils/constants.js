@@ -3,7 +3,11 @@ export const TILE_SIZE = 32;
 export const WORLD_WIDTH = 220;
 export const WORLD_HEIGHT = 220;
 
-export const MIN_ZOOM = 0.2;
+// Piso absoluto de zoom — baixo o bastante pra "contain" (camera.js) deixar
+// caber o mapa inteiro (220 tiles) em telas comuns; render/camera.js aplica
+// o zoom mínimo real por viewport em cima disso (pode ficar mais alto que
+// isso se a janela for maior que o mundo, nunca mais baixo).
+export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 4;
 
 export const TIME_SPEEDS = [1, 2, 4];
@@ -104,9 +108,9 @@ export const FLEE_HEALTH_THRESHOLD = 35; // abaixo disso (%), foge em vez de lut
 // uma busca por vizinhos só precise olhar a célula do agente + as 8 ao redor.
 export const SPATIAL_CELL_SIZE = PERCEPTION_RADIUS * TILE_SIZE;
 
-// LOD: agentes fora desse raio da câmera rodam em modo agregado (sem
+// LOD: agentes fora da viewport (simulation/lod.js:classifyAgents, checa
+// contra a tela via camera.worldToScreen) rodam em modo agregado (sem
 // percepção/decisão/pathfinding — caro e inútil se ninguém tá vendo).
-export const LOD_ACTIVE_RADIUS = 40 * TILE_SIZE;
 // Fora de foco, as necessidades não decaem normalmente — são empurradas de
 // volta pra perto do topo (a vila "se vira sozinha" fora da tela), pra não
 // morrer tudo de fome só por estar fora do foco.

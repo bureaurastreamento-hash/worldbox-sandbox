@@ -11,8 +11,17 @@ export function createGameLoop({ timeState, update, render }) {
     lastTime = now;
 
     const simDt = timeState.advance(realDt);
-    update(simDt);
-    render();
+    try {
+      update(simDt);
+      render();
+    } catch (err) {
+      // Sem isso, uma exceção não tratada em qualquer lugar de update/render
+      // (agente, vila, clã, o que for) trava o jogo inteiro pra sempre e sem
+      // aviso nenhum — nem o próximo requestAnimationFrame chega a ser
+      // agendado. Loga o erro real e segue tentando o próximo frame, em vez
+      // de travar tudo por um bug isolado num agente/vila específico.
+      console.error('Erro no game loop (update/render):', err);
+    }
 
     rafId = requestAnimationFrame(frame);
   }

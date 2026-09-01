@@ -60,7 +60,11 @@ function spawnVillage({ id, name, tx, ty, specialization }) {
       position: tileToWorld(agentSpot.tx, agentSpot.ty, TILE_SIZE),
       villageId: village.id,
       decisionTimer: world.rng.range(0, 0.5),
-      age: FOUNDER_AGE,
+      // Jitter na idade: fundadores com a mesma idade exata batiam MAX_AGE
+      // todos juntos, e se a reprodução não tivesse acontecido nenhuma vez
+      // até lá (comércio ainda bootstrapando numa vila especializada), a
+      // vila inteira morria de velhice de uma vez, sem ninguém pra repor.
+      age: FOUNDER_AGE + world.rng.range(0, 60),
       skinTone: world.rng.next() < 0.5 ? 'light' : 'dark',
       gender: world.rng.next() < 0.5 ? 'man' : 'woman',
     });
@@ -189,7 +193,7 @@ const loop = createGameLoop({
     updateTrade(world, dt);
 
     world.spatialIndex = buildSpatialIndex(world.agents);
-    const { active, background } = classifyAgents(world, camera);
+    const { active, background } = classifyAgents(world, camera, canvas.width, canvas.height);
 
     for (const agent of active) {
       scanPerception(agent, world);

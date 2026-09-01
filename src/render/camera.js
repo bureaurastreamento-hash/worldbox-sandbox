@@ -4,11 +4,16 @@ import { clamp } from '../utils/mathUtils.js';
 export function createCamera({ x = 0, y = 0, zoom = 1, worldPxWidth = 0, worldPxHeight = 0 } = {}) {
   const camera = { x, y, zoom, worldPxWidth, worldPxHeight };
 
-  // Zoom mínimo que ainda mostra só o mapa (nunca menos que isso, senão
-  // apareceria vazio além da borda). Cresce se a janela for maior que o mundo.
+  // Zoom mínimo que ainda cabe o mapa inteiro na tela ("contain": encolhe até
+  // a maior dimensão do mapa caber, sobra espaço na outra — clampToBounds
+  // centraliza esse espaço sobrando). Não confundir com "cover" (max em vez
+  // de min), que força mostrar sempre a tela cheia de mapa mas nunca deixa
+  // ver o mapa inteiro de uma vez se a proporção da janela não bater com a
+  // do mundo — era o comportamento antigo, e o motivo do mapa "não caber"
+  // mesmo no menor zoom.
   function minZoomForViewport(viewW, viewH) {
     if (!camera.worldPxWidth || !camera.worldPxHeight) return MIN_ZOOM;
-    return Math.max(MIN_ZOOM, viewW / camera.worldPxWidth, viewH / camera.worldPxHeight);
+    return Math.max(MIN_ZOOM, Math.min(viewW / camera.worldPxWidth, viewH / camera.worldPxHeight));
   }
 
   function clampToBounds(viewW, viewH) {
