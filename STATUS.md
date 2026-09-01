@@ -8,7 +8,8 @@ Snapshot do estado atual. Sessão em andamento, iniciada depois da pausa registr
 2. **Correção**: fome inicial de cada fundador agora é sorteada entre `FOUNDER_HUNGER_MIN=50` e `FOUNDER_HUNGER_MAX=100` (`utils/constants.js`, aplicado em `main.js:spawnVillage`) em vez de sempre 100 — espalha o instante em que cada fundador decide ir comer, evitando a rajada simultânea. `STARTING_FOOD_STOCK` subiu de 40 para 60 como margem extra.
 3. **Testado ao vivo pelo Claude** (navegador real, ~2 minutos reais, velocidade 4x): população de uma vila permaneceu estável em 8/8 o tempo todo, estoque de comida oscilando saudável (59-65/100), sem repetir o colapso. Ainda não é a sessão longa de 15-30 min jogada pelo usuário recomendada abaixo (§5 item 1) — só uma verificação rápida de que a rajada não se repete.
 4. **Achado colateral, não corrigido (cosmético)**: quando vários agentes convergem pro mesmo ponto (centro da vila), os sprites ficam empilhados exatamente na mesma posição, sem nenhum offset — dá a impressão visual de que agentes "sumiram" quando na verdade estão todos sobrepostos. Confirmado que é só visual (população real no inspetor não mudou). Não mexi nisso, não foi pedido.
-5. **Ritmo de mineração/construção — ajustado, sem confirmação longa ainda**: a pedido direto do usuário ("não estou vendo evolução notável"), investiguei a causa provável (`mine.js` só considera depósito já visto pela percepção do agente; `wander.js` só explora tiles já visíveis, sem viés de busca — descoberta de montanha por acaso é lenta). `PERCEPTION_RADIUS` 8→12; `HOUSE_WOOD_COST`/`HOUSE_STONE_COST` 30/20→20/12. Testado ao vivo por ~3 minutos reais (4x): população saudável, madeira entrando aos poucos numa vila madeireira, mas nenhum minério descoberto ainda nessa janela curta — não dá pra confirmar o efeito real sem sessão bem mais longa (ver `DESIGN.md` §8).
+5. **Ritmo de mineração/construção — ajustado e confirmado funcionando numa sessão ao vivo**: a pedido direto do usuário ("não estou vendo evolução notável"), investiguei a causa provável (`mine.js` só considera depósito já visto pela percepção do agente; `wander.js` só explora tiles já visíveis, sem viés de busca — descoberta de montanha por acaso é lenta). `PERCEPTION_RADIUS` 8→12; `HOUSE_WOOD_COST`/`HOUSE_STONE_COST` 30/20→20/12. Numa sessão de teste seguinte, uma vila nasceu encostada numa cadeia de montanha — selecionando um agente direto, confirmei `AÇÃO: minerando`, e o estoque de `stone` da vila passou de 0/50 pra 1/50 pouco depois: o ciclo descobrir→minerar→entregar funciona de ponta a ponta. Não cobre o caso de vila que nasce longe de montanha (ainda depende de sorte no wander), mas confirma que o ajuste ataca a causa certa.
+6. **Sprites de agentes empilhados sem offset — achado e corrigido**: quando vários convergiam pro centro da vila, ficavam desenhados na posição exata, sobrepostos, parecendo que agentes tinham sumido. Corrigido em `render/agentRenderer.js` — cada agente ganha um pequeno deslocamento determinístico (hash do `agent.id`) só no desenho em tela, nunca em `agent.position`. Testado ao vivo: grupo antes ilegível agora aparece espalhado corretamente.
 
 ## 2. Estado atual por sistema
 
@@ -29,11 +30,11 @@ Snapshot do estado atual. Sessão em andamento, iniciada depois da pausa registr
 | Life-cycle | ✅ Funcionando. Fome inicial dos fundadores agora dessincronizada (item 1/2 acima) — não deveria mais causar extinção quase-instantânea. |
 | Simulation LOD | ✅ Funcionando, escala com zoom. |
 | UI/HUD | ✅ HUD básico + inspetor completo (scores, vila, clã, seleção direta de vila). |
-| Sprites de agente | ✅ Pose por ação corrente, com animação de andar. ⚠️ Sem offset entre agentes empilhados no mesmo tile (item 4 acima) — cosmético, não corrigido. |
+| Sprites de agente | ✅ Pose por ação corrente, com animação de andar. Offset determinístico por agente evita sobreposição total quando vários convergem pro mesmo ponto (item 6 acima). |
 | Decoração do mapa | ✅ Árvore e planta com arte real (3 espécies de árvore, 2 de planta). Casa no placeholder geométrico — sem sprite de casa na leva de arte. |
 | Especialização de vila | ✅ Funcionando (comida/madeira, sempre complementar). |
-| Minério (evolução) | ✅ Funcionando. Raio de percepção subiu (8→12) pra acelerar a descoberta por acaso — ajuste feito nesta sessão, ainda sem confirmação de sessão longa (ver §1 item 5). |
-| Construção (evolução) | ✅ Funcionando. Custo de casa reduzido (30/20→20/12 madeira/pedra) — ajuste feito nesta sessão, ainda sem confirmação de sessão longa (ver §1 item 5). |
+| Minério (evolução) | ✅ Funcionando, confirmado ao vivo nesta sessão (descobrir→minerar→entregar). Raio de percepção subiu (8→12) — vila longe de montanha ainda depende de sorte no wander (ver §1 item 5). |
+| Construção (evolução) | ✅ Funcionando. Custo de casa reduzido (30/20→20/12 madeira/pedra) — ainda sem confirmação de uma casa completando de ponta a ponta numa sessão real (ver §1 item 5). |
 | Papéis visuais por ação | ✅ Funcionando. Camponês por ação; guerreiro (orc/elfo/cavaleiro) durante `fight`. |
 | Ataque ofensivo/saque | ✅ Funcionando (evidência indireta forte); falta confirmação direta por seleção de agente. |
 | Fome ligada ao estoque | ✅ Funcionando, e agora sem o risco de rajada simultânea no nascimento da vila (ver item 1/2). |
@@ -41,7 +42,7 @@ Snapshot do estado atual. Sessão em andamento, iniciada depois da pausa registr
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
 
-1. **Ajustes de mineração/construção desta sessão (raio de percepção, custo de casa) só foram testados por ~3 minutos reais** — nenhum minério chegou a ser descoberto nessa janela curta, então o efeito real no ritmo de construção segue sem confirmação (ver §1 item 5). Se depois de uma sessão real mais longa ainda estiver lento, os outros candidatos não tentados são: vilas nascerem mais perto de montanha, ou dar viés de exploração pro `wander.js` (hoje só escolhe entre tiles já visíveis agora, sem tendência a se afastar).
+1. **Mineração confirmada funcionando ao vivo, mas construção (casa completa) ainda não foi vista de ponta a ponta** — a sessão de teste achou uma vila colada em montanha (caso favorável); não testei o suficiente pra ver `HOUSE_STONE_COST`/`HOUSE_WOOD_COST` completos e uma casa sendo adicionada a `village.buildings`. Se depois de uma sessão real mais longa mineração ainda estiver lenta em vilas longe de montanha, os candidatos não tentados são: vilas nascerem mais perto de montanha, ou dar viés de exploração pro `wander.js` (hoje só escolhe entre tiles já visíveis agora, sem tendência a se afastar).
 2. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa — funciona corretamente, não crasha, mas pode precisar de mais amortecimento (histerese) se parecer caótico demais jogando de verdade.
 3. **A correção da espiral de extinção populacional por reprodução** (sessão bem anterior) nunca foi confirmada numa sessão de jogo real ao vivo por tempo longo, só em simulação em lote.
 4. **A dessincronização da fome inicial (correção desta sessão) só foi confirmada por ~2 minutos reais de teste ao vivo** — span curto. Ainda vale jogar a sessão longa recomendada em §5 item 1 pra ter mais confiança, inclusive olhando as 4 vilas, não só uma.
@@ -49,7 +50,6 @@ Snapshot do estado atual. Sessão em andamento, iniciada depois da pausa registr
 6. **Indicador visual `💀 extinta`** nunca foi visto aparecer ao vivo.
 7. **Testes automatizados de sessão longa esbarram em throttling de `requestAnimationFrame` em aba de segundo plano do Chrome** — limitação de tooling confirmada, não bug do jogo. Sessões longas precisam ser jogadas pelo usuário em primeiro plano.
 8. **Crescimento populacional inicial rápido** (32→69 agentes em ~200s simulados, achado em sessão anterior) — não confirmado se estabiliza numa sessão muito mais longa.
-9. **Sprites de agentes empilhados no mesmo tile não têm offset visual** (achado nesta sessão, item 4 de §1) — puramente cosmético, dá a impressão errada de que agentes sumiram quando só estão sobrepostos.
 
 ## 4. Decisões técnicas e o motivo
 
@@ -62,12 +62,11 @@ Decisões desta sessão:
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Jogar uma sessão real (não automatizada) de 15-30+ minutos, olhando as 4 vilas** — o item mais importante em aberto; os testes desta sessão cobriram só alguns minutos reais por vez, numa vila por vez. Observar: (a) se a correção da fome inicial se mantém com mais tempo; (b) se o ritmo de mineração/construção melhorou de verdade (alguma casa chega a completar?); (c) se dá pra ver saque durante uma guerra; (d) qualquer coisa visualmente estranha.
-2. **Se mineração/construção ainda estiver lenta depois da sessão real**: tentar os candidatos não usados ainda — vilas nascerem mais perto de montanha, ou dar viés de exploração ao `wander.js`.
+1. **Jogar uma sessão real (não automatizada) de 15-30+ minutos, olhando as 4 vilas** — o item mais importante em aberto; os testes desta sessão cobriram só alguns minutos reais por vez, numa vila por vez. Observar: (a) se a correção da fome inicial se mantém com mais tempo; (b) se alguma casa chega a completar (mineração já confirmada, construção ainda não); (c) se dá pra ver saque durante uma guerra; (d) qualquer coisa visualmente estranha.
+2. **Se mineração ainda estiver lenta numa vila que nasce longe de montanha**: tentar os candidatos não usados ainda — vilas nascerem mais perto de montanha, ou dar viés de exploração ao `wander.js`.
 3. **Recalibrar a frequência/amortecimento de troca guerra↔paz** se uma sessão real mostrar isso como problema de sensação de jogo (ver §3 item 2).
 4. **Casa não tem sprite na leva de arte atual** — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js`.
 5. **Confirmar visualmente saque e o indicador `💀 extinta`** numa sessão real (automação de clique não seleciona agentes em movimento de forma confiável).
-6. **(Baixa prioridade, cosmético) offset visual entre agentes empilhados no mesmo tile** — só se incomodar jogando; não afeta simulação.
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 

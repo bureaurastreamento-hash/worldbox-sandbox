@@ -89,6 +89,27 @@ const MOVE_EPSILON_SQ = 0.05 * 0.05; // px; abaixo disso conta como parado
 const RADIUS_BY_STAGE = { child: 6, adult: 9, elder: 9 }; // fallback enquanto os sprites carregam
 const HEIGHT_BY_STAGE = { child: 30, adult: 44, elder: 44 }; // px de tela em zoom 1
 
+// Vários agentes convergindo pro mesmo ponto (centro da vila, pra comer/
+// entregar/construir) acabam na mesma posição exata — sem nenhum offset,
+// os sprites ficam empilhados perfeitamente um em cima do outro, dando a
+// impressão visual de que agentes sumiram (achado jogando, ver STATUS.md).
+// Puramente cosmético: espalha só o desenho em tela, nunca `agent.position`
+// (não afeta movimento, pathfinding nem nenhuma lógica). Determinístico por
+// `agent.id` — mesmo padrão de hash usado em decorationRenderer.js pra
+// variante de espécie, sem consumir a sequência de rng do mundo.
+function hashId(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+function stackOffset(agent, camera) {
+  const h = hashId(agent.id);
+  const angle = (h % 1000) / 1000 * Math.PI * 2;
+  const dist = Math.max(2, 6 * camera.zoom); // px de tela
+  return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist };
+}
+
 const lastPositions = new Map(); // agent.id -> { x, y }, pra detectar movimento real
 
 function isAgentMoving(agent) {
@@ -129,6 +150,9 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
 
   for (const agent of world.agents) {
     const pos = camera.worldToScreen(agent.position.x, agent.position.y, viewW, viewH);
+    const offset = stackOffset(agent, camera);
+    pos.x += offset.x;
+    pos.y += offset.y;
     const moving = isAgentMoving(agent);
 
     if (agent.id === selectedAgentId) {
