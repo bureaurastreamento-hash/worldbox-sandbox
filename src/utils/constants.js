@@ -14,7 +14,14 @@ export const TIME_SPEEDS = [1, 2, 4];
 
 export const AGENT_SPEED = 60; // px de mundo por segundo
 
-export const PERCEPTION_RADIUS = 8; // tiles
+// Subido de 8 pra 12: mineração/construção nunca decolavam numa sessão de
+// ~1h (STATUS.md) porque agent/actions/mine.js só considera um depósito de
+// montanha depois que o agente já viu o tile com a própria percepção — e
+// wander.js só escolhe entre tiles já visíveis agora, então achar montanha
+// por acaso era um passeio aleatório lento demais. Raio maior não muda a
+// lógica de ninguém, só aumenta a chance de topar com montanha (ou qualquer
+// outro recurso) explorando.
+export const PERCEPTION_RADIUS = 12; // tiles
 
 // 5 (original) provou ser pouca gente pra cobrir sobrevivência + economia +
 // reprodução ao mesmo tempo, especialmente com minério universal e
@@ -104,8 +111,13 @@ export const CRITICAL_RESOURCES = ['food', 'wood'];
 // estoque comunitário e aumenta o teto de população da vila que a construiu
 // (village/village.js:getPopulationCap) — efeito real, não decoração (isso
 // já existe em render/decorationRenderer.js, sem lógica nenhuma).
-export const HOUSE_WOOD_COST = 30;
-export const HOUSE_STONE_COST = 20;
+// Reduzido de 30/20 — mesmo com o raio de percepção maior (ver
+// PERCEPTION_RADIUS acima) ajudando a achar montanha mais rápido, pedra
+// ainda depende de descoberta por acaso e some rápido no primeiro consumo;
+// custo menor dá mais chance real de uma casa completar numa sessão comum,
+// sem zerar o gate de recurso (ainda exige acumular estoque de verdade).
+export const HOUSE_WOOD_COST = 20;
+export const HOUSE_STONE_COST = 12;
 export const HOUSE_POP_BONUS = 5; // por casa construída
 export const BUILD_WORK_SECONDS = 15; // trabalho contínuo no centro da vila até completar
 // Como GATHER_SCORE_WEIGHT: sobrevivência pessoal ainda deve vencer antes
