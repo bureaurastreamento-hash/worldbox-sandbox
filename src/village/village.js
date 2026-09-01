@@ -16,6 +16,9 @@ export function createVillage({ id, name, center, specialization = 'food' }) {
     stock: { food: 0, wood: 0 },
     capacity: { food: VILLAGE_FOOD_CAPACITY, wood: VILLAGE_WOOD_CAPACITY },
     demand: { food: 0, wood: 0 },
+    distress: { food: 0, wood: 0 }, // segundos consecutivos com demanda alta desse recurso; ver village/stock.js:updateDistress
+    inChaos: false, // colapso interno — derivado da distress, ver village/stock.js:updateChaos
+    raidTargetVillageId: null, // ordem institucional de saque, ver clan/clanDecision.js e agent/actions/raid.js
     population: [],
     reproCooldown: REPRO_COOLDOWN_MIN,
   };

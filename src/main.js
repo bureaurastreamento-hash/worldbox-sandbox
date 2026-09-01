@@ -1,11 +1,12 @@
-import { createWorld, findSpawnTile, findWalkableNear } from './world/world.js';
+import { createWorld, findSpawnTile, findWalkableNear, getVillage } from './world/world.js';
 import { generateDecorations } from './world/decorations.js';
 import { buildSpatialIndex } from './world/spatialIndex.js';
 import { createVillage, addResident } from './village/village.js';
-import { computeDemand } from './village/stock.js';
+import { computeDemand, updateDistress, updateChaos } from './village/stock.js';
 import { updateTrade } from './village/trade.js';
 import { createClan, addVillage as addVillageToClan, setStance } from './clan/clan.js';
 import { proposeTreaty, signTreaty } from './clan/diplomacy.js';
+import { updateClanDecision } from './clan/clanDecision.js';
 import { createAgent } from './agent/agent.js';
 import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
@@ -33,6 +34,8 @@ import {
   CLAN_COLORS,
   INITIAL_STANCE_WEIGHTS,
   NEUTRAL_TRADE_TREATY_CHANCE,
+  CLAN_RECONSIDER_INTERVAL_MAX,
+  CHAOS_NEEDS_DECAY_MULTIPLIER,
 } from './utils/constants.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -108,6 +111,7 @@ for (let i = 0; i < VILLAGE_COUNT; i++) {
     id: `clan-${i + 1}`,
     name: `Clã da Vila ${i + 1}`,
     color: CLAN_COLORS[i % CLAN_COLORS.length],
+    decisionTimer: world.rng.range(0, CLAN_RECONSIDER_INTERVAL_MAX),
   });
   addVillageToClan(clan, village);
   clans.push(clan);
@@ -174,6 +178,12 @@ const loop = createGameLoop({
 
     for (const v of world.villages) {
       computeDemand(v);
+      updateDistress(v, dt);
+      updateChaos(v);
+    }
+
+    for (const c of world.clans) {
+      updateClanDecision(c, world, dt);
     }
 
     updateTrade(world, dt);
@@ -188,7 +198,8 @@ const loop = createGameLoop({
       }
       decayMemory(agent.memory, dt);
 
-      updateNeeds(agent.needs, dt);
+      const village = getVillage(world, agent.villageId);
+      updateNeeds(agent.needs, village?.inChaos ? dt * CHAOS_NEEDS_DECAY_MULTIPLIER : dt);
       ageAgent(agent, dt);
       checkDeath(agent, world, dt);
       if (!agent.alive) continue;

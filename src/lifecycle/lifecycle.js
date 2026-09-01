@@ -69,6 +69,7 @@ export function updateVillageReproduction(village, world, dt) {
   village.reproCooldown = world.rng.range(REPRO_COOLDOWN_MIN, REPRO_COOLDOWN_MAX);
 
   if (village.population.length >= VILLAGE_POP_CAP) return;
+  if (village.inChaos) return; // colapso interno (village/stock.js:updateChaos) trava reprodução
   if ((village.demand.food ?? 0) > REPRO_FOOD_DEMAND_MAX) return;
 
   const eligible = village.population

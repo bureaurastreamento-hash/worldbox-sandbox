@@ -41,14 +41,26 @@ export function signTreaty(treaty, clanA, clanB, tick = 0) {
   return treaty;
 }
 
+// Tratado assinado e vigente de um tipo específico entre os dois clãs.
+export function hasTreaty(clanA, clanB, type) {
+  return clanA.treaties.some(
+    (t) => t.type === type && t.status === 'signed' && (t.clanA === clanB.id || t.clanB === clanB.id),
+  );
+}
+
+// Rompe um tratado vigente — marca como 'broken' em vez de remover, pra
+// manter o histórico (mesmo padrão de agent.alive em vez de apagar o
+// agente). canTrade/hasTreaty só contam tratados com status 'signed'.
+export function breakTreaty(treaty) {
+  treaty.status = 'broken';
+}
+
 // Mesma clã sempre comercia; clãs diferentes precisam ser aliados ou ter um
 // tratado de comércio assinado (não basta postura neutra por si só).
 export function canTrade(clanA, clanB) {
   if (clanA.id === clanB.id) return true;
   if (getStance(clanA, clanB) === 'allied') return true;
-  return clanA.treaties.some(
-    (t) => t.type === 'trade' && t.status === 'signed' && (t.clanA === clanB.id || t.clanB === clanB.id),
-  );
+  return hasTreaty(clanA, clanB, 'trade');
 }
 
 const DANGEROUS_STANCES = new Set(['war', 'tense']);

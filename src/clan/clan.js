@@ -1,4 +1,4 @@
-export function createClan({ id, name, color }) {
+export function createClan({ id, name, color, decisionTimer = 0 }) {
   return {
     id,
     name,
@@ -6,6 +6,7 @@ export function createClan({ id, name, color }) {
     memberVillageIds: [],
     stanceByClan: {}, // clanId -> war | tense | neutral | allied
     treaties: [],
+    decisionTimer, // jitter por clã pra reconsideração diplomática não sincronizar (clan/clanDecision.js)
   };
 }
 

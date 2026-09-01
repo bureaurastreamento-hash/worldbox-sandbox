@@ -99,8 +99,9 @@ export function drawVillages(ctx, world, camera, selectedVillageId) {
     const roleIcon = village.specialization === 'wood' ? '⚔️' : '🌾';
     const suffix = STANCE_LABELS[worstStance(world, village)];
     const tradeSuffix = hasExtraTradeLink(world, village) ? ' · 🤝 comércio' : '';
+    const chaosSuffix = village.inChaos ? ' · 💥 colapso' : '';
     ctx.fillText(
-      `${roleIcon} ${village.name} — 🌾 ${food}/${foodCap} · 🪵 ${wood}/${woodCap}${suffix}${tradeSuffix}`,
+      `${roleIcon} ${village.name} — 🌾 ${food}/${foodCap} · 🪵 ${wood}/${woodCap}${suffix}${tradeSuffix}${chaosSuffix}`,
       pos.x,
       pos.y - size / 2 - 4,
     );

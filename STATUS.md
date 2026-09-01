@@ -1,6 +1,6 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do fim da sessão que implementou as fatias 1-10 (ver `DESIGN.md` seção 5) mais uma leva de correções, atualizado na sessão seguinte após consertar o sprite quebrado (§7), adicionar decoração do mapa (§8), completar a fatia 11 — UI de observação (§9) e resolver a lacuna de especialização de vila (§10). Fatias 1-11 completas, mais especialização de vila implementada além do roteiro original. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`).
+Snapshot do fim da sessão que implementou as fatias 1-10 (ver `DESIGN.md` seção 5) mais uma leva de correções, atualizado na sessão seguinte após consertar o sprite quebrado (§7), adicionar decoração do mapa (§8), completar a fatia 11 — UI de observação (§9), resolver a lacuna de especialização de vila (§10) e implementar diplomacia dinâmica entre clãs (§11). Fatias 1-11 completas, mais especialização de vila e diplomacia dinâmica implementadas além do roteiro original. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`).
 
 ## 1. O que foi feito nesta sessão
 
@@ -36,9 +36,9 @@ Nesta ordem:
 | Utility AI / Decision | ✅ Funcionando. 8 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `deliver`, `fight`, `flee`. |
 | Pathfinding | ✅ Funcionando (A*, testado contra obstáculos e em 60 pares aleatórios). |
 | Village (estoque/demanda/população) | ✅ Funcionando. |
-| Clan/Diplomacy | ✅ Funcionando (postura, tratados, efeito real). Sem UI pro jogador propor tratado manualmente — só acontece no setup inicial do mundo. |
-| Trade/Economy | ✅ Observável agora — especialização de vila (ver §10) faz a demanda divergir de verdade entre as duas vilas, então o comércio de comida/madeira flui nos dois sentidos quando a diplomacia permite. |
-| Combat | ✅ Funcionando (engajar/fugir, dano mútuo, morte). Só reativo — sem ataque ofensivo deliberado, só defesa quando os territórios se aproximam. |
+| Clan/Diplomacy | ✅ Funcionando, agora **dinâmico** (ver §11): clãs reavaliam guerra/paz/comércio/troca de parceiro periodicamente, reagindo à economia real, não só postura fixada no world-gen. Mundo agora com N vilas/clãs (`VILLAGE_COUNT=4`, ver §11), não mais só 2. |
+| Trade/Economy | ✅ Observável — especialização de vila (ver §10) faz a demanda divergir de verdade entre as vilas; comércio flui nos dois sentidos quando a diplomacia permite, e agora é a própria diplomacia dinâmica (§11) que propõe/rompe tratados de comércio, não só o setup inicial. |
+| Combat | ✅ Funcionando (engajar/fugir, dano mútuo, morte). Só reativo — sem ataque ofensivo deliberado; guerra agora pode ser declarada dinamicamente por desespero econômico (§11), mas sem efeito de saque — ver §6 próximos passos. |
 | Life-cycle | ✅ Funcionando. |
 | Simulation LOD | ✅ Funcionando, validado só via simulação sintética (a população real do jogo, cap 30/vila, não é grande o suficiente pro jogador notar diferença de performance sozinho). |
 | UI/HUD | ✅ HUD básico (ação/idade/fome/sono/vida) + inspetor (fatia 11, ver §9): scores de decisão, estoque/demanda/população da vila, postura/tratados do clã. |
@@ -72,11 +72,15 @@ Nesta ordem:
 
 Todas as 11 fatias do `DESIGN.md` (seção 5) estão implementadas agora. O que resta é lacuna/polish, não fatia pendente:
 
-1. **Trocar o placeholder geométrico da decoração pela arte real** quando ela existir — reaproveitar `world.decorations` (dados) e só reescrever `render/decorationRenderer.js` (ver §8), igual ao pipeline dos sprites de agente.
+1. **Ataque ofensivo/saque** (pedido explícito do usuário, parte da diplomacia dinâmica — ver §11) — guerra hoje pode ser declarada dinamicamente por desespero econômico, mas combate continua só reativo (defesa quando territórios se cruzam). Falta a ação de saque de verdade: agentes marcham deliberadamente até a vila inimiga (`village.raidTargetVillageId`, campo já reservado em `village.js`) e saqueiam estoque, reaproveitando `deliver.js` (genérico por `carryingType`) pro transporte de volta. Combate em rota emergiria sozinho do sistema de `fight`/`flee` já existente, sem plumbing extra.
 
-2. **Diplomacia dinâmica entre vilas/clãs** (pedido explícito do usuário, ver §10) — hoje postura de clã e tratados são decididos uma vez no world-gen e nunca reavaliados. O usuário quer que vilas reajam de verdade à sua situação econômica ao longo do tempo: uma vila desfavorecida (sem parceiro de comércio, ou parceiro que a abandonou por um acordo melhor) poderia entrar em colapso interno, romper um tratado, propor um novo a outro clã, ou escalar pra guerra e tentar roubar o suprimento que falta. É essencialmente um novo sistema — uma camada de utility AI institucional (vila/clã), paralela à do agente — não um ajuste pontual. Precisa de sessão de design própria antes de codar: que sinais disparam uma reavaliação, o que "caos interno" significa mecanicamente, se village/clan.js ganha um "reconsider" análogo ao `agent/decision.js`, se 2 vilas bastam pra ficar interessante ou se pede uma 3ª pra dar opção real de troca de parceiro.
+2. **Trocar o placeholder geométrico da decoração pela arte real** quando ela existir — reaproveitar `world.decorations` (dados) e só reescrever `render/decorationRenderer.js` (ver §8), igual ao pipeline dos sprites de agente.
 
-3. **Ligar a fome individual do agente ao estoque da vila** (ver `DESIGN.md` §6, limite conhecido) — hoje `eat.js` sempre come direto do ambiente, então uma vila guerreira sem comida nunca faz seus agentes passarem fome de verdade a nível individual, só a nível institucional (reprodução travada). Mudança maior, mexe no loop de sobrevivência de todo agente; avaliar junto com o item 2 (uma vila em colapso econômico dinâmico é o cenário onde essa fome individual realmente importaria).
+3. **Ligar a fome individual do agente ao estoque da vila** (ver `DESIGN.md` §6, limite conhecido) — hoje `eat.js` sempre come direto do ambiente, então uma vila guerreira sem comida nunca faz seus agentes passarem fome de verdade a nível individual, só a nível institucional (reprodução travada, needs decaindo mais rápido em colapso — ver §11). Mudança maior, mexe no loop de sobrevivência de todo agente; o cenário de colapso dinâmico (§11) é onde essa fome individual realmente importaria.
+
+4. **Considerar depois**: vilas com população zerada (extintas por guerra/colapso) continuam participando normalmente da diplomacia dinâmica como se tivessem gente (ver `DESIGN.md` §7, não implementado ainda) — não é crítico, mas é uma inconsistência observável numa sessão longa.
+
+5. **Considerar depois**: recalibrar a frequência de troca guerra/paz da diplomacia dinâmica (§11) — funciona e não crasha, mas numa sessão de observação longa a postura entre alguns pares de clã pode alternar com uma cadência que parece volátil. Depende de sensação de jogo, não só de número — vale revisitar depois de assistir de verdade, não só simular.
 
 ## 7. Sprites de variação integrados (feito nesta sessão)
 
@@ -126,4 +130,42 @@ Resolve a lacuna do `DESIGN.md` §6 (pilar 4: "vila guerreira que não produz co
 - **Testado ao vivo, numa aba em primeiro plano, rodando em velocidade 4x por ~30s de tempo real (~2min de tempo simulado)**: confirmado sem erros de console; vila food-especializada acumulou comida (`4/100`) e nunca madeira; vila wood-especializada acumulou madeira (`3/100`, crescendo) e nunca comida — demanda de comida travada em ~100% pra ela, exatamente o comportamento esperado. Achado no processo (não é bug): nos primeiros ~30-60s de mundo novo, os agentes recém-criados ainda não tinham colhido nada porque fome/sono (que decaem de 100 a 0 em 60-90s) dominam o utility score nesse período — é o mesmo comportamento documentado na fatia 5 (`GATHER_SCORE_WEIGHT` < 1, sobrevivência pessoal vence trabalho comunitário), só precisei esperar mais tempo de simulação pra observar o gather de madeira vencer.
 - Commitado e enviado pro `main` (site ao vivo já atualizado) — ver commits desta sessão.
 
-**Nota sobre o pedido de diplomacia dinâmica**: ao responder a pergunta sobre profundidade, o usuário descreveu um sistema bem maior — vilas trocando de parceiro comercial por um acordo melhor, colapso interno de uma vila desfavorecida, decisão de atacar pra roubar suprimento, "incluir bastante opções pra IA emergente escolher". Isso é um sistema novo (diplomacia/economia reavaliada ao longo do tempo, não só no world-gen), não um ajuste da especialização de vila — registrado como próximo passo #2 em vez de implementado nesta rodada, porque merece sua própria conversa de design (mecanismos de "caos interno", com que frequência uma vila reconsidera, se 2 vilas bastam pra ficar interessante).
+**Nota histórica**: ao responder a pergunta sobre profundidade da especialização de vila, o usuário descreveu um sistema bem maior — vilas trocando de parceiro comercial por um acordo melhor, colapso interno de uma vila desfavorecida, decisão de atacar pra roubar suprimento, "incluir bastante opções pra IA emergente escolher". Isso virou seu próprio pedido (diplomacia dinâmica), implementado na sequência desta mesma sessão — ver §11.
+
+## 11. Diplomacia dinâmica entre clãs (feito nesta sessão)
+
+Pedido explícito do usuário (ver nota acima). Perguntei antes de codar (escala do mundo, ataque ofensivo nesta leva ou não, definição mecânica de "caos interno") — respostas: expandir pra N vilas/clãs agora, construir ataque ofensivo já nesta leva, e "reprodução trava + needs decaem mais rápido" pro caos. Implementado em 3 sub-estágios, cada um testado antes do próximo; o 4º (ataque ofensivo) ficou pra próxima sessão — ver §6, item 1.
+
+### Estágio A — mundo com N vilas/clãs
+
+- `utils/constants.js`: `VILLAGE_COUNT = 4` (era sempre 2); `CLAN_COLORS` (paleta de 6, cicla por índice); removidas `WAR_VILLAGE_MIN/MAX_DIST` — o ataque ofensivo futuro marcha até o alvo via pathfinding, então proximidade física deixou de ser pré-requisito pra guerra ficar observável.
+- `utils/rng.js`: `shuffle(array)` novo (Fisher-Yates determinístico), usado pra embaralhar a especialização balanceada (metade comida, metade madeira) entre as `VILLAGE_COUNT` vilas.
+- `main.js`: loop de spawn generalizado (1ª vila perto do centro do mapa, as demais em ângulos uniformes ao redor dela com jitter, mesmo range de distância `SECOND_VILLAGE_MIN/MAX_DIST` de antes); postura inicial sorteada independentemente pra cada par de clãs (`for i, for j=i+1`), não mais um único par.
+- **Nenhuma mudança necessária** em `village/trade.js`, `combat/combat.js`, `render/villageRenderer.js` ou `ui/inspector.js` — todos já eram genéricos sobre `world.villages`/`world.clans` (loops, sem índices fixos), confirmado por grep antes de mexer.
+- Testado ao vivo (mundo com `window.__debugWorld` exposto temporariamente): 4 vilas/clãs gerados, especialização sempre 2/2, postura independente sorteada em todos os 6 pares (guerra/tensão/neutro/aliado), sem erros de console.
+
+### Estágio B — IA de decisão institucional (`clan/clanDecision.js`, novo)
+
+- `village.distress` (`{ food, wood }`, segundos) — `village/stock.js:updateDistress(village, dt)`: soma enquanto a demanda desse recurso está em déficit (`TRADE_DEFICIT_DEMAND_MIN`), reseta a zero assim que alivia. Chamado a cada tick em `main.js`, junto com `computeDemand`.
+- `clan/diplomacy.js`: `hasTreaty(clanA, clanB, type)` extraído de dentro de `canTrade` (reuso); `breakTreaty(treaty)` novo (marca `status: 'broken'`, mantém histórico — mesmo padrão de `agent.alive`).
+- `clan/clan.js`: `clan.decisionTimer` novo (jitter, mesmo padrão de `agent.decisionTimer`).
+- `clan/clanDecision.js` (novo): `updateClanDecision(clan, world, dt)`, chamado por clã a cada tick em `main.js`, reconsidera a cada 20-30s simulados (`CLAN_RECONSIDER_INTERVAL_MIN/MAX`). Pra cada outro clã, nessa ordem: escalar pra guerra (distress ≥ `DISTRESS_WAR_THRESHOLD_SECONDS` por um recurso que o outro tem de sobra) → buscar paz (guerra sem desespero que a sustente) → propor comércio (precisa de um recurso que o outro tem de sobra, ainda não comercia) → trocar de parceiro comercial (existe um 3º clã bem mais desesperado pelo recurso que essa vila exporta pro parceiro atual — `PARTNER_SWITCH_MARGIN` evita trocar por diferença mínima).
+- Assume 1 vila por clã (comentário no topo do arquivo) — verdade em todo o world-gen atual.
+
+### Estágio C — colapso interno
+
+- `village/stock.js:updateChaos(village)` — deriva `village.inChaos` de qualquer distress ≥ `DISTRESS_CHAOS_THRESHOLD_SECONDS` (bem maior que o limiar de guerra — precisa ser um desfecho raro, não o padrão de toda vila especializada enquanto o comércio bootstrapa).
+- `lifecycle.js:updateVillageReproduction` — `if (village.inChaos) return;` novo, antes do gate de `demand.food` que já existia (esse continua valendo pra fora do caos).
+- `main.js` — `updateNeeds(agent.needs, village?.inChaos ? dt * CHAOS_NEEDS_DECAY_MULTIPLIER : dt)`: fome/sono decaem 1.6x mais rápido pra moradores de vila em colapso, sem mudar `needs.js` (só escala o `dt` recebido).
+- `render/villageRenderer.js` e `ui/inspector.js`: indicador de colapso no label do mapa (💥) e no título da seção de vila do inspetor ("EM COLAPSO INTERNO"); inspetor também mostra segundos de desespero por recurso quando > 0.
+
+### Bug crítico encontrado e corrigido durante o teste: espiral de extinção
+
+Testado via simulação direta (chamando as mesmas funções do loop, sem depender de `requestAnimationFrame` — a aba em segundo plano throttla igual ao já documentado pra LOD/animação): com os limiares originais (guerra 45s, caos 90s), a população inteira morria de velhice sem repor NENHUMA vez, mesmo com produção acontecendo. Causa raiz: `REPRO_FOOD_DEMAND_MAX` (0.7, pré-existente) bloqueia reprodução enquanto a demanda de comida estiver alta — pra uma vila madeireira, comida só vem de comércio, e o comércio (via `TRADE_RATE_PER_SEC`/`TRADE_SURPLUS_DEMAND_MAX` de antes) levava tempo demais pra sequer começar a fluir; com os 20 fundadores todos na mesma idade inicial (`FOUNDER_AGE`), todos batiam `MAX_AGE` dentro da mesma janela de ~175s sem nenhuma reprodução ter acontecido ainda — extinção total, não um efeito do caos em si (o caos nem sempre tinha disparado ainda quando a população zerava).
+
+Corrigido ajustando 4 constantes (`utils/constants.js`), não a lógica: `TRADE_SURPLUS_DEMAND_MAX` 0.3→0.45 (exportar começa mais cedo), `TRADE_RATE_PER_SEC` 2→4 (flui mais rápido uma vez começando), `DISTRESS_WAR_THRESHOLD_SECONDS` 45→60 e `DISTRESS_CHAOS_THRESHOLD_SECONDS` 90→240 (dão mais tempo pro comércio se estabelecer antes de guerra/colapso). Testado de novo: população cresce e se estabiliza (16-19 de 20 vilas·agentes iniciais, num teste de ~4h simuladas) em vez de zerar — algumas vilas ainda podem ser extintas por guerra/colapso ao longo de uma sessão longa (2 de 4 no teste), o que é uma consequência plausível de guerra ter consequências reais, não um bug.
+
+**Limite conhecido, não corrigido**: postura de guerra/paz entre alguns pares de clã alternou com uma frequência que pareceu volátil numa simulação de ~4h — funciona corretamente (sem crash, reage à economia real), mas pode precisar de mais amortecimento (histerese) se parecer caótico demais numa sessão de observação de verdade. Registrado em §6.
+
+- Testado ao vivo (visual, não só simulação direta): label da vila mostrando papel + estoque + postura + colapso simultaneamente sem erro de render; inspetor mostrando "VILA — VILA 1 (GUERREIRA) — EM COLAPSO INTERNO", distress por recurso, tratados de comércio corretos. Sem erros de console em nenhuma etapa.
+- Commitado e enviado pro `main` (site ao vivo já atualizado) — ver commits desta sessão.

@@ -66,9 +66,33 @@ export const NEUTRAL_TRADE_TREATY_CHANCE = 0.4;
 
 // Comércio entre vilas: abaixo desse nível de demanda a vila tem sobra pra
 // exportar; acima do outro limite, ela tem déficit e precisa importar.
-export const TRADE_SURPLUS_DEMAND_MAX = 0.3;
+export const TRADE_SURPLUS_DEMAND_MAX = 0.45;
 export const TRADE_DEFICIT_DEMAND_MIN = 0.6;
-export const TRADE_RATE_PER_SEC = 2; // unidades de recurso por segundo numa rota ativa
+export const TRADE_RATE_PER_SEC = 4; // unidades de recurso por segundo numa rota ativa
+
+// Diplomacia dinâmica (clan/clanDecision.js): cada clã reavalia sua relação
+// com os outros num intervalo bem mais longo que o do agente (0.5s) — é uma
+// decisão institucional, não individual, e não precisa reagir tick a tick.
+export const CLAN_RECONSIDER_INTERVAL_MIN = 20; // segundos simulados
+export const CLAN_RECONSIDER_INTERVAL_MAX = 30;
+// Segundos consecutivos de demanda alta (>= TRADE_DEFICIT_DEMAND_MIN) por um
+// recurso até o clã considerar guerra pra tomá-lo à força de quem tem sobra.
+// Alto o bastante pra dar chance real da economia de comércio se estabelecer
+// primeiro (produção própria + rota de comércio têm um atraso natural
+// somado) — medido em teste: valores baixos aqui travavam reprodução (ver
+// DISTRESS_CHAOS_THRESHOLD_SECONDS) cedo demais e a população inteira
+// morria de velhice sem repor, mesmo com produção acontecendo.
+export const DISTRESS_WAR_THRESHOLD_SECONDS = 60;
+// Mais tempo ainda sem alívio (guerra, comércio, nada resolveu) — a vila
+// entra em colapso interno (ver village/stock.js:updateChaos). Precisa ser
+// bem maior que o limiar de guerra, pra ser um desfecho raro/extremo, não o
+// estado padrão de toda vila especializada enquanto o comércio bootstrapa.
+export const DISTRESS_CHAOS_THRESHOLD_SECONDS = 240;
+export const CHAOS_NEEDS_DECAY_MULTIPLIER = 1.6; // fome/sono decaem mais rápido em colapso
+// Só troca de parceiro de comércio por outro cuja demanda pelo recurso seja
+// pelo menos isso mais alta que a do parceiro atual — evita ficar trocando
+// de parceiro a cada reconsideração por uma diferença mínima.
+export const PARTNER_SWITCH_MARGIN = 0.2;
 
 export const COMBAT_DAMAGE_PER_SEC = 6; // dano mútuo por segundo em combate corpo a corpo
 export const MELEE_RANGE = TILE_SIZE * 1.2; // px de mundo pra contar como "adjacente"

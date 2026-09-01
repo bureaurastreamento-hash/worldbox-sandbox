@@ -80,15 +80,18 @@ export function createInspector(container) {
     }
 
     const roleLabel = SPECIALIZATION_LABELS[village.specialization] ?? village.specialization;
-    villageTitleEl.textContent = `Vila — ${village.name} (${roleLabel})`;
+    const chaosLabel = village.inChaos ? ' — EM COLAPSO INTERNO' : '';
+    villageTitleEl.textContent = `Vila — ${village.name} (${roleLabel})${chaosLabel}`;
     villagePopEl.textContent = `${village.population.length} / ${VILLAGE_POP_CAP}`;
     villageStockEl.innerHTML = '';
     for (const type of Object.keys(village.capacity)) {
       const stock = Math.floor(village.stock[type] ?? 0);
       const cap = village.capacity[type];
       const demandPct = Math.round((village.demand[type] ?? 0) * 100);
+      const distressSec = Math.floor(village.distress?.[type] ?? 0);
+      const distressLabel = distressSec > 0 ? ` · desespero há ${distressSec}s` : '';
       const li = document.createElement('li');
-      li.innerHTML = `<span>${type}</span><span>${stock}/${cap} · demanda ${demandPct}%</span>`;
+      li.innerHTML = `<span>${type}</span><span>${stock}/${cap} · demanda ${demandPct}%${distressLabel}</span>`;
       villageStockEl.appendChild(li);
     }
   }
