@@ -168,7 +168,12 @@ Cada fatia deve abrir no navegador e ser jogável/observável sozinha antes de a
 9. **Combate simulado por agente.** Guerreiros, engajar/fugir via utility, resolução no grid, efeito no estoque/população da vila.
 10. **Escala e LOD.** Otimizações para centenas/milhares: indexação espacial, throttling de decisão, simulação agregada para o que está fora de foco.
 11. **UI de observação.** Painel de inspeção de agente/vila/clã, indicadores de estado social/econômico, as poucas ferramentas de intervenção mínima definidas para o jogador.
+12. **Decoração do mapa.** Adicionada durante a sessão que implementou 1-10, fora da ordem original — árvores, plantas e casas como sprites decorativos parados (mesmo tratamento visual dos personagens, sem lógica nem movimento), pra deixar o mapa mais vivo. Animais ficam de fora desta fatia por decisão do usuário — entram numa leva futura, quando a arte estiver pronta, e mesmo aí como um caso à parte: comportamento ambiente simples (tipo `wander.js`, mas sem fome/vila/decisão), não um NPC de verdade.
+
+## 6. Lacuna conhecida: especialização de vila
+
+O pilar 4 do design ("vila guerreira que não produz comida... depende de vila agrícola") pressupõe vilas especializadas — mas nenhuma fatia 1-11 cria essa especialização. Fatia 8 (comércio) e fatia 9 (combate) já têm a infraestrutura pronta (rotas de excedente/déficit, postura de guerra), mas como as duas vilas do mundo hoje produzem o mesmo recurso do mesmo jeito, o caso de design original nunca fica observável na prática. Ainda não é uma fatia própria — decidir se/quando vira uma quando for revisitar o roteiro.
 
 ---
 
-Próximo passo sugerido: revisar este documento e, quando aprovado, seguir para o `ARCHITECTURE.md` (estrutura de pastas/arquivos, sem lógica de jogo ainda) — conforme a fatia 1 pedida.
+Status: fatias 1-10 implementadas, fatia 11 não iniciada (ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema e os próximos passos concretos da sessão mais recente).
