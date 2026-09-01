@@ -36,6 +36,8 @@ import {
   NEUTRAL_TRADE_TREATY_CHANCE,
   CLAN_RECONSIDER_INTERVAL_MAX,
   CHAOS_NEEDS_DECAY_MULTIPLIER,
+  FOUNDER_HUNGER_MIN,
+  FOUNDER_HUNGER_MAX,
 } from './utils/constants.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -68,6 +70,10 @@ function spawnVillage({ id, name, tx, ty, specialization }) {
       age: FOUNDER_AGE + world.rng.range(0, 15),
       rng: world.rng,
     });
+    // Dessincroniza a fome inicial (ver FOUNDER_HUNGER_MIN/MAX,
+    // utils/constants.js) — sem isso, todos os fundadores cruzam o limiar de
+    // "comer" praticamente juntos e esvaziam o estoque da vila numa rajada só.
+    agent.needs.hunger = world.rng.range(FOUNDER_HUNGER_MIN, FOUNDER_HUNGER_MAX);
 
     world.agents.push(agent);
     addResident(village, agent.id);

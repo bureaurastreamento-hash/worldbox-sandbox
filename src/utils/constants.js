@@ -42,7 +42,27 @@ export const VILLAGE_WOOD_CAPACITY = 100;
 // fundadores de toda vila guerreira antes de qualquer comércio ter chance de
 // se estabelecer — bootstrap seguro, não um recurso renovável (uma vez
 // gasto, só volta via colheita ou comércio, igual o resto do estoque).
-export const STARTING_FOOD_STOCK = 40;
+// Subido de 40 pra 60 como margem extra junto com FOUNDER_HUNGER_MIN/MAX
+// abaixo — mesmo com a fome inicial dessincronizada, ainda dá pra vários
+// fundadores convergirem pra comer perto um do outro por coincidência.
+export const STARTING_FOOD_STOCK = 60;
+
+// Fome inicial de cada fundador sorteada nesse intervalo (main.js), em vez
+// de sempre 100 fixo. Sem isso, os AGENT_COUNT fundadores de uma vila
+// decaem em sincronia perfeita desde o nascimento (mesmo hunger, decisionTimer
+// só varia 0-0.5s) e cruzam o limiar de "comer" praticamente no mesmo
+// instante — todos convergindo pro centro da vila ao mesmo tempo e
+// consumindo o estoque comunitário numa rajada só (8 agentes x
+// EAT_FOOD_PER_SEC = 8/s contra um estoque pequeno, esvaziado em segundos).
+// Depois disso ninguém mais tem candidata de comer viável (eat.js:score
+// retorna 0 sem estoque) e a vila inteira morre de fome junto, ~70-80s de
+// tempo simulado após nascer — bug real observado jogando: as 4 vilas de um
+// mundo novo se extinguiam assim, quase ao mesmo tempo, bem antes de
+// qualquer economia ter chance de decolar. Espalhar a fome inicial faz os
+// fundadores cruzarem o limiar de comer em momentos diferentes, evitando a
+// rajada simultânea.
+export const FOUNDER_HUNGER_MIN = 50;
+export const FOUNDER_HUNGER_MAX = 100;
 
 // agent/actions/eat.js: unidades de estoque de comida consumidas por segundo
 // comendo, e quanto cada unidade restaura de fome. 15 unidades pra reencher
