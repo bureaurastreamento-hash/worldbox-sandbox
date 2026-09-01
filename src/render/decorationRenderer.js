@@ -1,28 +1,38 @@
-// Árvore e planta usam a arte real (assets/Assets-testes-para-o-claude-testar/)
-// — casa continua no placeholder geométrico, a leva de arte não trouxe
-// sprite de casa. `world.decorations` (world/decorations.js) não muda: cada
-// entrada só tem { type, x, y }, então a variante de espécie (árvore comum/
-// pinheiro/palmeira, arbusto liso/com fruta) é escolhida na hora do desenho,
-// determinística pela posição — mesma decoração sempre cai na mesma variante
-// entre frames, sem precisar guardar isso nos dados.
+// Árvore e planta usam arte real, quando existir (ver isSpriteReady abaixo)
+// — casa continua no placeholder geométrico até ter sprite de casa. A leva
+// de arte anterior (ArvoreComum/Pinheiro/Palmeira/Arbusto/ArbustoComida) foi
+// substituída durante a reorganização visual em andamento (ver STATUS.md) —
+// nenhuma variante nova foi selecionada ainda, então cai tudo no placeholder
+// por enquanto, de propósito. `world.decorations` (world/decorations.js) não
+// muda: cada entrada só tem { type, x, y }, então a variante de espécie é
+// escolhida na hora do desenho, determinística pela posição — mesma
+// decoração sempre cai na mesma variante entre frames, sem precisar guardar
+// isso nos dados.
 
-const SPRITE_DIR = 'assets/Assets-testes-para-o-claude-testar';
+// Pasta canônica de arte em uso — ver render/agentRenderer.js.
+const SPRITE_DIR = 'assets/sprites';
 
 const TREE_FILES = ['ArvoreComum', 'Pinheiro', 'Palmeira'];
 const PLANT_FILES = ['Arbusto', 'ArbustoComida'];
 const VARIANTS_BY_TYPE = { tree: TREE_FILES, plant: PLANT_FILES };
 
 const sprites = {}; // filename -> Image
-let totalSprites = 0;
 for (const file of [...TREE_FILES, ...PLANT_FILES]) {
   const img = new Image();
   img.src = `${SPRITE_DIR}/${file}.png`;
   sprites[file] = img;
-  totalSprites++;
 }
 
 const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
-let spritesReady = 0;
+
+// Ver o mesmo helper em render/agentRenderer.js: cada decoração cai no
+// placeholder individualmente se a variante dela especificamente não
+// carregou, em vez de travar TODAS as decorações no placeholder até que
+// 100% dos arquivos existam — importante durante a reorganização visual em
+// andamento, onde árvore pode ficar pronta antes de planta (ou vice-versa).
+function isSpriteReady(img) {
+  return !!img && img.complete && img.naturalWidth > 0;
+}
 
 function computeContentBounds(img) {
   const canvas = document.createElement('canvas');
@@ -55,10 +65,7 @@ function computeContentBounds(img) {
 }
 
 Object.values(sprites).forEach((img) => {
-  img.onload = () => {
-    spriteBounds.set(img, computeContentBounds(img));
-    spritesReady++;
-  };
+  img.onload = () => spriteBounds.set(img, computeContentBounds(img));
 });
 
 // Hash determinístico pela posição de mundo — não é rng consumida de lugar
@@ -113,7 +120,6 @@ export function drawDecorations(ctx, world, camera) {
   const topLeft = camera.screenToWorld(0, 0, viewW, viewH);
   const bottomRight = camera.screenToWorld(viewW, viewH, viewW, viewH);
   const margin = 64;
-  const spritesLoaded = spritesReady === totalSprites;
 
   for (const deco of world.decorations) {
     if (
@@ -134,13 +140,13 @@ export function drawDecorations(ctx, world, camera) {
     }
 
     const variants = VARIANTS_BY_TYPE[deco.type];
-    if (!variants || !spritesLoaded) {
+    const sprite = variants ? sprites[pickVariant(variants, deco.x, deco.y)] : null;
+    const bounds = isSpriteReady(sprite) ? spriteBounds.get(sprite) : null;
+    if (!bounds) {
       PLACEHOLDER_BY_TYPE[deco.type]?.(ctx, pos.x, pos.y, size);
       continue;
     }
 
-    const sprite = sprites[pickVariant(variants, deco.x, deco.y)];
-    const bounds = spriteBounds.get(sprite);
     const h = size;
     const w = h * (bounds.w / bounds.h);
     ctx.imageSmoothingEnabled = false;

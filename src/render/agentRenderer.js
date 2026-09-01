@@ -24,8 +24,14 @@
 // Mesmo tratamento de recorte por alpha de antes: as imagens têm espaço
 // vazio ao redor do personagem, calculado uma vez no load
 // (computeContentBounds), não fixado no código.
-const SPRITE_DIR = 'assets/Assets-testes-para-o-claude-testar';
+// Pasta canônica de arte em uso (o resto do que já foi baixado fica em
+// assets/Assets-testes-para-o-claude-testar/ como matéria-prima até ser
+// selecionado e recortado pra cá — ver STATUS.md/ROADMAP.md).
+const SPRITE_DIR = 'assets/sprites';
 
+// Vários desses arquivos não existem ainda (Camponês/Elfo ficaram sem arte
+// nova nesta rodada de reorganização visual, de propósito) — isSpriteReady()
+// abaixo trata isso graciosamente por agente, sem travar o resto do jogo.
 const SPRITE_FILES = {
   parado: 'ComponesParado',
   andando: 'COmponesAndando',
@@ -35,6 +41,9 @@ const SPRITE_FILES = {
   levandoTronco: 'ComponesLevandoOTroncoDaArvore',
   pescando: 'ComponesPescando',
   morto: 'ComponesMorto',
+  atacandoCivil: 'ComponesAtacando',
+  defendendoCivil: 'ComponesDefendendoAtaque',
+  correndo: 'COrrendo',
   orcAtacando: 'OrcAtacando',
   elfoAtirando: 'ElfoAtirando',
   cavaleiroAtacando: 'CavaleiroAtacando',
@@ -43,29 +52,15 @@ const SPRITE_FILES = {
   elfoParado: 'ElfoParado',
   elfoAndando: 'ElfoAndando',
   cavaleiroParado: 'CavaleiroParado',
-  cavaleiroCorrendo: 'CavaleiroCorrendo',
-};
-
-// assets/sprites/ é a pasta canônica de arte aprovada daqui pra frente —
-// assets/Assets-testes-para-o-claude-testar/ continua sendo só a pasta de
-// testes onde o resto da arte já integrada ainda mora (decisão do usuário,
-// sem migração retroativa por enquanto, ver STATUS.md).
-const NEW_SPRITE_DIR = 'assets/sprites';
-
-const NEW_SPRITE_FILES = {
-  atacandoCivil: 'ComponesAtacando',
-  defendendoCivil: 'ComponesDefendendoAtaque',
-  correndo: 'COrrendo',
+  cavaleiroAndando: 'CavaleiroAndando',
 };
 
 // Papel de guerreiro (agent.role, ver clan/clanDecision.js) fora de fight:
 // mostra o warriorType sorteado no nascimento parado/andando, em vez do
 // ciclo padrão de Camponês — permanente enquanto durar o papel, não só
 // durante o combate em si (isso já é o WARRIOR_ATTACK_SPRITE_KEY abaixo).
-// Cavaleiro não tem um "Andando" na leva de arte, só "Correndo" — mesmo
-// papel visual, nome de arquivo diferente.
 const WARRIOR_IDLE_SPRITE_KEY = { orc: 'orcParado', elfo: 'elfoParado', cavaleiro: 'cavaleiroParado' };
-const WARRIOR_WALK_SPRITE_KEY = { orc: 'orcAndando', elfo: 'elfoAndando', cavaleiro: 'cavaleiroCorrendo' };
+const WARRIOR_WALK_SPRITE_KEY = { orc: 'orcAndando', elfo: 'elfoAndando', cavaleiro: 'cavaleiroAndando' };
 
 const WARRIOR_ATTACK_SPRITE_KEY = {
   orc: 'orcAtacando',
@@ -74,22 +69,24 @@ const WARRIOR_ATTACK_SPRITE_KEY = {
 };
 
 const sprites = {}; // key -> Image
-let totalSprites = 0;
 for (const [key, file] of Object.entries(SPRITE_FILES)) {
   const img = new Image();
   img.src = `${SPRITE_DIR}/${file}.png`;
   sprites[key] = img;
-  totalSprites++;
-}
-for (const [key, file] of Object.entries(NEW_SPRITE_FILES)) {
-  const img = new Image();
-  img.src = `${NEW_SPRITE_DIR}/${file}.png`;
-  sprites[key] = img;
-  totalSprites++;
 }
 
 const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
-let spritesReady = 0;
+
+// Um sprite "pronto" é uma imagem que carregou com bitmap de verdade — não
+// basta checar se todo mundo carregou (like antes): com a reorganização
+// visual em andamento, várias entradas de SPRITE_FILES apontam pra arquivo
+// que não existe ainda de propósito (só parte da arte foi selecionada até
+// agora), e esperar todo mundo carregar travaria o jogo inteiro no fallback
+// geométrico pra sempre. Cada agente cai no fallback individualmente se o
+// sprite dele especificamente não carregou — o resto do jogo não é afetado.
+function isSpriteReady(img) {
+  return !!img && img.complete && img.naturalWidth > 0;
+}
 
 function computeContentBounds(img) {
   const canvas = document.createElement('canvas');
@@ -122,10 +119,7 @@ function computeContentBounds(img) {
 }
 
 Object.values(sprites).forEach((img) => {
-  img.onload = () => {
-    spriteBounds.set(img, computeContentBounds(img));
-    spritesReady++;
-  };
+  img.onload = () => spriteBounds.set(img, computeContentBounds(img));
 });
 
 const WALK_FRAME_MS = 220; // troca de perna a cada tanto tempo, só enquanto anda
@@ -211,7 +205,6 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
   const walkFrame = Math.floor(performance.now() / WALK_FRAME_MS) % 2;
-  const spritesLoaded = spritesReady === totalSprites;
 
   for (const agent of world.agents) {
     const pos = camera.worldToScreen(agent.position.x, agent.position.y, viewW, viewH);
@@ -229,9 +222,9 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
       ctx.stroke();
     }
 
-    if (spritesLoaded) {
-      const sprite = pickSprite(agent, moving, walkFrame);
-      const bounds = spriteBounds.get(sprite);
+    const sprite = pickSprite(agent, moving, walkFrame);
+    const bounds = isSpriteReady(sprite) ? spriteBounds.get(sprite) : null;
+    if (bounds) {
       const h = (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom;
       const w = h * (bounds.w / bounds.h);
       ctx.imageSmoothingEnabled = false;
