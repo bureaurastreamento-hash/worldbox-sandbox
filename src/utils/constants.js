@@ -46,15 +46,19 @@ export const VILLAGE_POP_CAP = 30;
 
 export const TERRITORY_RADIUS = 10; // tiles
 
-export const SECOND_VILLAGE_MIN_DIST = 70; // tiles, distância da primeira vila
+export const VILLAGE_COUNT = 4; // total de vilas/clãs no mundo (1 vila por clã)
+// Distância de cada vila (exceto a primeira, que nasce perto do centro do
+// mapa) até o centro — espalhadas em ângulos uniformes ao redor da 1ª,
+// com jitter. Não existe mais distância especial pra pares destinados à
+// guerra: o ataque ofensivo (agent/actions/raid.js) marcha até o alvo via
+// pathfinding, então proximidade física não é mais pré-requisito pra
+// guerra ficar observável.
+export const SECOND_VILLAGE_MIN_DIST = 70; // tiles
 export const SECOND_VILLAGE_MAX_DIST = 100;
-// Vilas destinadas à guerra nascem mais perto — territórios/rondas têm
-// chance real de se cruzar na fronteira; sem isso, o combate nunca
-// aconteceria organicamente (as vilas nunca se encontrariam).
-export const WAR_VILLAGE_MIN_DIST = 25;
-export const WAR_VILLAGE_MAX_DIST = 45;
 
-// Peso de sorteio da postura inicial entre os dois clãs fundadores.
+export const CLAN_COLORS = ['#4a7fd9', '#c9432b', '#3a9d5f', '#c9a227', '#a24fc9', '#3ac9c0'];
+
+// Peso de sorteio da postura inicial entre cada par de clãs fundadores.
 export const INITIAL_STANCE_WEIGHTS = { war: 0.15, tense: 0.15, neutral: 0.5, allied: 0.2 };
 // Se a postura sorteada for 'neutral', chance de também nascerem com um
 // tratado de comércio (vínculo econômico sem ser aliança completa).

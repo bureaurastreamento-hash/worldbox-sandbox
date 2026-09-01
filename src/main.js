@@ -27,10 +27,10 @@ import {
   TILE_SIZE,
   AGENT_COUNT,
   FOUNDER_AGE,
+  VILLAGE_COUNT,
   SECOND_VILLAGE_MIN_DIST,
   SECOND_VILLAGE_MAX_DIST,
-  WAR_VILLAGE_MIN_DIST,
-  WAR_VILLAGE_MAX_DIST,
+  CLAN_COLORS,
   INITIAL_STANCE_WEIGHTS,
   NEUTRAL_TRADE_TREATY_CHANCE,
 } from './utils/constants.js';
@@ -69,58 +69,74 @@ function spawnVillage({ id, name, tx, ty, specialization }) {
   return village;
 }
 
-// Especialização sempre complementar (uma comida, uma madeira) — sorteia só
-// qual das duas fica com qual, pra garantir que a interdependência do pilar
-// 4 do design (vila sem comida própria depende de comércio) sempre exista
-// nesse mundo, em vez de arriscar as duas caindo na mesma por acaso.
-const [homeSpecialization, rivalSpecialization] = world.rng.next() < 0.5 ? ['food', 'wood'] : ['wood', 'food'];
+// Especialização sempre balanceada (metade comida, metade madeira,
+// embaralhado) — garante que a interdependência do pilar 4 do design (vila
+// sem comida própria depende de comércio) sempre exista nesse mundo, em vez
+// de arriscar um sorteio 50/50 puro dar todo mundo igual por acaso.
+const specializations = [];
+for (let i = 0; i < VILLAGE_COUNT; i++) specializations.push(i % 2 === 0 ? 'food' : 'wood');
+world.rng.shuffle(specializations);
 
-const homeSpawn = findSpawnTile(world);
-const homeVillage = spawnVillage({
-  id: 'village-1',
-  name: 'Vila',
-  tx: homeSpawn.tx,
-  ty: homeSpawn.ty,
-  specialization: homeSpecialization,
-});
+// A 1ª vila nasce perto do centro do mapa; as demais espalhadas em ângulos
+// uniformes ao redor dela (com jitter), pra não ficarem todas do mesmo lado.
+const firstSpawn = findSpawnTile(world);
+const villages = [];
+const clans = [];
 
-// Sorteia a postura ANTES de posicionar a 2ª vila: se vai dar guerra, ela
-// nasce bem mais perto — territórios/rondas precisam ter chance real de se
-// cruzar na fronteira, senão as duas nunca se encontrariam pra lutar.
-const initialStance = world.rng.weighted(INITIAL_STANCE_WEIGHTS);
-const [minDist, maxDist] =
-  initialStance === 'war' ? [WAR_VILLAGE_MIN_DIST, WAR_VILLAGE_MAX_DIST] : [SECOND_VILLAGE_MIN_DIST, SECOND_VILLAGE_MAX_DIST];
+for (let i = 0; i < VILLAGE_COUNT; i++) {
+  let tx, ty;
+  if (i === 0) {
+    tx = firstSpawn.tx;
+    ty = firstSpawn.ty;
+  } else {
+    const angle = ((i - 1) / (VILLAGE_COUNT - 1)) * Math.PI * 2 + world.rng.range(-0.3, 0.3);
+    const dist = world.rng.range(SECOND_VILLAGE_MIN_DIST, SECOND_VILLAGE_MAX_DIST);
+    tx = clamp(Math.round(firstSpawn.tx + Math.cos(angle) * dist), 8, world.width - 9);
+    ty = clamp(Math.round(firstSpawn.ty + Math.sin(angle) * dist), 8, world.height - 9);
+  }
 
-const angle = world.rng.range(0, Math.PI * 2);
-const dist = world.rng.range(minDist, maxDist);
-const rivalTx = clamp(Math.round(homeSpawn.tx + Math.cos(angle) * dist), 8, world.width - 9);
-const rivalTy = clamp(Math.round(homeSpawn.ty + Math.sin(angle) * dist), 8, world.height - 9);
-const rivalVillage = spawnVillage({
-  id: 'village-2',
-  name: 'Vila Vizinha',
-  tx: rivalTx,
-  ty: rivalTy,
-  specialization: rivalSpecialization,
-});
+  const village = spawnVillage({
+    id: `village-${i + 1}`,
+    name: `Vila ${i + 1}`,
+    tx,
+    ty,
+    specialization: specializations[i],
+  });
+  villages.push(village);
 
-const homeClan = createClan({ id: 'clan-1', name: 'Clã de Vila', color: '#4a7fd9' });
-const rivalClan = createClan({ id: 'clan-2', name: 'Clã de Vila Vizinha', color: '#c9432b' });
-addVillageToClan(homeClan, homeVillage);
-addVillageToClan(rivalClan, rivalVillage);
-world.clans.push(homeClan, rivalClan);
+  const clan = createClan({
+    id: `clan-${i + 1}`,
+    name: `Clã da Vila ${i + 1}`,
+    color: CLAN_COLORS[i % CLAN_COLORS.length],
+  });
+  addVillageToClan(clan, village);
+  clans.push(clan);
+}
+world.clans.push(...clans);
 
-if (initialStance === 'allied') {
-  // demonstra o fluxo de tratado de verdade no caso amistoso; guerra/tensão/
-  // neutro nascem como o estado padrão, sem documento nenhum assinado.
-  const treaty = proposeTreaty(homeClan, rivalClan, 'alliance');
-  signTreaty(treaty, homeClan, rivalClan);
-} else {
-  setStance(homeClan, rivalClan, initialStance);
-  if (initialStance === 'neutral' && world.rng.next() < NEUTRAL_TRADE_TREATY_CHANCE) {
-    // vínculo econômico sem aliança militar completa — habilita comércio
-    // (village/trade.js) sem mudar a postura neutra.
-    const tradeTreaty = proposeTreaty(homeClan, rivalClan, 'trade');
-    signTreaty(tradeTreaty, homeClan, rivalClan);
+const homeVillage = villages[0];
+
+// Postura inicial sorteada independente pra cada par de clãs.
+for (let i = 0; i < clans.length; i++) {
+  for (let j = i + 1; j < clans.length; j++) {
+    const clanA = clans[i];
+    const clanB = clans[j];
+    const initialStance = world.rng.weighted(INITIAL_STANCE_WEIGHTS);
+
+    if (initialStance === 'allied') {
+      // demonstra o fluxo de tratado de verdade no caso amistoso; guerra/
+      // tensão/neutro nascem como estado padrão, sem documento assinado.
+      const treaty = proposeTreaty(clanA, clanB, 'alliance');
+      signTreaty(treaty, clanA, clanB);
+    } else {
+      setStance(clanA, clanB, initialStance);
+      if (initialStance === 'neutral' && world.rng.next() < NEUTRAL_TRADE_TREATY_CHANCE) {
+        // vínculo econômico sem aliança militar completa — habilita
+        // comércio (village/trade.js) sem mudar a postura neutra.
+        const tradeTreaty = proposeTreaty(clanA, clanB, 'trade');
+        signTreaty(tradeTreaty, clanA, clanB);
+      }
+    }
   }
 }
 

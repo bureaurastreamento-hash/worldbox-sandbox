@@ -43,5 +43,14 @@ export function createRng(seed) {
     return entries[entries.length - 1][0];
   }
 
-  return { next, range, int, weighted };
+  // Fisher-Yates in-place, usando `int` — determinístico pela mesma seed.
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = int(0, i);
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  return { next, range, int, weighted, shuffle };
 }
