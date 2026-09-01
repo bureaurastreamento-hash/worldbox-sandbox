@@ -19,6 +19,7 @@ const GATHER_SECONDS = 8; // tempo pra encher a carga colhendo
 export const GATHER_RATE = CARRY_CAPACITY / GATHER_SECONDS;
 
 export const VILLAGE_FOOD_CAPACITY = 100;
+export const VILLAGE_WOOD_CAPACITY = 100;
 
 // Abaixo de 1: sobrevivência pessoal deve normalmente vencer trabalho
 // comunitário antes de virar crítica (ver agent/actions/gather.js).

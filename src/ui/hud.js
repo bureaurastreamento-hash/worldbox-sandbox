@@ -5,6 +5,7 @@ const ACTION_LABELS = {
   eat: 'comendo',
   sleep: 'dormindo',
   gather: 'colhendo',
+  gatherWood: 'colhendo madeira',
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',

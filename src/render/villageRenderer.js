@@ -93,9 +93,16 @@ export function drawVillages(ctx, world, camera, selectedVillageId) {
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
     const food = Math.round(village.stock.food ?? 0);
-    const cap = village.capacity.food ?? 0;
+    const foodCap = village.capacity.food ?? 0;
+    const wood = Math.round(village.stock.wood ?? 0);
+    const woodCap = village.capacity.wood ?? 0;
+    const roleIcon = village.specialization === 'wood' ? '⚔️' : '🌾';
     const suffix = STANCE_LABELS[worstStance(world, village)];
     const tradeSuffix = hasExtraTradeLink(world, village) ? ' · 🤝 comércio' : '';
-    ctx.fillText(`${village.name} — 🌾 ${food}/${cap}${suffix}${tradeSuffix}`, pos.x, pos.y - size / 2 - 4);
+    ctx.fillText(
+      `${roleIcon} ${village.name} — 🌾 ${food}/${foodCap} · 🪵 ${wood}/${woodCap}${suffix}${tradeSuffix}`,
+      pos.x,
+      pos.y - size / 2 - 4,
+    );
   }
 }

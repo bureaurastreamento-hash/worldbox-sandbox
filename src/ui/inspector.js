@@ -12,11 +12,13 @@ const ACTION_LABELS = {
   eat: 'comendo',
   sleep: 'dormindo',
   gather: 'colhendo',
+  gatherWood: 'colhendo madeira',
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',
 };
 
+const SPECIALIZATION_LABELS = { food: 'agrícola', wood: 'guerreira' };
 const STANCE_LABELS = { war: 'guerra', tense: 'tensão', neutral: 'neutro', allied: 'aliado' };
 const TREATY_LABELS = { alliance: 'aliança', defense_pact: 'pacto de defesa', nonaggression: 'não-agressão', trade: 'comércio' };
 
@@ -77,7 +79,8 @@ export function createInspector(container) {
       return;
     }
 
-    villageTitleEl.textContent = `Vila — ${village.name}`;
+    const roleLabel = SPECIALIZATION_LABELS[village.specialization] ?? village.specialization;
+    villageTitleEl.textContent = `Vila — ${village.name} (${roleLabel})`;
     villagePopEl.textContent = `${village.population.length} / ${VILLAGE_POP_CAP}`;
     villageStockEl.innerHTML = '';
     for (const type of Object.keys(village.capacity)) {

@@ -1,6 +1,8 @@
 // Levar a carga até o estoque da vila. Só entra como candidata se o agente
-// já está carregando algo (ver gather.js) — score alto e fixo pra virar
-// quase um compromisso assumido, não uma escolha reavaliada a cada tick.
+// já está carregando algo (ver gather.js/gatherWood.js) — score alto e fixo
+// pra virar quase um compromisso assumido, não uma escolha reavaliada a cada
+// tick. Genérico por tipo de recurso: `agent.carryingType` diz onde entregar,
+// escrito por quem encheu a carga.
 
 import { addStock } from '../../village/stock.js';
 import { getVillage } from '../../world/world.js';
@@ -27,7 +29,8 @@ export function step(agent, world, dt) {
   }
   if (status !== 'arrived') return;
 
-  addStock(village, 'food', agent.carrying);
+  addStock(village, agent.carryingType ?? 'food', agent.carrying);
   agent.carrying = 0;
+  agent.carryingType = null;
   clearMovement(agent);
 }

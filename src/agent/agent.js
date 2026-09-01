@@ -19,7 +19,8 @@ export function createAgent({
     path: null, // waypoints até target (agent/movement.js), calculado via pathfinding
     pathTargetKey: null,
     villageId,
-    carrying: 0, // unidades de recurso carregadas (gather.js/deliver.js)
+    carrying: 0, // unidades de recurso carregadas (gather.js/gatherWood.js/deliver.js)
+    carryingType: null, // 'food' | 'wood' — qual recurso está em `carrying`; deliver.js lê pra saber onde entregar
     needs: createNeeds(),
     perception: { tiles: [], agents: [] }, // o que está visível agora (perception.js reescreve a cada tick)
     memory: createMemory(), // o que já foi visto, com confiança decrescente

@@ -42,9 +42,9 @@ canvas.height = window.innerHeight;
 const seed = String(Date.now());
 const world = createWorld({ seed, width: WORLD_WIDTH, height: WORLD_HEIGHT });
 
-function spawnVillage({ id, name, tx, ty }) {
+function spawnVillage({ id, name, tx, ty, specialization }) {
   const spot = findWalkableNear(world, tx, ty, 10);
-  const village = createVillage({ id, name, center: tileToWorld(spot.tx, spot.ty, TILE_SIZE) });
+  const village = createVillage({ id, name, center: tileToWorld(spot.tx, spot.ty, TILE_SIZE), specialization });
   world.villages.push(village);
 
   for (let i = 0; i < AGENT_COUNT; i++) {
@@ -69,8 +69,20 @@ function spawnVillage({ id, name, tx, ty }) {
   return village;
 }
 
+// Especialização sempre complementar (uma comida, uma madeira) — sorteia só
+// qual das duas fica com qual, pra garantir que a interdependência do pilar
+// 4 do design (vila sem comida própria depende de comércio) sempre exista
+// nesse mundo, em vez de arriscar as duas caindo na mesma por acaso.
+const [homeSpecialization, rivalSpecialization] = world.rng.next() < 0.5 ? ['food', 'wood'] : ['wood', 'food'];
+
 const homeSpawn = findSpawnTile(world);
-const homeVillage = spawnVillage({ id: 'village-1', name: 'Vila', tx: homeSpawn.tx, ty: homeSpawn.ty });
+const homeVillage = spawnVillage({
+  id: 'village-1',
+  name: 'Vila',
+  tx: homeSpawn.tx,
+  ty: homeSpawn.ty,
+  specialization: homeSpecialization,
+});
 
 // Sorteia a postura ANTES de posicionar a 2ª vila: se vai dar guerra, ela
 // nasce bem mais perto — territórios/rondas precisam ter chance real de se
@@ -83,7 +95,13 @@ const angle = world.rng.range(0, Math.PI * 2);
 const dist = world.rng.range(minDist, maxDist);
 const rivalTx = clamp(Math.round(homeSpawn.tx + Math.cos(angle) * dist), 8, world.width - 9);
 const rivalTy = clamp(Math.round(homeSpawn.ty + Math.sin(angle) * dist), 8, world.height - 9);
-const rivalVillage = spawnVillage({ id: 'village-2', name: 'Vila Vizinha', tx: rivalTx, ty: rivalTy });
+const rivalVillage = spawnVillage({
+  id: 'village-2',
+  name: 'Vila Vizinha',
+  tx: rivalTx,
+  ty: rivalTy,
+  specialization: rivalSpecialization,
+});
 
 const homeClan = createClan({ id: 'clan-1', name: 'Clã de Vila', color: '#4a7fd9' });
 const rivalClan = createClan({ id: 'clan-2', name: 'Clã de Vila Vizinha', color: '#c9432b' });

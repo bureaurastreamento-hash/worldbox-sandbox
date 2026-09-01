@@ -110,7 +110,7 @@ Village {
 
   population: agentId[]
   buildings: []
-  specialization: emergente          // derivado da distribuição de roles da população, não atribuído manualmente
+  specialization: 'food' | 'wood'    // atribuído na criação da vila, sorteado complementar entre as duas (ver §6) — simplificação deliberada do "emergente" original, ver STATUS.md
 }
 ```
 
@@ -170,9 +170,11 @@ Cada fatia deve abrir no navegador e ser jogável/observável sozinha antes de a
 11. **UI de observação.** Painel de inspeção de agente/vila/clã, indicadores de estado social/econômico, as poucas ferramentas de intervenção mínima definidas para o jogador.
 12. **Decoração do mapa.** Adicionada durante a sessão que implementou 1-10, fora da ordem original — árvores, plantas e casas como sprites decorativos parados (mesmo tratamento visual dos personagens, sem lógica nem movimento), pra deixar o mapa mais vivo. Animais ficam de fora desta fatia por decisão do usuário — entram numa leva futura, quando a arte estiver pronta, e mesmo aí como um caso à parte: comportamento ambiente simples (tipo `wander.js`, mas sem fome/vila/decisão), não um NPC de verdade.
 
-## 6. Lacuna conhecida: especialização de vila
+## 6. Especialização de vila (resolvido)
 
-O pilar 4 do design ("vila guerreira que não produz comida... depende de vila agrícola") pressupõe vilas especializadas — mas nenhuma fatia 1-11 cria essa especialização. Fatia 8 (comércio) e fatia 9 (combate) já têm a infraestrutura pronta (rotas de excedente/déficit, postura de guerra), mas como as duas vilas do mundo hoje produzem o mesmo recurso do mesmo jeito, o caso de design original nunca fica observável na prática. Ainda não é uma fatia própria — decidir se/quando vira uma quando for revisitar o roteiro.
+O pilar 4 do design ("vila guerreira que não produz comida... depende de vila agrícola") pressupunha vilas especializadas — implementado após a fatia 11: cada vila nasce com `specialization` = `'food'` ou `'wood'` (sorteio sempre complementar entre as duas), e só colhe o recurso da própria especialização (`agent/actions/gather.js` pontua 0 se a vila não for `'food'`; `agent/actions/gatherWood.js`, novo, pontua 0 se não for `'wood'`). `village/trade.js` já era genérico por tipo de recurso desde a fatia 8, então passou a mover madeira e comida nos dois sentidos sem nenhuma mudança — é o que viabiliza o caso original na prática (vila guerreira sem comida própria importando de uma vila agrícola aliada, e a agrícola importando madeira de volta).
+
+**Limite conhecido desta implementação:** a fome *individual* do agente (`agent/actions/eat.js`) continua vindo direto de qualquer tile de grama por perto, independente do estoque da vila — não está amarrada à especialização. Isso significa que a vila guerreira "sente fome" no nível institucional (demanda de comida travada perto de 100%, reprodução bloqueada sem comércio — ver `utils/constants.js:REPRO_FOOD_DEMAND_MAX`), mas os agentes dela não morrem de fome individualmente só por isso. Ligar a fome individual ao estoque comunitário seria a próxima camada, fica pra quando for revisitada — mexe no loop de sobrevivência de todo agente, não só dos de vila especializada, e merece sua própria sessão de design/teste.
 
 ---
 
