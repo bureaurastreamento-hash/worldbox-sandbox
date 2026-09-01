@@ -26,12 +26,14 @@ src/
     tile.js
     pathfinding.js
     spatialIndex.js
+    decorations.js
 
   render/
     camera.js
     renderer.js
     tileRenderer.js
     villageRenderer.js
+    decorationRenderer.js
     agentRenderer.js
     debugRenderer.js
 
@@ -95,10 +97,11 @@ src/
 - **`world/tile.js`** — tipos de tile, factory e `isWalkable` (água e montanha bloqueiam; é a única fonte de verdade sobre o que é andável — `pathfinding.js`, `perception.js` e a colocação inicial de vila/agente usam essa mesma função).
 - **`world/pathfinding.js`** — A* no grid de tiles; `agent/movement.js` é o único consumidor. Sem isso, o deslocamento em linha reta cortava direto por água/montanha sempre que o alvo estava do outro lado de um obstáculo.
 - **`world/spatialIndex.js`** — `buildSpatialIndex(agents)` (reconstruído em `main.js` a cada tick) + `queryNearby(index, pos, radius)`, buckets de grid do tamanho do raio de percepção. Substitui a varredura O(n) de `agent/perception.js` sobre `world.agents` — sem isso, achar "quem tá por perto" vira O(n²) no total e não escala (medido: 6.6x mais rápido que força bruta com 1500 agentes).
+- **`world/decorations.js`** — `generateDecorations(world)`, chamado uma vez em `main.js` depois de terreno e vilas existirem (não em `createWorld`, que roda antes das vilas). Árvore/planta por chance em tile de floresta/grama, pulando o raio de "clareira" de qualquer vila; casas espalhadas dentro dessa clareira. Puramente visual — não afeta `isWalkable`, pathfinding, percepção nem nenhum outro sistema. Usa uma rng própria (`${seed}-decorations`) pra não desviar a sequência de `world.rng` (gameplay).
 
 - **`render/camera.js`** — posição/zoom da câmera e transforms mundo↔tela. Consumido por todo o `render/` e por `input/inputHandler.js` (picking sob o cursor).
-- **`render/renderer.js`** — orquestra o desenho por frame: limpa canvas, chama `tileRenderer`, `agentRenderer`, `debugRenderer` (se ativo), nessa ordem. Só lê `world` e `camera`, nunca muta estado de jogo.
-- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera. `agentRenderer.js` escolhe uma de 4 variantes de sprite por `${agent.skinTone}-${agent.gender}` (`WMan`/`WGirl`/`BMan`/`BGirl`, ver `agent/agent.js`) e alterna os 2 quadros de cada uma (ciclo de passo, só enquanto o agente se move de verdade — detectado comparando posição entre frames, não pela ação atual) com fallback pro círculo antigo enquanto carregam, recortando o conteúdo real de cada sprite pelo canal alpha (as imagens têm bastante espaço vazio ao redor, e o recorte é o que garante que os quadros apareçam do mesmo tamanho), e o anel de seleção do agente escolhido pelo jogador.
+- **`render/renderer.js`** — orquestra o desenho por frame: limpa canvas, chama `tileRenderer`, `villageRenderer`, `decorationRenderer`, `agentRenderer`, `debugRenderer` (se ativo), nessa ordem — decoração fica no chão, agentes desenham por cima. Só lê `world` e `camera`, nunca muta estado de jogo.
+- **`render/tileRenderer.js`**, **`villageRenderer.js`**, **`decorationRenderer.js`**, **`agentRenderer.js`**, **`debugRenderer.js`** — cada um desenha sua camada, com culling pelo viewport da câmera. `decorationRenderer.js` desenha `world.decorations` (`world/decorations.js`) como placeholder geométrico (triângulo = árvore, círculo pequeno = planta, retângulo com telhado = casa) — sem arte real ainda; é o único arquivo a reescrever quando ela chegar, o dado de `world.decorations` não muda. `agentRenderer.js` escolhe uma de 4 variantes de sprite por `${agent.skinTone}-${agent.gender}` (`WMan`/`WGirl`/`BMan`/`BGirl`, ver `agent/agent.js`) e alterna os 2 quadros de cada uma (ciclo de passo, só enquanto o agente se move de verdade — detectado comparando posição entre frames, não pela ação atual) com fallback pro círculo antigo enquanto carregam, recortando o conteúdo real de cada sprite pelo canal alpha (as imagens têm bastante espaço vazio ao redor, e o recorte é o que garante que os quadros apareçam do mesmo tamanho), e o anel de seleção do agente escolhido pelo jogador.
 
 - **`agent/agent.js`** — dados e factory do agente (posição, id; needs/traits/perception/memory se anexam aqui nas fatias 2-3). `skinTone` (`'light'`/`'dark'`) e `gender` (`'man'`/`'woman'`) são sorteados 50/50 nos fundadores (`main.js:spawnVillage`) e herdados nos filhos (`lifecycle.js:tryReproduce` — `skinTone` de um dos pais, `gender` independente); só usados por `render/agentRenderer.js` pra escolher a variante de sprite.
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).

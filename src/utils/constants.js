@@ -82,3 +82,12 @@ export const LOD_ACTIVE_RADIUS = 40 * TILE_SIZE;
 // volta pra perto do topo (a vila "se vira sozinha" fora da tela), pra não
 // morrer tudo de fome só por estar fora do foco.
 export const BACKGROUND_NEEDS_RESTORE_PER_SEC = 100 / 15;
+
+// Decoração do mapa: puramente visual, gerada uma vez na criação do mundo
+// (determinística pela seed, como o terreno), sem lógica nem colisão.
+export const DECORATION_TREE_CHANCE = 0.08; // por tile de floresta
+export const DECORATION_PLANT_CHANCE = 0.04; // por tile de grama
+export const DECORATION_HOUSES_PER_VILLAGE = 6;
+// Nenhuma árvore/planta nasce mais perto da vila que isso, pra manter a área
+// dela legível (onde as casas ficam); casas nascem dentro desse raio.
+export const DECORATION_VILLAGE_CLEARING_RADIUS = TERRITORY_RADIUS;

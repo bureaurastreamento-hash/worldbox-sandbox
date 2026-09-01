@@ -1,5 +1,6 @@
 import { drawTiles } from './tileRenderer.js';
 import { drawTerritories, drawVillages } from './villageRenderer.js';
+import { drawDecorations } from './decorationRenderer.js';
 import { drawAgents } from './agentRenderer.js';
 import { drawPerceptionRadius } from './debugRenderer.js';
 
@@ -12,6 +13,7 @@ export function createRenderer(canvas, camera) {
       drawTiles(ctx, world, camera);
       drawTerritories(ctx, world, camera);
       drawVillages(ctx, world, camera);
+      drawDecorations(ctx, world, camera);
       drawAgents(ctx, world, camera, selectedAgentId);
       if (debugState?.showPerception) drawPerceptionRadius(ctx, world, camera);
     },

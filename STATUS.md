@@ -43,7 +43,7 @@ Nesta ordem:
 | Simulation LOD | ✅ Funcionando, validado só via simulação sintética (a população real do jogo, cap 30/vila, não é grande o suficiente pro jogador notar diferença de performance sozinho). |
 | UI/HUD | ⚠️ Parcial. Mostra ação/idade/fome/sono/vida do agente selecionado. Sem inspetor de vila/clã, sem scores de decisão visíveis — isso é a fatia 11, não iniciada. |
 | Sprites de agente | ✅ Consertado — 4 variantes (pele clara/escura × homem/mulher), ver §7. |
-| Decoração do mapa (árvores/plantas/casas) | ❌ Não iniciado. |
+| Decoração do mapa (árvores/plantas/casas) | ✅ Placeholder geométrico, ver §8. Arte real ainda não existe. |
 | Animais no mapa | ❌ Não iniciado — decisão já tomada (decorativo simples primeiro; "vagando sem IA" fica pra outra leva quando tiver arte pronta). |
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
@@ -70,9 +70,9 @@ Nesta ordem:
 
 ## 6. Próximos passos concretos, em ordem
 
-1. **Decoração do mapa**: árvores, plantas, casas como sprites decorativos parados — mesmo tratamento visual dos personagens (`new Image()`, recorte por alpha, fallback enquanto carrega), sem lógica nem movimento. Prováveis pontos de entrada: um `render/decorationRenderer.js` novo, e decidir se a posição de cada decoração é determinística por seed (nasce sempre no mesmo lugar pra uma dada seed, tipo o terreno) ou aleatória a cada carregamento. **Sem arte ainda** — perguntar ao usuário se já tem os arquivos antes de começar, ou usar formas geométricas simples como placeholder só se ele pedir pra não esperar.
+1. **Fatia 11 — UI de observação**: inspetor completo do agente/vila/clã selecionado (scores de cada ação candidata, estoque/demanda da vila, tratados do clã) — hoje só existe o HUD básico (ação/idade/fome/sono/vida). Ver `ARCHITECTURE.md` (`ui/inspector.js`, ainda stub).
 
-2. **Fatia 11 — UI de observação**: inspetor completo do agente/vila/clã selecionado (scores de cada ação candidata, estoque/demanda da vila, tratados do clã) — hoje só existe o HUD básico (ação/idade/fome/sono/vida). Ver `ARCHITECTURE.md` (`ui/inspector.js`, ainda stub).
+2. **Trocar o placeholder geométrico da decoração pela arte real** quando ela existir — reaproveitar `world.decorations` (dados) e só reescrever `render/decorationRenderer.js` (ver §8), igual ao pipeline dos sprites de agente.
 
 3. **Considerar depois** (não pedido ainda, mas decorre do que já existe): especialização de vila — é o que falta pro caso de design original ("guerreira depende de agrícola") ficar observável de verdade. Não é uma fatia própria no `DESIGN.md`; decidir com o usuário se/quando vira uma.
 
@@ -85,4 +85,14 @@ Consertado o bug crítico do fim da sessão anterior (`Human1.png`/`Human2.png` 
 - `lifecycle.js:tryReproduce`: filho herda `skinTone` de um dos dois pais (50/50, não sempre o mesmo) e `gender` 50/50 independente.
 - `render/agentRenderer.js`: `VARIANT_FILE_PREFIX` mapeia as 4 combinações (`light-man`→`WMan`, `light-woman`→`WGirl`, `dark-man`→`BMan`, `dark-woman`→`BGirl`) para pares de frames `[parado, andando]`; `computeContentBounds` (recorte por alpha) reaproveitado sem mudança para as 8 imagens; `drawAgents` escolhe o par por `${agent.skinTone}-${agent.gender}`.
 - Testado: as 8 imagens carregam com HTTP 200 (sem 404), sem erros de console; visual ao vivo numa aba em primeiro plano confirmou recorte consistente e animação de andar funcionando; sorteio 50/50 e herança confirmados rodando o código diretamente (200 amostras cada, distribuição ~50/50 nas duas pontas).
-- Não commitado ainda — decidir com o usuário antes de dar push.
+- Commitado e enviado pro `main` (site ao vivo já atualizado).
+
+## 8. Decoração do mapa com placeholder geométrico (feito nesta sessão)
+
+Sem arte ainda (usuário optou por placeholder pra não esperar):
+
+- `world/decorations.js`: `generateDecorations(world)` gera a lista de decorações uma vez, depois de o terreno e as duas vilas existirem (chamado em `main.js` logo antes de criar a câmera) — árvore em tile de floresta (`DECORATION_TREE_CHANCE` = 8%) e planta em tile de grama (`DECORATION_PLANT_CHANCE` = 4%), pulando qualquer tile dentro do raio de "clareira" de alguma vila (`DECORATION_VILLAGE_CLEARING_RADIUS` = mesmo raio do território, `utils/constants.js`); casas (`DECORATION_HOUSES_PER_VILLAGE` = 6 por vila) espalhadas dentro dessa clareira. Usa uma rng própria (`createRng('${seed}-decorations')`) pra ser determinística pela seed sem consumir a sequência da rng de gameplay do mundo (`world.rng`).
+- `world/world.js`: `world.decorations` inicializado vazio em `createWorld`, populado depois em `main.js`.
+- `render/decorationRenderer.js` (novo): desenha formas geométricas simples — triângulo verde pra árvore, círculo pequeno pra planta, retângulo com telhado triangular pra casa — com culling por viewport igual ao `tileRenderer.js`. Comentário no topo do arquivo já marca que é o único arquivo a reescrever quando a arte real chegar (dado de `world.decorations` não muda).
+- `render/renderer.js`: `drawDecorations` entra na ordem de desenho entre `drawVillages` e `drawAgents` — decoração fica no chão, agentes desenham por cima.
+- Testado ao vivo numa aba em primeiro plano: árvores nas florestas, plantas espalhadas na grama, casas dentro do território da vila, sem sobrepor agentes de forma confusa, sem erros de console.

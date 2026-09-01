@@ -1,4 +1,5 @@
 import { createWorld, findSpawnTile, findWalkableNear } from './world/world.js';
+import { generateDecorations } from './world/decorations.js';
 import { buildSpatialIndex } from './world/spatialIndex.js';
 import { createVillage, addResident } from './village/village.js';
 import { computeDemand } from './village/stock.js';
@@ -103,6 +104,8 @@ if (initialStance === 'allied') {
     signTreaty(tradeTreaty, homeClan, rivalClan);
   }
 }
+
+world.decorations = generateDecorations(world);
 
 const camera = createCamera({
   x: homeVillage.center.x,

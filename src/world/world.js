@@ -14,6 +14,7 @@ export function createWorld({ seed, width, height }) {
     agents: [],
     villages: [],
     clans: [],
+    decorations: [], // preenchido por world/decorations.js depois de as vilas existirem
     rng,
   };
 }
