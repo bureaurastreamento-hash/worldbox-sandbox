@@ -169,6 +169,6 @@ Abrir http://localhost:8000 — nenhum passo de build.
 
 ---
 
-Status: fatias 1-11 implementadas (ver `DESIGN.md`, seção 5), mais especialização de vila, diplomacia dinâmica entre clãs e evolução da civilização — minério + construção (`DESIGN.md` §6-8) — além do roteiro original. Ver `STATUS.md` pra próximos passos concretos.
+Status: fatias 1-11 implementadas (ver `DESIGN.md`, seção 5), mais especialização de vila, diplomacia dinâmica entre clãs (guerra/paz/comércio/saque, `DESIGN.md` §7) e evolução da civilização — minério + construção + papéis visuais (`DESIGN.md` §6-8) — além do roteiro original, mais decoração do mapa com arte real e fome individual ligada ao estoque da vila numa sessão posterior. Ver `STATUS.md` pra próximos passos concretos.
 
 Nota sobre a fatia 9 (desatualizada — corrigida numa sessão posterior): não existe mais um "spawn de guerra" separado — todas as vilas (exceto a 1ª, no centro) nascem à mesma distância padrão (`SECOND_VILLAGE_MIN/MAX_DIST`, 70-100 tiles) em ângulos radiais ao redor dela. A distância deixou de ser um problema pro combate acontecer quando `agent/actions/raid.js` chegou (evolução da civilização, `DESIGN.md` §7): agentes em guerra marcham deliberadamente até o centro da vila inimiga via pathfinding, não dependem mais de território cruzar por acaso vagando.

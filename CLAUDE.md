@@ -21,6 +21,10 @@ Worldbox Sandbox — god simulator 2D em grid, no estilo WorldBox, com o diferen
 - Não refatorar nada que não foi pedido.
 - Antes de implementar algo grande, explicar o plano primeiro (e, quando pedido, fazer perguntas de esclarecimento antes de escrever design ou código).
 
+## Regra
+
+Antes de responder, verifique se alguma skill disponível se aplica à tarefa.
+
 ## Running
 
 ```bash

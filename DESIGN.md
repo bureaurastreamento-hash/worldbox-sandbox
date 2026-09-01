@@ -220,4 +220,4 @@ Pedido do usuário: uma progressão real, no espírito do WorldBox, mas **autôn
 
 ---
 
-Status: fatias 1-11 implementadas, mais especialização de vila, diplomacia dinâmica e evolução da civilização (minério + construção + papéis visuais, §8) além do roteiro original (ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema e os próximos passos concretos da sessão mais recente).
+Status: fatias 1-11 implementadas, mais especialização de vila, diplomacia dinâmica (com ataque ofensivo/saque, §7) e evolução da civilização (minério + construção + papéis visuais, §8) além do roteiro original — mais decoração do mapa com arte real (§5 item 12) e fome individual ligada ao estoque da vila (§6) numa sessão posterior. Ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema e os próximos passos concretos da sessão mais recente.
