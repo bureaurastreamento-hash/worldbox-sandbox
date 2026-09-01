@@ -3,3 +3,8 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Matéria-prima de arte (packs baixados inteiros, PSD/ASEPRITE/__MACOSX
+# incluídos) — só o que for selecionado e recortado entra em assets/sprites/.
+# Ver STATUS.md/ROADMAP.md sobre o processo de seleção.
+assets/Assets-testes-para-o-claude-testar/
