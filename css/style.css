@@ -164,6 +164,14 @@ html, body {
   padding: 2px 0;
 }
 
+.resource-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  image-rendering: pixelated;
+}
+
 .inspector-score-row.current span:first-child {
   color: #6fbf6f;
   font-weight: bold;
