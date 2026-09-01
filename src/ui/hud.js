@@ -7,6 +7,7 @@ const ACTION_LABELS = {
   gather: 'colhendo',
   gatherWood: 'colhendo madeira',
   mine: 'minerando',
+  build: 'construindo',
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',

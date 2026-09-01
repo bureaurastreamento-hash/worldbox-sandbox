@@ -5,6 +5,8 @@ import {
   MINING_RESOURCES,
   REPRO_COOLDOWN_MIN,
   TERRITORY_RADIUS,
+  VILLAGE_POP_CAP,
+  HOUSE_POP_BONUS,
 } from '../utils/constants.js';
 
 // specialization: 'food' | 'wood' — decide qual dos dois recursos os
@@ -47,4 +49,11 @@ export function createVillage({ id, name, center, specialization = 'food' }) {
 
 export function addResident(village, agentId) {
   village.population.push(agentId);
+}
+
+// Teto de população efetivo — base + bônus por casa construída
+// (agent/actions/build.js). Usado tanto pra pontuar a decisão de construir
+// quanto pro gate de reprodução (lifecycle.js), pra não duplicar a fórmula.
+export function getPopulationCap(village) {
+  return VILLAGE_POP_CAP + village.buildings.length * HOUSE_POP_BONUS;
 }

@@ -22,6 +22,7 @@ export function createAgent({
     carrying: 0, // unidades de recurso carregadas (gather.js/gatherWood.js/mine.js/deliver.js)
     carryingType: null, // 'food' | 'wood' | um de MINING_RESOURCES — qual recurso está em `carrying`; deliver.js lê pra saber onde entregar
     miningResource: null, // qual minério mine.js está mirando na viagem corrente (persiste entre reconsiderações até entregar)
+    buildProgress: 0, // segundos de trabalho acumulados em build.js na construção corrente
     needs: createNeeds(),
     perception: { tiles: [], agents: [] }, // o que está visível agora (perception.js reescreve a cada tick)
     memory: createMemory(), // o que já foi visto, com confiança decrescente

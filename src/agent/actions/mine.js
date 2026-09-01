@@ -6,7 +6,7 @@
 // de montanha, não a lógica.
 
 import { TILE_TYPES } from '../../world/tile.js';
-import { TILE_SIZE, CARRY_CAPACITY, GATHER_RATE, GATHER_SCORE_WEIGHT, MINING_RESOURCES } from '../../utils/constants.js';
+import { TILE_SIZE, CARRY_CAPACITY, GATHER_RATE, MINE_SCORE_WEIGHT, MINING_RESOURCES } from '../../utils/constants.js';
 import { recallNearest } from '../memory.js';
 import { getVillage, findWalkableNear } from '../../world/world.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
@@ -24,7 +24,7 @@ function bestChoice(agent, world, village) {
   let bestScore = 0;
   for (const resource of MINING_RESOURCES) {
     if (!recallNearest(agent.memory, agent.position, isSafeDeposit(world, agent, resource))) continue;
-    const score = (village.demand[resource] ?? 0) * GATHER_SCORE_WEIGHT;
+    const score = (village.demand[resource] ?? 0) * MINE_SCORE_WEIGHT;
     if (score > bestScore) {
       bestScore = score;
       best = resource;

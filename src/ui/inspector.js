@@ -4,8 +4,8 @@
 // numa vila sem um agente selecionado (input/inputHandler.js) mostra só a
 // vila/clã, sem seção de agente.
 
-import { VILLAGE_POP_CAP } from '../utils/constants.js';
 import { getStance } from '../clan/clan.js';
+import { getPopulationCap } from '../village/village.js';
 
 const ACTION_LABELS = {
   wander: 'vagando',
@@ -14,6 +14,7 @@ const ACTION_LABELS = {
   gather: 'colhendo',
   gatherWood: 'colhendo madeira',
   mine: 'minerando',
+  build: 'construindo',
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',
@@ -83,7 +84,7 @@ export function createInspector(container) {
     const roleLabel = SPECIALIZATION_LABELS[village.specialization] ?? village.specialization;
     const chaosLabel = village.inChaos ? ' — EM COLAPSO INTERNO' : '';
     villageTitleEl.textContent = `Vila — ${village.name} (${roleLabel})${chaosLabel}`;
-    villagePopEl.textContent = `${village.population.length} / ${VILLAGE_POP_CAP}`;
+    villagePopEl.textContent = `${village.population.length} / ${getPopulationCap(village)} (${village.buildings.length} casa${village.buildings.length === 1 ? '' : 's'})`;
     villageStockEl.innerHTML = '';
     for (const type of Object.keys(village.capacity)) {
       const stock = Math.floor(village.stock[type] ?? 0);

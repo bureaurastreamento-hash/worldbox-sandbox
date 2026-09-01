@@ -60,11 +60,12 @@ function spawnVillage({ id, name, tx, ty, specialization }) {
       position: tileToWorld(agentSpot.tx, agentSpot.ty, TILE_SIZE),
       villageId: village.id,
       decisionTimer: world.rng.range(0, 0.5),
-      // Jitter na idade: fundadores com a mesma idade exata batiam MAX_AGE
-      // todos juntos, e se a reprodução não tivesse acontecido nenhuma vez
-      // até lá (comércio ainda bootstrapando numa vila especializada), a
-      // vila inteira morria de velhice de uma vez, sem ninguém pra repor.
-      age: FOUNDER_AGE + world.rng.range(0, 60),
+      // Jitter pequeno na idade: só pra fundadores não baterem MAX_AGE no
+      // exato mesmo tick uns dos outros. Uma faixa grande aqui piora as
+      // coisas (fundador nascido perto do topo da faixa já nasce com pouco
+      // tempo de vida) — a causa real de população zerar era MAX_AGE curto
+      // demais pra reprodução acompanhar, corrigido lá (utils/constants.js).
+      age: FOUNDER_AGE + world.rng.range(0, 15),
       skinTone: world.rng.next() < 0.5 ? 'light' : 'dark',
       gender: world.rng.next() < 0.5 ? 'man' : 'woman',
     });

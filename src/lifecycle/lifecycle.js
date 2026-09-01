@@ -1,6 +1,6 @@
 import { clamp } from '../utils/mathUtils.js';
 import { createAgent } from '../agent/agent.js';
-import { addResident } from '../village/village.js';
+import { addResident, getPopulationCap } from '../village/village.js';
 import { findNearestEnemy } from '../combat/combat.js';
 import {
   CHILD_ADULT_AGE,
@@ -13,7 +13,6 @@ import {
   REPRO_MIN_ADULTS,
   REPRO_ELIGIBLE_HUNGER,
   REPRO_FOOD_DEMAND_MAX,
-  VILLAGE_POP_CAP,
 } from '../utils/constants.js';
 
 export function ageAgent(agent, dt) {
@@ -68,7 +67,7 @@ export function updateVillageReproduction(village, world, dt) {
   if (village.reproCooldown > 0) return;
   village.reproCooldown = world.rng.range(REPRO_COOLDOWN_MIN, REPRO_COOLDOWN_MAX);
 
-  if (village.population.length >= VILLAGE_POP_CAP) return;
+  if (village.population.length >= getPopulationCap(village)) return;
   if (village.inChaos) return; // colapso interno (village/stock.js:updateChaos) trava reprodução
   if ((village.demand.food ?? 0) > REPRO_FOOD_DEMAND_MAX) return;
 
