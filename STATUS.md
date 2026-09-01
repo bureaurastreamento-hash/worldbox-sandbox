@@ -1,6 +1,6 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do fim da sessão que implementou as fatias 1-10 (ver `DESIGN.md` seção 5) mais uma leva de correções, atualizado no início da sessão seguinte após consertar o sprite quebrado (§6 antigo, passo 1 — ver §7). Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`).
+Snapshot do fim da sessão que implementou as fatias 1-10 (ver `DESIGN.md` seção 5) mais uma leva de correções, atualizado na sessão seguinte após consertar o sprite quebrado (§7), adicionar decoração do mapa (§8) e completar a fatia 11 — UI de observação (§9). Fatias 1-11 completas. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`).
 
 ## 1. O que foi feito nesta sessão
 
@@ -41,7 +41,7 @@ Nesta ordem:
 | Combat | ✅ Funcionando (engajar/fugir, dano mútuo, morte). Só reativo — sem ataque ofensivo deliberado, só defesa quando os territórios se aproximam. |
 | Life-cycle | ✅ Funcionando. |
 | Simulation LOD | ✅ Funcionando, validado só via simulação sintética (a população real do jogo, cap 30/vila, não é grande o suficiente pro jogador notar diferença de performance sozinho). |
-| UI/HUD | ⚠️ Parcial. Mostra ação/idade/fome/sono/vida do agente selecionado. Sem inspetor de vila/clã, sem scores de decisão visíveis — isso é a fatia 11, não iniciada. |
+| UI/HUD | ✅ HUD básico (ação/idade/fome/sono/vida) + inspetor (fatia 11, ver §9): scores de decisão, estoque/demanda/população da vila, postura/tratados do clã. |
 | Sprites de agente | ✅ Consertado — 4 variantes (pele clara/escura × homem/mulher), ver §7. |
 | Decoração do mapa (árvores/plantas/casas) | ✅ Placeholder geométrico, ver §8. Arte real ainda não existe. |
 | Animais no mapa | ❌ Não iniciado — decisão já tomada (decorativo simples primeiro; "vagando sem IA" fica pra outra leva quando tiver arte pronta). |
@@ -70,11 +70,13 @@ Nesta ordem:
 
 ## 6. Próximos passos concretos, em ordem
 
-1. **Fatia 11 — UI de observação**: inspetor completo do agente/vila/clã selecionado (scores de cada ação candidata, estoque/demanda da vila, tratados do clã) — hoje só existe o HUD básico (ação/idade/fome/sono/vida). Ver `ARCHITECTURE.md` (`ui/inspector.js`, ainda stub).
+Todas as 11 fatias do `DESIGN.md` (seção 5) estão implementadas agora. O que resta é lacuna/polish, não fatia pendente:
 
-2. **Trocar o placeholder geométrico da decoração pela arte real** quando ela existir — reaproveitar `world.decorations` (dados) e só reescrever `render/decorationRenderer.js` (ver §8), igual ao pipeline dos sprites de agente.
+1. **Trocar o placeholder geométrico da decoração pela arte real** quando ela existir — reaproveitar `world.decorations` (dados) e só reescrever `render/decorationRenderer.js` (ver §8), igual ao pipeline dos sprites de agente.
 
-3. **Considerar depois** (não pedido ainda, mas decorre do que já existe): especialização de vila — é o que falta pro caso de design original ("guerreira depende de agrícola") ficar observável de verdade. Não é uma fatia própria no `DESIGN.md`; decidir com o usuário se/quando vira uma.
+2. **Considerar depois** (não pedido ainda, mas decorre do que já existe): especialização de vila — é o que falta pro caso de design original ("guerreira depende de agrícola") ficar observável de verdade. Não é uma fatia própria no `DESIGN.md`; decidir com o usuário se/quando vira uma.
+
+3. **Considerar depois**: seleção direta de vila/clã (hoje o inspetor de vila/clã, §9, só aparece indiretamente via agente selecionado — clicar na vila/clã diretamente não é possível).
 
 ## 7. Sprites de variação integrados (feito nesta sessão)
 
@@ -96,3 +98,17 @@ Sem arte ainda (usuário optou por placeholder pra não esperar):
 - `render/decorationRenderer.js` (novo): desenha formas geométricas simples — triângulo verde pra árvore, círculo pequeno pra planta, retângulo com telhado triangular pra casa — com culling por viewport igual ao `tileRenderer.js`. Comentário no topo do arquivo já marca que é o único arquivo a reescrever quando a arte real chegar (dado de `world.decorations` não muda).
 - `render/renderer.js`: `drawDecorations` entra na ordem de desenho entre `drawVillages` e `drawAgents` — decoração fica no chão, agentes desenham por cima.
 - Testado ao vivo numa aba em primeiro plano: árvores nas florestas, plantas espalhadas na grama, casas dentro do território da vila, sem sobrepor agentes de forma confusa, sem erros de console.
+
+## 9. Fatia 11 — UI de observação (feito nesta sessão)
+
+Painel novo, `#inspector` (topo direito, ao lado do HUD básico já existente no topo esquerdo). Não introduz seleção própria — reaproveita `uiState.selectedAgentId` (o mesmo clique que já move o `hud.js`), então só funciona com um agente selecionado, não com clique direto em vila/clã (ver §6, considerar depois).
+
+- `agent/decision.js:reconsider`: passou a gravar `agent.lastScores = scores` (snapshot dos scores de todas as ações candidatas na última reconsideração) — só pra leitura da UI, não influencia a decisão em si. Campo `lastScores: null` adicionado ao factory em `agent/agent.js`.
+- `ui/inspector.js` (era stub, agora implementado): `createInspector(container)` retorna `{ update(agent, selectionState, world) }`, chamado em `main.js` junto com `hud.updateAgentStatus`. Mostra, quando um agente vivo está selecionado:
+  - **Agente**: lista de scores de decisão ordenada do maior pro menor, ação atual destacada em verde.
+  - **Vila**: nome, população/cap (`VILLAGE_POP_CAP`), estoque/capacidade/demanda de cada recurso.
+  - **Clã**: nome, postura (`clan/clan.js:getStance`) com cada outro clã do mundo, lista de tratados assinados (tipo + com qual clã).
+  - Espelha os três estados do `hud.js` (nada selecionado / vivo / morreu).
+- `index.html`/`css/style.css`: div `#inspector` nova, painel fixo topo-direito, mesmo estilo visual do HUD (fundo escuro translúcido, borda cinza).
+- Testado ao vivo numa aba em primeiro plano: selecionado um agente colhendo recurso — painel mostrou `colhendo` no topo com 0.55, as outras 6 ações com score correto (a maioria 0.00), vila com `5/30` população e `food 0/100 · demanda 100%`, clã mostrando postura `guerra` com o clã vizinho e "nenhum tratado assinado". Deseleção (clique em área vazia) volta ao estado neutro corretamente. Sem erros de console.
+- Commitado e enviado pro `main` (site ao vivo já atualizado) — ver commit desta sessão.

@@ -176,4 +176,4 @@ O pilar 4 do design ("vila guerreira que não produz comida... depende de vila a
 
 ---
 
-Status: fatias 1-10 implementadas, fatia 11 não iniciada (ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema e os próximos passos concretos da sessão mais recente).
+Status: fatias 1-11 implementadas (ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema e os próximos passos concretos da sessão mais recente).

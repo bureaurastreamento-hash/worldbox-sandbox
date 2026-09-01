@@ -107,7 +107,7 @@ src/
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
 - **`agent/perception.js`** — varre o raio de visão (tiles direto no grid; agentes via `world/spatialIndex.js:queryNearby`, que devolve um superconjunto por bounding box — ainda filtra por distância real depois); produz o que o agente vê *agora* — tiles e também outros agentes vivos por perto (`agent.perception.agents`, usado por `combat/combat.js`).
 - **`agent/memory.js`** — locais/relações conhecidos, com confiança que decai. `perception` alimenta `memory`; `decision` só considera o que está em `memory` ou na percepção atual — nunca o estado real do `world` que o agente não viu. Essa é a fronteira mais importante da arquitetura: **decision.js nunca lê `world` diretamente para saber "o que existe", só para executar uma ação já escolhida sobre um alvo já conhecido.**
-- **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção.
+- **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção. Guarda o snapshot de scores em `agent.lastScores` a cada reconsideração, consumido só por `ui/inspector.js` (fatia 11).
 - **`agent/movement.js`** — `moveToward(agent, world, dt, targetWorldPos)` compartilhado por toda ação que anda até um alvo: calcula o caminho uma vez (`world/pathfinding.js`) e segue os waypoints, devolvendo `'moving' | 'arrived' | 'unreachable'`. Nenhuma ação implementa movimento por conta própria.
 - **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `gather.js` pontua pela demanda da vila (não pela necessidade do agente) e enche `agent.carrying`; `deliver.js` só vira candidata quando `agent.carrying > 0` e descarrega no `village/stock.js` ao chegar. `fight.js`/`flee.js` usam `combat/combat.js:findNearestEnemy` — crianças e agentes com vida abaixo do limiar nunca lutam (score 0), só fogem (score alto); o resto prioriza lutar, mas foge se a vida cair demais em combate — reavaliado a cada reconsideração, não uma decisão travada.
 
@@ -126,7 +126,7 @@ src/
 
 - **`input/inputHandler.js`** — pan/zoom de câmera (arrastar/scroll), pausar/mudar velocidade, `[D]` toggle de debug. Clique (sem arrastar, distingue por distância percorrida desde o mousedown) seleciona o agente mais próximo do cursor em `uiState.selectedAgentId`; clicar fora de qualquer agente deseleciona.
 - **`ui/hud.js`** — controles de tempo, renderizado em `#hud` (DOM, fora do canvas). O painel de status mostra o agente selecionado (`uiState.selectedAgentId`, lido em `main.js`) em três estados: nada selecionado, vivo, ou morreu (evita o problema de antes: com painel sempre em `world.agents[0]`, a identidade mudava sozinha quando esse agente morria e era removido do array).
-- **`ui/inspector.js`** — painel de inspeção mais completo da entidade selecionada (scores das candidatas, estoque/demanda, tratados) — o essencial de "ver o que o agente selecionado está fazendo" já existe no `hud.js`; isto fica pra fatia 11.
+- **`ui/inspector.js`** (fatia 11) — painel de inspeção mais completo (`#inspector`, topo direito), reaproveita `uiState.selectedAgentId` sem introduzir seleção própria. Mostra o score de cada ação candidata na última reconsideração (`agent.lastScores`, escrito por `agent/decision.js:reconsider` — snapshot só pra UI, não influencia a decisão), destacando a ação atual; estoque/demanda/população da vila do agente; postura do clã dele com os outros clãs e os tratados assinados. Espelha os três estados de `hud.js` (nada selecionado / vivo / morreu).
 
 - **`utils/rng.js`**, **`mathUtils.js`**, **`constants.js`** — sem estado de jogo; helpers puros usados por qualquer módulo acima.
 
@@ -158,6 +158,6 @@ Abrir http://localhost:8000 — nenhum passo de build.
 
 ---
 
-Status: fatias 1-10 implementadas (ver `DESIGN.md`, seção 5). Próximo passo: fatia 11 (UI de observação).
+Status: fatias 1-11 implementadas (ver `DESIGN.md`, seção 5). Ver `STATUS.md` pra próximos passos concretos.
 
 Nota sobre a fatia 9: vilas destinadas à guerra nascem mais perto (`WAR_VILLAGE_MIN/MAX_DIST` em `utils/constants.js`) — sem isso, a distância padrão entre vilas (70-100 tiles) é maior que qualquer coisa que um agente perceba ou percorra vagando, e elas nunca se encontrariam pra lutar.

@@ -106,3 +106,70 @@ html, body {
   background: #3a7d3a;
   border-color: #6fbf6f;
 }
+
+#inspector {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 220px;
+  margin: 8px;
+  pointer-events: auto;
+  background: rgba(20, 20, 20, 0.75);
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #fff;
+  font-family: sans-serif;
+  font-size: 12px;
+  padding: 8px 10px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+.inspector-empty {
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+.inspector-section {
+  margin-bottom: 10px;
+}
+
+.inspector-section:last-child {
+  margin-bottom: 0;
+}
+
+.inspector-title {
+  text-transform: uppercase;
+  font-size: 10px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.inspector-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.inspector-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inspector-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.inspector-score-row.current span:first-child {
+  color: #6fbf6f;
+  font-weight: bold;
+}
+
+.inspector-muted {
+  opacity: 0.5;
+  font-style: italic;
+}

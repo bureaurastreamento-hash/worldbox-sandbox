@@ -24,6 +24,7 @@ export function createAgent({
     perception: { tiles: [], agents: [] }, // o que está visível agora (perception.js reescreve a cada tick)
     memory: createMemory(), // o que já foi visto, com confiança decrescente
     currentAction: null,
+    lastScores: null, // snapshot dos scores da última reconsideração (decision.js), pra ui/inspector.js
     decisionTimer, // jitter por agente para não recalcular todos no mesmo tick
     age,
     lifeStage: 'child', // corrigido pelo primeiro ageAgent() do tick, ver lifecycle.js

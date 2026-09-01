@@ -24,6 +24,7 @@ function reconsider(agent, world) {
   for (const type of Object.keys(ACTION_TYPES)) {
     scores[type] = ACTION_TYPES[type].score(agent, world);
   }
+  agent.lastScores = scores; // snapshot pra UI de inspeção (ui/inspector.js), não usado pela decisão em si
 
   if (!agent.currentAction) {
     agent.currentAction = highestScoring(scores);

@@ -1,5 +1,148 @@
-// Fatia 11: painel de inspeção do agente/vila/clã selecionado — mostra needs,
-// ação atual e score das candidatas, estoque/demanda da vila, tratados do
-// clã. É a janela para "por que a sociedade decidiu isso".
+// Fatia 11: painel de inspeção do agente selecionado — mostra o score de
+// cada ação candidata (por que a decisão de utilidade escolheu a ação
+// atual), o estoque/demanda da vila dele e a postura/tratados do clã dele.
+// Não introduz seleção própria: reaproveita `uiState.selectedAgentId`
+// (input/inputHandler.js), o mesmo estado que já move o hud.js básico.
 
-// TODO (fatia 11): createInspector(container), inspect(entity)
+import { VILLAGE_POP_CAP } from '../utils/constants.js';
+import { getStance } from '../clan/clan.js';
+
+const ACTION_LABELS = {
+  wander: 'vagando',
+  eat: 'comendo',
+  sleep: 'dormindo',
+  gather: 'colhendo',
+  deliver: 'entregando',
+  fight: 'lutando',
+  flee: 'fugindo',
+};
+
+const STANCE_LABELS = { war: 'guerra', tense: 'tensão', neutral: 'neutro', allied: 'aliado' };
+const TREATY_LABELS = { alliance: 'aliança', defense_pact: 'pacto de defesa', nonaggression: 'não-agressão', trade: 'comércio' };
+
+export function createInspector(container) {
+  container.innerHTML = `
+    <div class="inspector-empty" data-field="empty">clique num personagem pra inspecionar</div>
+    <div class="inspector-body" data-field="body" hidden>
+      <div class="inspector-section">
+        <div class="inspector-title">Agente — scores de decisão</div>
+        <ul class="inspector-list" data-field="scores"></ul>
+      </div>
+      <div class="inspector-section">
+        <div class="inspector-title" data-field="village-title">Vila</div>
+        <div class="inspector-row"><span>população</span><span data-field="village-pop">–</span></div>
+        <ul class="inspector-list" data-field="village-stock"></ul>
+      </div>
+      <div class="inspector-section">
+        <div class="inspector-title" data-field="clan-title">Clã</div>
+        <ul class="inspector-list" data-field="clan-stances"></ul>
+        <ul class="inspector-list" data-field="clan-treaties"></ul>
+      </div>
+    </div>
+  `;
+
+  const emptyEl = container.querySelector('[data-field="empty"]');
+  const bodyEl = container.querySelector('[data-field="body"]');
+  const scoresEl = container.querySelector('[data-field="scores"]');
+  const villageTitleEl = container.querySelector('[data-field="village-title"]');
+  const villagePopEl = container.querySelector('[data-field="village-pop"]');
+  const villageStockEl = container.querySelector('[data-field="village-stock"]');
+  const clanTitleEl = container.querySelector('[data-field="clan-title"]');
+  const clanStancesEl = container.querySelector('[data-field="clan-stances"]');
+  const clanTreatiesEl = container.querySelector('[data-field="clan-treaties"]');
+
+  function renderScores(agent) {
+    scoresEl.innerHTML = '';
+    if (!agent.lastScores) {
+      scoresEl.innerHTML = '<li class="inspector-muted">sem dados ainda</li>';
+      return;
+    }
+
+    const entries = Object.entries(agent.lastScores).sort((a, b) => b[1] - a[1]);
+    for (const [type, score] of entries) {
+      const li = document.createElement('li');
+      li.className = 'inspector-score-row';
+      if (type === agent.currentAction) li.classList.add('current');
+      li.innerHTML = `<span>${ACTION_LABELS[type] ?? type}</span><span>${score.toFixed(2)}</span>`;
+      scoresEl.appendChild(li);
+    }
+  }
+
+  function renderVillage(village) {
+    if (!village) {
+      villageTitleEl.textContent = 'Vila — nenhuma';
+      villagePopEl.textContent = '–';
+      villageStockEl.innerHTML = '';
+      return;
+    }
+
+    villageTitleEl.textContent = `Vila — ${village.name}`;
+    villagePopEl.textContent = `${village.population.length} / ${VILLAGE_POP_CAP}`;
+    villageStockEl.innerHTML = '';
+    for (const type of Object.keys(village.capacity)) {
+      const stock = Math.floor(village.stock[type] ?? 0);
+      const cap = village.capacity[type];
+      const demandPct = Math.round((village.demand[type] ?? 0) * 100);
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${type}</span><span>${stock}/${cap} · demanda ${demandPct}%</span>`;
+      villageStockEl.appendChild(li);
+    }
+  }
+
+  function renderClan(clan, world) {
+    if (!clan) {
+      clanTitleEl.textContent = 'Clã — nenhum';
+      clanStancesEl.innerHTML = '';
+      clanTreatiesEl.innerHTML = '';
+      return;
+    }
+
+    clanTitleEl.textContent = `Clã — ${clan.name}`;
+
+    clanStancesEl.innerHTML = '';
+    const others = world.clans.filter((c) => c.id !== clan.id);
+    if (others.length === 0) {
+      clanStancesEl.innerHTML = '<li class="inspector-muted">nenhum outro clã no mundo</li>';
+    }
+    for (const other of others) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${other.name}</span><span>${STANCE_LABELS[getStance(clan, other)] ?? '–'}</span>`;
+      clanStancesEl.appendChild(li);
+    }
+
+    clanTreatiesEl.innerHTML = '';
+    const signed = clan.treaties.filter((t) => t.status === 'signed');
+    if (signed.length === 0) {
+      clanTreatiesEl.innerHTML = '<li class="inspector-muted">nenhum tratado assinado</li>';
+    }
+    for (const treaty of signed) {
+      const otherId = treaty.clanA === clan.id ? treaty.clanB : treaty.clanA;
+      const other = world.clans.find((c) => c.id === otherId);
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${TREATY_LABELS[treaty.type] ?? treaty.type}</span><span>com ${other?.name ?? '–'}</span>`;
+      clanTreatiesEl.appendChild(li);
+    }
+  }
+
+  // selectionState: 'none' | 'alive' | 'dead' — mesmo estado que hud.js usa.
+  function update(agent, selectionState, world) {
+    if (selectionState !== 'alive' || !agent) {
+      emptyEl.hidden = false;
+      emptyEl.textContent = selectionState === 'dead' ? 'personagem selecionado morreu' : 'clique num personagem pra inspecionar';
+      bodyEl.hidden = true;
+      return;
+    }
+
+    emptyEl.hidden = true;
+    bodyEl.hidden = false;
+
+    const village = world.villages.find((v) => v.id === agent.villageId) ?? null;
+    const clan = village ? world.clans.find((c) => c.id === village.clanId) ?? null : null;
+
+    renderScores(agent);
+    renderVillage(village);
+    renderClan(clan, world);
+  }
+
+  return { update };
+}
