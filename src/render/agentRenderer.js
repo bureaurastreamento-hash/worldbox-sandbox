@@ -1,18 +1,31 @@
 // Sprites provisórios do amigo do usuário — ver memória do projeto: isto vai
-// ser substituído aos poucos. Human1 = parado, Human2 = passo de andar;
-// alterna 1/2 enquanto o agente se move de verdade, fica em 1 parado.
+// ser substituído aos poucos. Por variante (pele clara/escura x homem/mulher),
+// quadro 1 = parado, quadro 2 = passo de andar; alterna 1/2 enquanto o agente
+// se move de verdade, fica em 1 parado.
 //
-// As duas imagens são telas grandes (1200x1200) com bastante espaço vazio
-// ao redor do personagem, e o conteúdo não fica no mesmo lugar/tamanho
-// relativo nas duas — por isso o recorte do conteúdo real é calculado a
-// partir do canal alpha na hora de carregar, em vez de fixar coordenadas no
-// código (isso sobrevive à próxima troca de arte sem precisar mexer aqui).
-const FRAME_PATHS = ['assets/sprites/Human1.png', 'assets/sprites/Human2.png'];
-const sprites = FRAME_PATHS.map((path) => {
-  const img = new Image();
-  img.src = path;
-  return img;
-});
+// As imagens são telas grandes com bastante espaço vazio ao redor do
+// personagem, e o conteúdo não fica no mesmo lugar/tamanho relativo em
+// todas — por isso o recorte do conteúdo real é calculado a partir do canal
+// alpha na hora de carregar, em vez de fixar coordenadas no código (isso
+// sobrevive à próxima troca de arte sem precisar mexer aqui).
+const VARIANT_FILE_PREFIX = {
+  'light-man': 'WMan',
+  'light-woman': 'WGirl',
+  'dark-man': 'BMan',
+  'dark-woman': 'BGirl',
+};
+const DEFAULT_VARIANT = 'light-man';
+
+const spritesByVariant = {}; // variantKey -> [imgParado, imgAndando]
+let totalSprites = 0;
+for (const [variant, prefix] of Object.entries(VARIANT_FILE_PREFIX)) {
+  spritesByVariant[variant] = [1, 2].map((frame) => {
+    const img = new Image();
+    img.src = `assets/sprites/${prefix}${frame}.png`;
+    totalSprites++;
+    return img;
+  });
+}
 const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
 let spritesReady = 0;
 
@@ -46,11 +59,13 @@ function computeContentBounds(img) {
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-sprites.forEach((img) => {
-  img.onload = () => {
-    spriteBounds.set(img, computeContentBounds(img));
-    spritesReady++;
-  };
+Object.values(spritesByVariant).forEach((frames) => {
+  frames.forEach((img) => {
+    img.onload = () => {
+      spriteBounds.set(img, computeContentBounds(img));
+      spritesReady++;
+    };
+  });
 });
 
 const WALK_FRAME_MS = 220; // troca de perna a cada tanto tempo, só enquanto anda
@@ -75,7 +90,7 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
   const walkFrame = Math.floor(performance.now() / WALK_FRAME_MS) % 2;
-  const spritesLoaded = spritesReady === sprites.length;
+  const spritesLoaded = spritesReady === totalSprites;
 
   for (const agent of world.agents) {
     const pos = camera.worldToScreen(agent.position.x, agent.position.y, viewW, viewH);
@@ -91,7 +106,9 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
     }
 
     if (spritesLoaded) {
-      const sprite = sprites[moving ? walkFrame : 0];
+      const variantKey = `${agent.skinTone}-${agent.gender}`;
+      const frames = spritesByVariant[variantKey] ?? spritesByVariant[DEFAULT_VARIANT];
+      const sprite = frames[moving ? walkFrame : 0];
       const bounds = spriteBounds.get(sprite);
       const h = (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom;
       const w = h * (bounds.w / bounds.h);

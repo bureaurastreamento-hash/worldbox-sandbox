@@ -56,6 +56,8 @@ function spawnVillage({ id, name, tx, ty }) {
       villageId: village.id,
       decisionTimer: world.rng.range(0, 0.5),
       age: FOUNDER_AGE,
+      skinTone: world.rng.next() < 0.5 ? 'light' : 'dark',
+      gender: world.rng.next() < 0.5 ? 'man' : 'woman',
     });
 
     world.agents.push(agent);

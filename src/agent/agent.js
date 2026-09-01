@@ -1,10 +1,20 @@
 import { createNeeds } from './needs.js';
 import { createMemory } from './memory.js';
 
-export function createAgent({ id, position, villageId = null, decisionTimer = 0, age = 0 }) {
+export function createAgent({
+  id,
+  position,
+  villageId = null,
+  decisionTimer = 0,
+  age = 0,
+  skinTone = 'light',
+  gender = 'man',
+}) {
   return {
     id,
     position: { x: position.x, y: position.y },
+    skinTone, // 'light' | 'dark' — escolhe o sprite (agentRenderer.js)
+    gender, // 'man' | 'woman' — escolhe o sprite (agentRenderer.js)
     target: null, // alvo de movimento da ação corrente; null = precisa escolher um
     path: null, // waypoints até target (agent/movement.js), calculado via pathfinding
     pathTargetKey: null,

@@ -1,6 +1,6 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do fim da sessão que implementou as fatias 1-10 (ver `DESIGN.md` seção 5) mais uma leva de correções. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`).
+Snapshot do fim da sessão que implementou as fatias 1-10 (ver `DESIGN.md` seção 5) mais uma leva de correções, atualizado no início da sessão seguinte após consertar o sprite quebrado (§6 antigo, passo 1 — ver §7). Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`).
 
 ## 1. O que foi feito nesta sessão
 
@@ -42,15 +42,14 @@ Nesta ordem:
 | Life-cycle | ✅ Funcionando. |
 | Simulation LOD | ✅ Funcionando, validado só via simulação sintética (a população real do jogo, cap 30/vila, não é grande o suficiente pro jogador notar diferença de performance sozinho). |
 | UI/HUD | ⚠️ Parcial. Mostra ação/idade/fome/sono/vida do agente selecionado. Sem inspetor de vila/clã, sem scores de decisão visíveis — isso é a fatia 11, não iniciada. |
-| Sprites de agente | ⚠️ **Quebrado no momento** — ver §3, bug #1. |
+| Sprites de agente | ✅ Consertado — 4 variantes (pele clara/escura × homem/mulher), ver §7. |
 | Decoração do mapa (árvores/plantas/casas) | ❌ Não iniciado. |
 | Animais no mapa | ❌ Não iniciado — decisão já tomada (decorativo simples primeiro; "vagando sem IA" fica pra outra leva quando tiver arte pronta). |
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
 
-1. **[Crítico] Sprite do agente quebrado no jogo ao vivo agora.** `src/render/agentRenderer.js` referencia `assets/sprites/Human1.png` e `Human2.png`, que foram deletados nesta sessão (substituídos pelos 8 arquivos de variação). O jogo cai no fallback (círculo amarelo) até a integração ser feita — é o próximo passo #1 abaixo.
-2. Não testei a animação de andar nem o LOD visualmente ao vivo de forma confiável — o Chrome automatizado usado nos testes throttla o `requestAnimationFrame` de abas em segundo plano. Validei ambos via simulação direta (chamando as funções fora do loop do navegador) em vez de observar o jogo rodando. Vale conferir manualmente numa aba em primeiro plano.
-3. Combate é só reativo — vilas em guerra só se encontram organicamente perto da fronteira (por isso nascem mais perto). Não tem "invadir a vila inimiga" nem qualquer comportamento ofensivo deliberado.
+1. Não testei a animação de andar nem o LOD visualmente ao vivo de forma confiável — o Chrome automatizado usado nos testes throttla o `requestAnimationFrame` de abas em segundo plano. Validei ambos via simulação direta (chamando as funções fora do loop do navegador) em vez de observar o jogo rodando. Vale conferir manualmente numa aba em primeiro plano. (A integração dos 8 sprites, §7, foi testada numa aba em primeiro plano e confirmou que a animação de andar continua funcionando visualmente.)
+2. Combate é só reativo — vilas em guerra só se encontram organicamente perto da fronteira (por isso nascem mais perto). Não tem "invadir a vila inimiga" nem qualquer comportamento ofensivo deliberado.
 
 ## 4. Decisões técnicas e o motivo
 
@@ -71,17 +70,19 @@ Nesta ordem:
 
 ## 6. Próximos passos concretos, em ordem
 
-1. **Consertar o sprite quebrado (urgente) — integrar os 8 arquivos de variação.**
-   - `assets/sprites/`: `BMan1.png`/`BMan2.png` (pele escura, homem), `BGirl1.png`/`BGirl2.png` (pele escura, mulher), `WMan1.png`/`WMan2.png` (pele clara, homem), `WGirl1.png`/`WGirl2.png` (pele clara, mulher). `1` = parado, `2` = passo de andar (mesmo padrão já usado pro `Human1`/`Human2` anterior).
-   - Adicionar em `agent/agent.js`: campos `skinTone` (`'dark'` | `'light'`) e `gender` (`'man'` | `'woman'`), passados no `createAgent({...})` com default sensato.
-   - Fundadores (`main.js:spawnVillage`): sortear os dois 50/50 via `world.rng`.
-   - Filhos (`lifecycle.js:tryReproduce`): herdar `skinTone` de um dos dois pais (aleatório, não sempre o mesmo), `gender` 50/50 independente.
-   - `render/agentRenderer.js`: trocar o par único de sprites por um mapa de 4 variantes (`dark-man`, `dark-woman`, `light-man`, `light-woman`), cada uma com seus dois quadros; reaproveitar `computeContentBounds` (já existe, não reescrever) pras 8 imagens. Escolher a variante por `${agent.skinTone}-${agent.gender}`.
-   - Testar como nas fatias anteriores: carregar as 8 imagens sem erro 404, conferir que o recorte de conteúdo bate pra cada uma, visual ao vivo com pelo menos uma combinação de cada variante em tela.
-   - Commitar (`assets/sprites/*` já commitado; falta só o código) e dar push.
+1. **Decoração do mapa**: árvores, plantas, casas como sprites decorativos parados — mesmo tratamento visual dos personagens (`new Image()`, recorte por alpha, fallback enquanto carrega), sem lógica nem movimento. Prováveis pontos de entrada: um `render/decorationRenderer.js` novo, e decidir se a posição de cada decoração é determinística por seed (nasce sempre no mesmo lugar pra uma dada seed, tipo o terreno) ou aleatória a cada carregamento. **Sem arte ainda** — perguntar ao usuário se já tem os arquivos antes de começar, ou usar formas geométricas simples como placeholder só se ele pedir pra não esperar.
 
-2. **Decoração do mapa**: árvores, plantas, casas como sprites decorativos parados — mesmo tratamento visual dos personagens (`new Image()`, recorte por alpha, fallback enquanto carrega), sem lógica nem movimento. Prováveis pontos de entrada: um `render/decorationRenderer.js` novo, e decidir se a posição de cada decoração é determinística por seed (nasce sempre no mesmo lugar pra uma dada seed, tipo o terreno) ou aleatória a cada carregamento. **Sem arte ainda** — perguntar ao usuário se já tem os arquivos antes de começar, ou usar formas geométricas simples como placeholder só se ele pedir pra não esperar.
+2. **Fatia 11 — UI de observação**: inspetor completo do agente/vila/clã selecionado (scores de cada ação candidata, estoque/demanda da vila, tratados do clã) — hoje só existe o HUD básico (ação/idade/fome/sono/vida). Ver `ARCHITECTURE.md` (`ui/inspector.js`, ainda stub).
 
-3. **Fatia 11 — UI de observação**: inspetor completo do agente/vila/clã selecionado (scores de cada ação candidata, estoque/demanda da vila, tratados do clã) — hoje só existe o HUD básico (ação/idade/fome/sono/vida). Ver `ARCHITECTURE.md` (`ui/inspector.js`, ainda stub).
+3. **Considerar depois** (não pedido ainda, mas decorre do que já existe): especialização de vila — é o que falta pro caso de design original ("guerreira depende de agrícola") ficar observável de verdade. Não é uma fatia própria no `DESIGN.md`; decidir com o usuário se/quando vira uma.
 
-4. **Considerar depois** (não pedido ainda, mas decorre do que já existe): especialização de vila — é o que falta pro caso de design original ("guerreira depende de agrícola") ficar observável de verdade. Não é uma fatia própria no `DESIGN.md`; decidir com o usuário se/quando vira uma.
+## 7. Sprites de variação integrados (feito nesta sessão)
+
+Consertado o bug crítico do fim da sessão anterior (`Human1.png`/`Human2.png` deletados sem substituição no código):
+
+- `agent/agent.js`: `createAgent` ganhou `skinTone` (`'light'` | `'dark'`, default `'light'`) e `gender` (`'man'` | `'woman'`, default `'man'`).
+- `main.js:spawnVillage`: cada fundador sorteia os dois 50/50 via `world.rng.next()`.
+- `lifecycle.js:tryReproduce`: filho herda `skinTone` de um dos dois pais (50/50, não sempre o mesmo) e `gender` 50/50 independente.
+- `render/agentRenderer.js`: `VARIANT_FILE_PREFIX` mapeia as 4 combinações (`light-man`→`WMan`, `light-woman`→`WGirl`, `dark-man`→`BMan`, `dark-woman`→`BGirl`) para pares de frames `[parado, andando]`; `computeContentBounds` (recorte por alpha) reaproveitado sem mudança para as 8 imagens; `drawAgents` escolhe o par por `${agent.skinTone}-${agent.gender}`.
+- Testado: as 8 imagens carregam com HTTP 200 (sem 404), sem erros de console; visual ao vivo numa aba em primeiro plano confirmou recorte consistente e animação de andar funcionando; sorteio 50/50 e herança confirmados rodando o código diretamente (200 amostras cada, distribuição ~50/50 nas duas pontas).
+- Não commitado ainda — decidir com o usuário antes de dar push.
