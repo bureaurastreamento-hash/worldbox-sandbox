@@ -36,6 +36,23 @@ export const GATHER_RATE = CARRY_CAPACITY / GATHER_SECONDS;
 export const VILLAGE_FOOD_CAPACITY = 100;
 export const VILLAGE_WOOD_CAPACITY = 100;
 
+// Toda vila nasce com isso em estoque de comida, mesmo a especializada em
+// madeira (que nunca produz comida própria, ver village/village.js). Sem
+// isso, agent/actions/eat.js (fome ligada ao estoque) mataria de fome os
+// fundadores de toda vila guerreira antes de qualquer comércio ter chance de
+// se estabelecer — bootstrap seguro, não um recurso renovável (uma vez
+// gasto, só volta via colheita ou comércio, igual o resto do estoque).
+export const STARTING_FOOD_STOCK = 40;
+
+// agent/actions/eat.js: unidades de estoque de comida consumidas por segundo
+// comendo, e quanto cada unidade restaura de fome. 15 unidades pra reencher
+// 0->100 (mesma duração de antes, quando comer não consumia nada do
+// estoque) — cerca de 1.5 viagem de gather.js (CARRY_CAPACITY=10) por
+// reabastecimento completo de um agente; valor inicial, calibrar depois de
+// observar jogando (ver STATUS.md).
+export const EAT_FOOD_PER_SEC = 1;
+export const EAT_RESTORE_PER_FOOD = 100 / 15 / EAT_FOOD_PER_SEC;
+
 // Abaixo de 1: sobrevivência pessoal deve normalmente vencer trabalho
 // comunitário antes de virar crítica (ver agent/actions/gather.js).
 export const GATHER_SCORE_WEIGHT = 0.55;

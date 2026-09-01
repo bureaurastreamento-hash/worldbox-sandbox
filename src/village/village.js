@@ -7,6 +7,7 @@ import {
   TERRITORY_RADIUS,
   VILLAGE_POP_CAP,
   HOUSE_POP_BONUS,
+  STARTING_FOOD_STOCK,
 } from '../utils/constants.js';
 
 // specialization: 'food' | 'wood' — decide qual dos dois recursos os
@@ -20,7 +21,7 @@ import {
 // utils/constants.js:CRITICAL_RESOURCES), só comércio genérico e construção.
 export function createVillage({ id, name, center, specialization = 'food' }) {
   const capacity = { food: VILLAGE_FOOD_CAPACITY, wood: VILLAGE_WOOD_CAPACITY };
-  const stock = { food: 0, wood: 0 };
+  const stock = { food: STARTING_FOOD_STOCK, wood: 0 }; // ver STARTING_FOOD_STOCK: bootstrap seguro pra eat.js
   const demand = { food: 0, wood: 0 };
   for (const resource of MINING_RESOURCES) {
     capacity[resource] = VILLAGE_MINERAL_CAPACITY;

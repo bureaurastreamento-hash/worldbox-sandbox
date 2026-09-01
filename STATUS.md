@@ -21,6 +21,10 @@ Por último, próximo passo indicado (§5 item 2 de então): **trocar o placehol
 
 Achado de processo, não do jogo: o primeiro teste ao vivo desta parte mostrou tela **totalmente preta** — a causa foi um `cd` de sessões anteriores (checando dimensão de arquivo) que deixou o diretório de trabalho do terminal dentro de `assets/Assets-testes-para-o-claude-testar/`, então o servidor local subiu servindo aquele diretório em vez da raiz do projeto. Depois de corrigir isso, um segundo problema apareceu: o Chrome manteve em cache uma versão antiga do módulo `decorationRenderer.js` entre navegações (o `python -m http.server` não manda `Cache-Control`), mascarada porque `read_console_messages`/`read_network_requests` desta sessão de automação não capturaram nem os `console.error` nem os pedidos de imagem de forma confiável — só um hard reload (`Ctrl+Shift+R`) resolveu e confirmou a arte de verdade na tela. Vale lembrar disso em testes futuros: depois de editar um arquivo servido por `http.server` e já ter aberto a página antes no mesmo Chrome, sempre hard-reload, não confiar só em "sem erro no console" como prova de que o código novo rodou.
 
+Por fim, o usuário pediu explicitamente pra avançar direto pro item 4 da lista de então (fome individual ligada ao estoque), pulando os itens de observação 1-3 pra depois — mas antes de codar, perguntei (via pergunta ao usuário) qual abordagem usar, porque a própria sessão anterior tinha marcado esse item como arriscado: uma mudança parecida (`REPRO_FOOD_DEMAND_MAX` amarrado ao estoque institucional) já causou a espiral de extinção populacional documentada em §1 item 9. **Fome individual ligada ao estoque (implementado)**: `agent/actions/eat.js` reescrito — usuário escolheu a versão mais fiel ao pilar 4 ("comer vira ir até a vila", não a híbrida mais segura): o agente marcha até o centro da vila e come de `village.stock.food`; sem estoque, comer não é candidata viável, e o agente passa fome de verdade (pode até morrer de fome numa vila guerreira sem comércio, não só travar reprodução). Pra não abrir a mesma espiral de novo, toda vila (inclusive guerreira) agora nasce com `STARTING_FOOD_STOCK=40` em vez de zero — decisão minha, não pedida literalmente, mas necessária: sem isso, os fundadores de qualquer vila guerreira morreriam de fome nos primeiros ~70s de qualquer partida nova, antes de qualquer comércio ter chance real de se formar. Detalhe técnico completo em `DESIGN.md` §6 e `ARCHITECTURE.md`.
+
+**Testado ao vivo**: ~9 minutos simulados a 4x (servidor subido do diretório correto desta vez, aba nova + hard reload, lição do teste anterior aplicada). Checei duas vilas — Vila 1 (agrícola) com `comendo` aparecendo certinho na lista de scores do inspetor de agente, estoque de comida estável (40/100); Vila 3 (guerreira, em guerra com a Vila 4, nunca produz comida própria) também com 40/100 ainda intacto, população 8/30 sem nenhuma morte nas duas. Sem erro no console durante todo o teste. **Não deu tempo de confirmar o cenário mais importante**: ver o estoque inicial da guerreira se esgotar de verdade e uma morte por fome individual acontecer como esperado — 9 minutos simulados não foi suficiente pra isso acontecer organicamente; fica como item novo em §5.
+
 ## 1. O que foi implementado ou alterado na sessão anterior
 
 Nesta ordem:
@@ -45,7 +49,7 @@ Nesta ordem:
 | Camera/Render | ✅ Funcionando. Zoom mínimo agora "contain" (mapa inteiro cabe na tela). |
 | Perception | ✅ Funcionando (tiles + recurso de montanha + agentes, via índice espacial). |
 | Memory | ✅ Funcionando. |
-| Needs | ⚠️ Parcial. Só fome e sono das 5 necessidades originais do pitch. Fome é sempre do ambiente direto, nunca do estoque da vila (ver §6, item de fatia futura). |
+| Needs | ⚠️ Parcial. Só fome e sono das 5 necessidades originais do pitch. Fome agora vem do estoque da vila (`village.stock.food`), não mais do ambiente direto — ver §0. |
 | Utility AI / Decision | ✅ Funcionando. 11 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `mine`, `build`, `deliver`, `fight`, `flee`, `raid`. |
 | Pathfinding | ✅ Funcionando (A*). Montanha não é andável — ações que envolvem depósito de montanha miram o tile andável adjacente. |
 | Village (estoque/demanda/população) | ✅ Funcionando. 6 recursos (food/wood/stone/coal/iron/gold). Teto de população dinâmico via `getPopulationCap` (base + bônus por casa construída). |
@@ -91,21 +95,23 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Confirmar o saque com uma leitura direta de agente, não só evidência indireta** — o teste desta sessão (ver §0) já observou uma guerra real escalar e o `distress` resetar repetidamente sem comércio ativo (evidência forte de saque funcionando), mas não uma seleção direta de um agente com `currentAction === 'raid'` nem visualização de população zerando numa vila saqueada até o fim. Também falta checar se `RAID_SCORE` está bem calibrado numa sessão mais longa (nem esvazia a economia toda vez que há guerra, nem é ignorado).
+1. **Confirmar que fome ligada ao estoque não reabre a espiral de extinção** — a mudança mais arriscada desta sessão (ver §0): 9 minutos simulados não foram suficientes pra ver o `STARTING_FOOD_STOCK` de uma vila guerreira se esgotar de verdade nem uma morte por fome individual acontecer. Prioridade alta — deixar rodando bem mais tempo (30+ minutos reais) e observar particularmente vilas guerreiras/em guerra, que são o caso mais exposto (nunca produzem comida própria). Se aparecer extinção, o histórico de investigação em §1 item 9 é o ponto de partida.
 
-2. **Confirmar a estabilidade populacional jogando de verdade** (não só simulação direta) — deixar o jogo rodando uma sessão real de 15-30+ minutos e observar se a população se mantém saudável nas 4 vilas, se alguma entra em colapso/extinção, e se o crescimento inicial rápido (32→69 em ~200s simulados nos testes) se estabiliza bem. Reportar o que acontecer antes de mexer em mais balanceamento.
+2. **Confirmar o saque com uma leitura direta de agente, não só evidência indireta** — o teste desta sessão (ver §0) já observou uma guerra real escalar e o `distress` resetar repetidamente sem comércio ativo (evidência forte de saque funcionando), mas não uma seleção direta de um agente com `currentAction === 'raid'` nem visualização de população zerando numa vila saqueada até o fim. Também falta checar se `RAID_SCORE` está bem calibrado numa sessão mais longa (nem esvazia a economia toda vez que há guerra, nem é ignorado).
 
-3. **Ajustar ritmo de mineração/construção se parecer lento demais jogando** — considerar aumentar `PERCEPTION_RADIUS`, ou vilas nascerem mais perto de montanha, ou reduzir `HOUSE_STONE_COST`/`HOUSE_WOOD_COST`, dependendo do que a sessão de observação (item 2) mostrar.
+3. **Confirmar a estabilidade populacional jogando de verdade** (não só simulação direta) — deixar o jogo rodando uma sessão real de 15-30+ minutos e observar se a população se mantém saudável nas 4 vilas, se alguma entra em colapso/extinção, e se o crescimento inicial rápido (32→69 em ~200s simulados nos testes) se estabiliza bem. Pode ser a mesma sessão de observação do item 1. Reportar o que acontecer antes de mexer em mais balanceamento.
 
-4. **Ligar a fome individual do agente ao estoque da vila** — hoje `eat.js` sempre come direto do ambiente, então uma vila sem comida institucional nunca faz seus agentes passarem fome de verdade a nível individual. Mudança maior, mexe no loop de sobrevivência de todo agente — avaliar só depois dos itens acima estarem estáveis.
+4. **Ajustar ritmo de mineração/construção se parecer lento demais jogando** — considerar aumentar `PERCEPTION_RADIUS`, ou vilas nascerem mais perto de montanha, ou reduzir `HOUSE_STONE_COST`/`HOUSE_WOOD_COST`, dependendo do que a sessão de observação (itens 1/3) mostrar.
 
-5. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
+5. **Calibrar `EAT_FOOD_PER_SEC`/`EAT_RESTORE_PER_FOOD`/`STARTING_FOOD_STOCK` se a sessão de observação (item 1) mostrar desbalanceado** — valores iniciais escolhidos por raciocínio, não por teste longo (ver comentário em `utils/constants.js`).
 
-6. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 2) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
+6. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
 
-7. **Considerar depois**: casa não tem sprite na leva de arte atual — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js` (mesmo padrão de árvore/planta).
+7. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 3) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
 
-8. **Considerar depois**: confirmar visualmente ao vivo (não só lendo o código) cada pose específica de ação dos papéis visuais (§0) — cortando árvore, minerando, construindo, guerreiro lutando — numa sessão de observação real; a automação de clique não conseguiu selecionar um agente específico em movimento pra checar isso durante o teste desta sessão.
+8. **Considerar depois**: casa não tem sprite na leva de arte atual — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js` (mesmo padrão de árvore/planta).
+
+9. **Considerar depois**: confirmar visualmente ao vivo (não só lendo o código) cada pose específica de ação dos papéis visuais (§0) — cortando árvore, minerando, construindo, guerreiro lutando — numa sessão de observação real; a automação de clique não conseguiu selecionar um agente específico em movimento pra checar isso durante o teste desta sessão.
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 

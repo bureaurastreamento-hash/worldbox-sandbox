@@ -1,38 +1,30 @@
-// Fatia 2: sem sistema de recursos ainda (isso é fatia 4+/economia), então
-// "comer" busca o tile de grama conhecido mais próximo e recupera fome nele.
-// Fatia 3: "conhecido" agora é agent.memory, não o mundo inteiro — se o
-// agente nunca viu grama por perto, essa ação não tem candidata (score cai
-// a zero mesmo com fome alta, e ele precisa vagar até avistar uma).
+// Comer consome o estoque comunitário da vila (village.stock.food) — antes
+// (fatia 2, sem sistema de recursos ainda) comia direto de qualquer tile de
+// grama por perto, sem nenhuma relação com o estoque; era o limite conhecido
+// registrado em DESIGN.md §6. Agora, sem comida no estoque, o agente não tem
+// candidata viável (mesmo padrão de gather.js: "só entra na lista se o
+// agente sabe que existe algo pra fazer") — ele passa fome de verdade se a
+// vila não produz nem recebe comida, cumprindo o pilar 4 também no nível
+// individual, não só institucional.
 
-import { TILE_TYPES } from '../../world/tile.js';
-import { TILE_SIZE } from '../../utils/constants.js';
 import { urgency, applyEffect } from '../needs.js';
-import { recallNearest } from '../memory.js';
-import { isHostileTerritory } from '../../clan/diplomacy.js';
+import { getVillage } from '../../world/world.js';
+import { addStock } from '../../village/stock.js';
+import { EAT_FOOD_PER_SEC, EAT_RESTORE_PER_FOOD } from '../../utils/constants.js';
 import { moveToward, clearMovement } from '../movement.js';
 
-const RESTORE_PER_SEC = 100 / 15;
-
-function isSafeGrass(world, agent) {
-  return (e) => e.type === TILE_TYPES.GRASS && !isHostileTerritory(world, agent, e.tx, e.ty);
-}
-
 export function score(agent, world) {
-  const known = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent));
-  if (!known) return 0;
+  const village = getVillage(world, agent.villageId);
+  if (!village || (village.stock.food ?? 0) <= 0) return 0; // nada pra comer agora
   return urgency(agent.needs.hunger);
 }
 
-function findFoodTile(agent, world) {
-  const entry = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent));
-  if (!entry) return null;
-  return { x: (entry.tx + 0.5) * TILE_SIZE, y: (entry.ty + 0.5) * TILE_SIZE };
-}
-
 export function step(agent, world, dt) {
+  const village = getVillage(world, agent.villageId);
+  if (!village) return;
+
   if (!agent.target) {
-    agent.target = findFoodTile(agent, world);
-    if (!agent.target) return; // nenhuma grama conhecida; espera a próxima reconsideração
+    agent.target = { x: village.center.x, y: village.center.y };
   }
 
   const status = moveToward(agent, world, dt, agent.target);
@@ -40,7 +32,10 @@ export function step(agent, world, dt) {
     clearMovement(agent);
     return;
   }
-  if (status === 'arrived') {
-    applyEffect(agent.needs, 'hunger', RESTORE_PER_SEC * dt);
-  }
+  if (status !== 'arrived') return;
+
+  const consume = Math.min(EAT_FOOD_PER_SEC * dt, village.stock.food ?? 0);
+  if (consume <= 0) return; // estoque esvaziou enquanto ele vinha andando; espera a próxima reconsideração
+  addStock(village, 'food', -consume);
+  applyEffect(agent.needs, 'hunger', consume * EAT_RESTORE_PER_FOOD);
 }
