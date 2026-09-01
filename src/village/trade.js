@@ -24,10 +24,12 @@ export function updateTrade(world, dt) {
     const clanA = getClan(world, a.clanId);
     if (!clanA) continue;
 
+    if (a.population.length === 0) continue; // vila extinta não comercia — ver clan/clanDecision.js
+
     for (let j = i + 1; j < world.villages.length; j++) {
       const b = world.villages[j];
       const clanB = getClan(world, b.clanId);
-      if (!clanB || !canTrade(clanA, clanB)) continue;
+      if (!clanB || !canTrade(clanA, clanB) || b.population.length === 0) continue;
 
       for (const resource of Object.keys(a.capacity)) {
         const demandA = a.demand[resource] ?? 0;

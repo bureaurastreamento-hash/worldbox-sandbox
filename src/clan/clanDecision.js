@@ -52,7 +52,7 @@ function findBetterPartner(world, clan, currentPartnerId, resource, currentDeman
     if (hasTreaty(clan, other, 'trade') || stance === 'allied') continue; // já tem o recurso garantido
 
     const otherVillage = getClanVillage(world, other);
-    if (!otherVillage) continue;
+    if (!otherVillage || otherVillage.population.length === 0) continue; // vila extinta não é parceiro de comércio
 
     const theirDemand = otherVillage.demand[resource] ?? 0;
     if (theirDemand > bestDemand) {
@@ -65,6 +65,14 @@ function findBetterPartner(world, clan, currentPartnerId, resource, currentDeman
 }
 
 function reconsiderRelationship(world, clan, other, village, otherVillage) {
+  // Vila extinta (população zerada, mas nunca removida — ver lifecycle.js)
+  // não participa da diplomacia como se tivesse gente: não declara nem sofre
+  // guerra, não propõe nem recebe comércio. Ela continua existindo como
+  // entidade com estoque só pra efeito de saque (agent/actions/raid.js já
+  // saqueia villages sem checar população — permanece de propósito, ver
+  // DESIGN.md §7).
+  if (otherVillage.population.length === 0) return;
+
   const stance = getStance(clan, other);
   const distress = mostDistressedResource(village);
 
@@ -145,7 +153,7 @@ export function updateClanDecision(clan, world, dt) {
   clan.decisionTimer = world.rng.range(CLAN_RECONSIDER_INTERVAL_MIN, CLAN_RECONSIDER_INTERVAL_MAX);
 
   const village = getClanVillage(world, clan);
-  if (!village) return;
+  if (!village || village.population.length === 0) return; // vila extinta não decide nada (ver reconsiderRelationship)
 
   for (const other of world.clans) {
     if (other.id === clan.id) continue;

@@ -35,6 +35,17 @@ Usuário pediu explicitamente: "roda, analisa, a gente corrige o que tiver pra c
 
 **Testado de novo**: mundo novo (seed nova), mesmo perfil de risco (vila guerreira, tense com um clã) — ~300s reais / ~1200s simulados (20 minutos simulados, bem além dos ~400s onde a extinção anterior aconteceu). População estável em 8/30 o tempo todo, comida nunca zerou, sem erro no console. Não dá pra provar que a correção elimina 100% o risco (o sorteio de posturas iniciais ainda pode gerar combinações ruins, e comércio recém-habilitado ainda leva tempo real pra se estabelecer), mas fecha o buraco identificado — o próximo passo é continuar observando sessões futuras de olho nisso. Detalhe técnico completo em `DESIGN.md` §7/§8 e `ARCHITECTURE.md` (`clan/clanDecision.js`).
 
+## 0.2. Leva de mudanças e detalhes (usuário pediu pra escolher e seguir)
+
+Escolhi o item 6 da lista de então (§5) — **vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica** — por ser bem delimitado, direto de implementar e testar, e no mesmo espírito da correção de §0.1 (vila morta continuando a "agir" institucionalmente como se tivesse gente). Empacotei junto três detalhes pequenos e relacionados:
+
+1. **Vila extinta não decide nem é alvo de diplomacia (implementado)** — `clan/clanDecision.js`: uma vila com `population.length === 0` não reconsidera relação com ninguém (nem declara guerra, nem propõe paz/comércio), e também não é considerada como alvo válido por outro clã (não recebe proposta de guerra/comércio, não é escolhida como "parceiro melhor" em `findBetterPartner`). Saque (`raid.js`) continua funcionando normalmente contra ela de propósito — é a única interação que ainda faz sentido com uma vila morta com estoque sobrando.
+2. **Vila extinta também não comercia via `village/trade.js`** (detalhe relacionado, mesmo raciocínio) — antes, um tratado de comércio já assinado continuaria movendo recurso pra dentro de uma vila morta pra sempre (desperdício silencioso do lado de quem ainda tem gente).
+3. **Indicador visual `💀 extinta` no label da vila no mapa** (`render/villageRenderer.js`) — só o inspetor mostrava população exata; no mapa, uma vila extinta parecia só "em colapso econômico". Ajuda inclusive testes futuros (dificuldade real desta sessão pra distinguir os dois estados de longe).
+4. **Correção de nota desatualizada no `ARCHITECTURE.md`** — a nota de fechamento da fatia 9 mencionava um `WAR_VILLAGE_MIN/MAX_DIST` que não existe mais no código (achado ao conferir o código pra outro item desta sessão); corrigida pra descrever o que realmente acontece hoje (todas as vilas nascem à mesma distância, `SECOND_VILLAGE_MIN/MAX_DIST`, e é `raid.js` — não a distância de spawn — que garante o encontro pra guerra).
+
+**Testado**: subida rápida do servidor + hard reload, ~40s simulados a 4x, sem erro no console, vila selecionada mostrando o label novo corretamente (`aliada · 🤝 comércio`, sem `💀 extinta` porque a população estava saudável). Não foi uma sessão longa o bastante pra ver uma vila morrer de verdade e confirmar o indicador `💀 extinta` aparecendo ao vivo — a lógica foi conferida por leitura de código (mesmo padrão de guarda `population.length === 0` já usado em outros lugares do arquivo), não observada morrendo.
+
 ## 1. O que foi implementado ou alterado na sessão anterior
 
 Nesta ordem:
@@ -63,7 +74,7 @@ Nesta ordem:
 | Utility AI / Decision | ✅ Funcionando. 11 ações: `wander`, `eat`, `sleep`, `gather`, `gatherWood`, `mine`, `build`, `deliver`, `fight`, `flee`, `raid`. |
 | Pathfinding | ✅ Funcionando (A*). Montanha não é andável — ações que envolvem depósito de montanha miram o tile andável adjacente. |
 | Village (estoque/demanda/população) | ✅ Funcionando. 6 recursos (food/wood/stone/coal/iron/gold). Teto de população dinâmico via `getPopulationCap` (base + bônus por casa construída). |
-| Clan/Diplomacy | ✅ Funcionando e **dinâmico**: guerra/paz/comércio/troca de parceiro reavaliados periodicamente por clã, reagindo à economia real. N vilas/clãs (hoje 4), não mais só 2. |
+| Clan/Diplomacy | ✅ Funcionando e **dinâmico**: guerra/paz/comércio/troca de parceiro reavaliados periodicamente por clã, reagindo à economia real. N vilas/clãs (hoje 4), não mais só 2. Vila extinta não decide nem é alvo (ver §0.2). |
 | Trade/Economy | ✅ Observável — especialização faz a demanda divergir de verdade; diplomacia dinâmica propõe/rompe tratados sozinha, não só no setup inicial. |
 | Combat | ✅ Engajar/fugir/dano/morte reativos + ataque ofensivo deliberado (`agent/actions/raid.js`): guerra declarada por desespero agora tem efeito prático de saque via `village.raidTargetVillageId`. |
 | Life-cycle | ✅ Funcionando. Reprodução ajustada nesta sessão (ver §4) pra não zerar a população. |
@@ -82,7 +93,7 @@ Nesta ordem:
 
 1. ~~Combate é só reativo~~ **Resolvido nesta sessão** (ver §0) — `agent/actions/raid.js` dá efeito prático de saque à guerra declarada dinamicamente; testado ao vivo com uma guerra real escalando (evidência indireta forte de que o ciclo saque→entrega funciona, ver §0), mas sem confirmação direta por seleção de agente ainda.
 2. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa (diplomacia dinâmica reage a cada 20-30s por clã) — funciona corretamente, não crasha, mas pode precisar de mais amortecimento (histerese) se parecer caótico demais jogando de verdade.
-3. **Vilas com população zerada continuam participando da diplomacia** como se tivessem gente (propõem/recebem tratados, podem entrar em guerra) — não crasha, mas é uma inconsistência observável.
+3. ~~Vilas com população zerada continuam participando da diplomacia~~ **Resolvido** (ver §0.2) — não decidem nem são alvo de guerra/comércio; continuam só saqueáveis, de propósito.
 4. **Mineração e construção são lentas** — minério depende de descoberta por acaso de um tile de montanha do tipo certo; em ~1h simulada de teste, nenhuma casa chegou a ser construída em nenhuma vila (pedra nunca acumulou o suficiente por tempo suficiente). Funciona, mas pode ser insatisfatório numa sessão de jogo real.
 5. **A correção da espiral de extinção populacional (item 9 de §1) foi validada só via simulação direta em lote** (bypassa o throttling de `requestAnimationFrame`), nunca numa sessão de jogo real ao vivo por tempo longo. Se o usuário observar extinção jogando de verdade, é esperado que aconteça bem menos que antes, mas o risco não está formalmente descartado.
 6. **Crescimento populacional inicial foi rápido nos testes** (32→69 agentes em ~200s simulados, com `AGENT_COUNT=8`) — não confirmado se isso eventualmente estabiliza de forma saudável numa sessão muito mais longa que a testada (~1h), ou se pode estourar o teto de população de forma estranha.
@@ -115,13 +126,13 @@ Decisões desta sessão, incluindo onde o usuário escolheu entre opções propo
 
 5. **Calibrar `EAT_FOOD_PER_SEC`/`EAT_RESTORE_PER_FOOD`/`STARTING_FOOD_STOCK` se a sessão de observação (item 1) mostrar desbalanceado** — valores iniciais escolhidos por raciocínio, não por teste longo (ver comentário em `utils/constants.js`).
 
-6. **Considerar depois**: vilas com população zerada não deveriam participar normalmente da diplomacia dinâmica (ver §3, item 3).
+6. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 3) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
 
-7. **Considerar depois**: recalibrar a frequência/amortecimento de troca guerra↔paz se a sessão de observação (item 3) mostrar isso como um problema de sensação de jogo (ver §3, item 2).
+7. **Considerar depois**: casa não tem sprite na leva de arte atual — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js` (mesmo padrão de árvore/planta).
 
-8. **Considerar depois**: casa não tem sprite na leva de arte atual — se o amigo do usuário adicionar um, só trocar `drawHouse` em `render/decorationRenderer.js` (mesmo padrão de árvore/planta).
+8. **Considerar depois**: confirmar visualmente ao vivo (não só lendo o código) cada pose específica de ação dos papéis visuais (§0) — cortando árvore, minerando, construindo, guerreiro lutando — numa sessão de observação real; a automação de clique não conseguiu selecionar um agente específico em movimento pra checar isso durante o teste desta sessão.
 
-9. **Considerar depois**: confirmar visualmente ao vivo (não só lendo o código) cada pose específica de ação dos papéis visuais (§0) — cortando árvore, minerando, construindo, guerreiro lutando — numa sessão de observação real; a automação de clique não conseguiu selecionar um agente específico em movimento pra checar isso durante o teste desta sessão.
+9. **Considerar depois**: confirmar visualmente o indicador `💀 extinta` (§0.2) aparecendo de verdade numa vila que morreu — implementado e conferido por leitura de código, mas não observado ao vivo ainda.
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 

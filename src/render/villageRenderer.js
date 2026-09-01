@@ -100,8 +100,12 @@ export function drawVillages(ctx, world, camera, selectedVillageId) {
     const suffix = STANCE_LABELS[worstStance(world, village)];
     const tradeSuffix = hasExtraTradeLink(world, village) ? ' · 🤝 comércio' : '';
     const chaosSuffix = village.inChaos ? ' · 💥 colapso' : '';
+    // Vila extinta continua existindo como entidade com estoque (ver
+    // clan/clanDecision.js), mas não participa mais de nada institucional —
+    // marcar no mapa evita confundir com uma vila só em colapso econômico.
+    const extinctSuffix = village.population.length === 0 ? ' · 💀 extinta' : '';
     ctx.fillText(
-      `${roleIcon} ${village.name} — 🌾 ${food}/${foodCap} · 🪵 ${wood}/${woodCap}${suffix}${tradeSuffix}${chaosSuffix}`,
+      `${roleIcon} ${village.name} — 🌾 ${food}/${foodCap} · 🪵 ${wood}/${woodCap}${suffix}${tradeSuffix}${chaosSuffix}${extinctSuffix}`,
       pos.x,
       pos.y - size / 2 - 4,
     );
