@@ -10,7 +10,7 @@ Worldbox Sandbox — god simulator 2D em grid, no estilo WorldBox, com o diferen
 
 - JavaScript vanilla com módulos ES nativos — sem framework, sem bundler, sem etapa de build.
 - Canvas 2D para renderização.
-- Precisa rodar com `python -m http.server 8000`, sem build step.
+- Precisa rodar com `python3 dev-server.py`, sem build step. **Não use `python -m http.server` puro** — ele não manda header de cache nenhum, e o navegador serve versões antigas de módulos JS editados recentemente, causando debug de "bugs fantasma" que na verdade são código desatualizado (aconteceu em mais de uma sessão). `dev-server.py` é o mesmo servidor, só com `Cache-Control: no-store` em toda resposta.
 - `index.html` fica na raiz (projeto publicado no GitHub Pages).
 - Arquivos pequenos, separados por responsabilidade — nada de arquivo gigante.
 - Sem dependências externas por CDN a menos que o usuário aprove antes.
@@ -28,7 +28,7 @@ Antes de responder, verifique se alguma skill disponível se aplica à tarefa.
 ## Running
 
 ```bash
-python -m http.server 8000
+python3 dev-server.py
 ```
 
 Then open http://localhost:8000
