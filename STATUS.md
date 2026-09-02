@@ -142,3 +142,62 @@ rodada foi entregar só o módulo.
 e as tiras têm layout diferente — 4 colunas × N linhas) e a folha de tiles
 Kenney em `Vários tipos de chão-.../` (16x16 com 1px de margem), que seria um
 terceiro formato.
+
+## 1c. Sessão seguinte — SpriteManager ligado nos predadores
+
+Primeiro consumidor real do módulo da §1b. `render/predatorRenderer.js`
+reescrito: em vez de um quadro estático por estado, toca as tiras completas
+do pack (Idle/Walk/Attack/Hurt/Death) para as duas espécies.
+
+O que ganhou:
+- **Animação de verdade** — patrulhar/perseguir/fugir viram `walking` ou
+  `idle` conforme o bicho tenha se deslocado no quadro; `attacking` toca o
+  golpe e reinicia enquanto o predador continuar atacando.
+- **Espelhamento por direção** — a arte olha pra direita; agora vira pra
+  esquerda quando anda pra esquerda, em vez de todo predador ficar virado
+  pro mesmo lado.
+- **Corpo que fica** — predador morto toca `death` e segura o último quadro.
+  Custo zero de simulação: `world.predators` nunca foi podado (só marca
+  `alive: false`), então o corpo já estava lá, só não havia arte pra mostrar.
+
+Três decisões técnicas que não são óbvias:
+1. **dt SIMULADO, não real** — o oposto de `particles.js`/`camera.js`. Uma
+   animação de personagem representa deslocamento no mundo, então tem que
+   congelar no pause e acelerar em 4x junto com o movimento. Derivado de
+   `world.elapsedSeconds` dentro do próprio módulo, sem mudar a assinatura de
+   `render()`.
+2. **Escala única de arte** (`ART_SCALE = 1.4`) em vez de altura fixa por
+   espécie. Como as duas vêm do mesmo pack na mesma escala, o demônio sair
+   maior que o monstro rasteiro é automático. **Isso aposentou o
+   `renderScale` por espécie** que tinha sido criado na §1a — ele só existia
+   porque o recorte por alfa de um quadro estático normalizava as duas pra
+   mesma altura.
+3. Os 4 recortes estáticos (`Demonio.png`, `MonstroSangue.png` e os dois
+   "Atacando") foram removidos de `assets/sprites/` — eram um quadro
+   escolhido a dedo de cada tira, e agora a tira inteira é usada.
+
+**Bug encontrado e corrigido durante o teste:** a detecção de "andou?" usava
+só `dx`, então um predador subindo ou descendo **em linha reta** contava como
+parado e mostrava a pose de repouso enquanto se deslocava. Invisível a olho —
+apareceu ao medir o índice de quadro ao vivo. Corrigido pra `hypot(dx, dy)`,
+mantendo só o X pra decidir o espelhamento.
+
+**Testado ao vivo:** sem erro de console (só os 2 avisos esperados de
+contagem de quadros do Demon); 24 views criadas, `world.elapsedSeconds`
+avançando 1.000s/s em 1x; ciclo de caminhada percorrendo os 8 quadros e
+repetindo (`3,4,5,6,7,0,1,2...`); `facing` alternando conforme a direção;
+demônio e monstro de sangue confirmados na tela com sombra e proporção certa.
+O ciclo `walking→idle→walking` a cada ~1s **não é bug** — é a patrulha real
+(chega ao alvo, espera a próxima reconsideração, escolhe outro).
+
+**Não confirmado ainda:** o clipe de ataque e o de morte numa perseguição
+orgânica de verdade — o caminho de código é o mesmo já validado no
+`sprite-lab.html`, mas nenhum combate contra predador aconteceu na janela de
+teste.
+
+**Próximo passo:** migrar `agentRenderer.js` pro SpriteManager. É bem mais
+envolvido que o predador — ele escolhe pose por AÇÃO corrente (cortando
+árvore, minerando, construindo, levando tronco, pescando), por papel
+(civil/guerreiro) e por estado de vida, e as poses de trabalho não existem
+nas tiras do pack novo. Precisa de decisão de design antes, não é uma
+tradução mecânica.

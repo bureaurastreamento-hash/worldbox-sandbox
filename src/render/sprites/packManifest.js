@@ -82,3 +82,10 @@ export const GRID_SHEETS = [
 ];
 
 export const ALL_SHEETS = [...STRIP_SHEETS, ...GRID_SHEETS];
+
+// Todas as tiras de um ator, pelo prefixo do nome do arquivo
+// ("Demon_A" -> Demon_A_Idle.png, Demon_A_Walk.png, ...). É assim que um
+// renderer pede só o que precisa sem repetir a lista de caminhos.
+export function sheetsFor(actorPrefix) {
+  return STRIP_SHEETS.filter((path) => path.split('/').pop().startsWith(`${actorPrefix}_`));
+}

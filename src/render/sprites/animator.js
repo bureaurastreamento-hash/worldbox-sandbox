@@ -79,6 +79,12 @@ export function createAnimator(actor, { state = DEFAULT_STATE, direction = DIREC
     get finished() {
       return finished;
     },
+    // Índice do quadro dentro do clipe. Leitura pura, mas exposta de
+    // propósito: sem ela não dá pra verificar de fora que a animação está
+    // realmente correndo (foi como um bug de detecção de movimento apareceu).
+    get frame() {
+      return frameInClip;
+    },
 
     setState,
 

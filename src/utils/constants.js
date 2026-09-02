@@ -359,13 +359,15 @@ export const PREDATOR_HEALTH_REGEN_PER_SEC = 100 / 30; // só enquanto foge, sem
 // aceita explicitamente, sem substituto de qualidade disponível; hoje as duas
 // espécies são corpo a corpo.
 //
-// `renderScale` é só apresentação (render/predatorRenderer.js): o monstro de
-// sangue é um bicho rasteiro, mais baixo que o demônio em pé, e o recorte por
-// alpha sozinho normalizaria os dois pra mesma altura na tela. Preserva a
-// proporção relativa da arte de origem (15px vs. 20px de conteúdo).
+// Houve aqui um `renderScale` por espécie, removido quando a animação chegou:
+// ele corrigia à mão o fato de o recorte por alfa de um quadro estático
+// normalizar as duas espécies pra mesma altura na tela. Com
+// render/predatorRenderer.js desenhando numa escala única de arte
+// (`ART_SCALE`), a diferença de tamanho entre o demônio em pé e o monstro
+// rasteiro sai sozinha da própria arte, que foi desenhada na mesma escala.
 export const PREDATOR_SPECIES_STATS = {
-  demon: { health: 60, attackDamage: 15, detectionRadiusTiles: 6, attackRange: 40, speed: 40, renderScale: 1 },
-  blood: { health: 35, attackDamage: 10, detectionRadiusTiles: 7, attackRange: 40, speed: 62, renderScale: 0.75 },
+  demon: { health: 60, attackDamage: 15, detectionRadiusTiles: 6, attackRange: 40, speed: 40 },
+  blood: { health: 35, attackDamage: 10, detectionRadiusTiles: 7, attackRange: 40, speed: 62 },
 };
 
 // agent/actions/fleePredator.js e fightPredator.js: mesma faixa de score
