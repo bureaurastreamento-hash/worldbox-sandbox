@@ -1,5 +1,10 @@
 // requestAnimationFrame loop: converte dt real em dt simulado via timeState
-// (que aplica pausa/velocidade), então chama update(simDt) e render().
+// (que aplica pausa/velocidade), então chama update(simDt) e render(realDt).
+//
+// render recebe o dt REAL (não o simulado) de propósito: efeitos de
+// apresentação (easing de câmera, tremor, partículas) devem correr no tempo
+// do jogador, não no tempo do jogo — continuam suaves com o jogo pausado ou
+// em 4x, em vez de congelar/acelerar junto.
 
 export function createGameLoop({ timeState, update, render }) {
   let rafId = null;
@@ -13,7 +18,7 @@ export function createGameLoop({ timeState, update, render }) {
     const simDt = timeState.advance(realDt);
     try {
       update(simDt);
-      render();
+      render(realDt);
     } catch (err) {
       // Sem isso, uma exceção não tratada em qualquer lugar de update/render
       // (agente, vila, clã, o que for) trava o jogo inteiro pra sempre e sem

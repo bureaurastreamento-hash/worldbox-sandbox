@@ -144,6 +144,32 @@ function drawHouseSprite(ctx, x, y, size) {
   ctx.drawImage(houseRoofSprite, x - half, y - size, size, half);
 }
 
+// Brilho pulsante atrás da fogueira — `performance.now()` (não `world.
+// elapsedSeconds`) de propósito: é feedback visual de ambiente, deve
+// continuar pulsando mesmo com o jogo pausado, mesmo espírito do easing de
+// câmera (render/camera.js:tick usa tempo real, não o simulado).
+const GLOW_PULSE_MS = 900;
+function drawCampfireGlow(ctx, x, y, size) {
+  const pulse = (Math.sin(performance.now() / GLOW_PULSE_MS) + 1) / 2; // 0..1
+  const radius = size * (0.9 + pulse * 0.25);
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  gradient.addColorStop(0, `rgba(255, 160, 60, ${0.35 + pulse * 0.15})`);
+  gradient.addColorStop(1, 'rgba(255, 160, 60, 0)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Sombra elipse translúcida — mesmo padrão de render/agentRenderer.js.
+function drawShadow(ctx, x, y, width) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, width / 2, width / 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+  ctx.fill();
+}
+const SHADOW_BY_TYPE = { tree: true, house: true }; // planta/fogueira/baú são baixos demais pra render valer a pena
+
 const PLACEHOLDER_BY_TYPE = {
   tree: drawTreePlaceholder,
   plant: drawPlantPlaceholder,
@@ -174,6 +200,10 @@ export function drawDecorations(ctx, world, camera) {
 
     const pos = camera.worldToScreen(deco.x, deco.y, viewW, viewH);
     const size = (BASE_SIZE_BY_TYPE[deco.type] ?? 16) * camera.zoom;
+
+    if (SHADOW_BY_TYPE[deco.type]) drawShadow(ctx, pos.x, pos.y, size * 0.7);
+
+    if (deco.type === 'campfire') drawCampfireGlow(ctx, pos.x, pos.y, size);
 
     if (deco.type === 'house') {
       if (isSpriteReady(houseRoofSprite) && isSpriteReady(houseWallSprite)) {

@@ -62,6 +62,7 @@ Object.values(sprites).forEach((img) => {
 });
 
 const BASE_HEIGHT = 28; // px de tela em zoom 1 — entre plant (12) e tree (26)/agente adulto (44)
+const HIT_FLASH_SECONDS = 0.15; // mesmo valor de render/agentRenderer.js
 
 function drawPlaceholder(ctx, x, y, size) {
   ctx.beginPath();
@@ -70,11 +71,19 @@ function drawPlaceholder(ctx, x, y, size) {
   ctx.fill();
 }
 
+function drawShadow(ctx, x, y, width) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, width / 2, width / 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.fill();
+}
+
 export function drawPredators(ctx, world, camera) {
   if (!world.predators?.length) return;
 
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
+  const now = world.elapsedSeconds ?? 0;
   ctx.imageSmoothingEnabled = false;
 
   for (const predator of world.predators) {
@@ -82,10 +91,12 @@ export function drawPredators(ctx, world, camera) {
 
     const pos = camera.worldToScreen(predator.position.x, predator.position.y, viewW, viewH);
     const size = BASE_HEIGHT * camera.zoom;
+    drawShadow(ctx, pos.x, pos.y, size * 0.6);
 
     const key = predator.state === 'attacking' ? `${predator.species}Attack` : predator.species;
     const sprite = sprites[key];
     const bounds = isSpriteReady(sprite) ? spriteBounds.get(sprite) : null;
+    const flashing = predator.hitFlashAt != null && now - predator.hitFlashAt < HIT_FLASH_SECONDS;
 
     if (!bounds) {
       drawPlaceholder(ctx, pos.x, pos.y, size);
@@ -95,5 +106,12 @@ export function drawPredators(ctx, world, camera) {
     const h = size;
     const w = h * (bounds.w / bounds.h);
     ctx.drawImage(sprite, bounds.x, bounds.y, bounds.w, bounds.h, pos.x - w / 2, pos.y - h, w, h);
+    if (flashing) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgba(255, 40, 40, 0.55)';
+      ctx.fillRect(pos.x - w / 2, pos.y - h, w, h);
+      ctx.restore();
+    }
   }
 }

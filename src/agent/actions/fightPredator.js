@@ -27,5 +27,5 @@ export function step(agent, world, dt) {
     return;
   }
 
-  resolvePredatorEngagement(agent, predator, dt);
+  resolvePredatorEngagement(agent, predator, dt, world);
 }

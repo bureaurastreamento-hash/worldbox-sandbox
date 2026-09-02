@@ -158,6 +158,7 @@ function stepChaseOrAttack(predator, world, dt, stats) {
   target.health = clamp(target.health - damage, 0, 100);
   target.lastDamageSource = 'predator';
   target.lastDamagePredatorSpecies = predator.species;
+  target.hitFlashAt = world.elapsedSeconds; // render/agentRenderer.js:HIT_FLASH_SECONDS
 }
 
 export function updatePredator(predator, world, dt) {

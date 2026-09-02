@@ -33,8 +33,15 @@ export function findNearestPredator(agent, world) {
   return nearest;
 }
 
-export function resolvePredatorEngagement(agent, predator, dt) {
+export function resolvePredatorEngagement(agent, predator, dt, world) {
   const damage = COMBAT_DAMAGE_PER_SEC * dt;
   predator.health = clamp(predator.health - damage, 0, predator.maxHealth);
-  if (predator.health <= 0) predator.alive = false;
+  if (world) predator.hitFlashAt = world.elapsedSeconds;
+  if (predator.health <= 0) {
+    predator.alive = false;
+    // Tremor de câmera (render/camera.js:triggerShake, consumido em
+    // main.js) — momento decisivo, não todo tick de dano (senão sacudiria
+    // o jogo inteiro durante toda a luta).
+    if (world) world.pendingShake = { intensity: 6, duration: 0.25 };
+  }
 }

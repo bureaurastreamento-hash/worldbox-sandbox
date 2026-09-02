@@ -25,5 +25,5 @@ export function step(agent, world, dt) {
     return;
   }
 
-  resolveEngagement(agent, enemy, dt);
+  resolveEngagement(agent, enemy, dt, world);
 }

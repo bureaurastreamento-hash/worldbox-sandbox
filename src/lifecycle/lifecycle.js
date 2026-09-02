@@ -60,6 +60,11 @@ export function checkDeath(agent, world, dt) {
         pushEvent(world, `${village.name} perdeu um morador de ${cause}`);
       }
       if (village.population.length === 1) pushEvent(world, `${village.name} foi extinta`);
+
+      // Tremor de câmera num golpe forte (render/camera.js:triggerShake,
+      // consumido em main.js) — só na morte por combate, não em toda troca
+      // de dano, e não em morte por fome/velhice (não é um "golpe").
+      if (cause === 'combate') world.pendingShake = { intensity: 8, duration: 0.3 };
     }
   }
 }

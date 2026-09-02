@@ -27,6 +27,8 @@
 // Pasta canônica de arte em uso (o resto do que já foi baixado fica em
 // assets/Assets-testes-para-o-claude-testar/ como matéria-prima até ser
 // selecionado e recortado pra cá — ver STATUS.md/ROADMAP.md).
+import { spawnDust, spawnSpark, spawnChip } from './particles.js';
+
 const SPRITE_DIR = 'assets/sprites';
 
 // Vários desses arquivos não existem ainda (Camponês/Elfo ficaram sem arte
@@ -138,6 +140,29 @@ const MOVE_EPSILON_SQ = 0.05 * 0.05; // px; abaixo disso conta como parado
 const RADIUS_BY_STAGE = { child: 6, adult: 9, elder: 9 }; // fallback enquanto os sprites carregam
 const HEIGHT_BY_STAGE = { child: 30, adult: 44, elder: 44 }; // px de tela em zoom 1
 
+// Sombra elipse translúcida no chão — dá noção de profundidade sem precisar
+// de luz/normal maps. Uma única `ctx.ellipse`+`fill` por agente, barato.
+function drawShadow(ctx, x, y, width) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, width / 2, width / 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.fill();
+}
+
+// Flash vermelho rápido no agente que sofre dano (combate de clã ou
+// predador) — `agent.hitFlashAt` é o `world.elapsedSeconds` de quando o
+// último golpe aconteceu (combat.js/predatorCombat.js/predatorAI.js),
+// comparado contra o relógio atual em vez de um timer decrementado por
+// frame (mesmo padrão de DEATH_LINGER_SECONDS: sem estado extra pra manter
+// sincronizado).
+const HIT_FLASH_SECONDS = 0.15;
+
+// Poeira ao andar: chance baixa por frame (não todo frame — uma nuvem
+// constante não lê como partícula individual). Faísca/lasca só quando o
+// agente já chegou e está de fato trabalhando (!moving, ver pickSprite).
+const DUST_CHANCE_PER_FRAME = 0.06;
+const WORK_PARTICLE_CHANCE_PER_FRAME = 0.08;
+
 // Vários agentes convergindo pro mesmo ponto (centro da vila, pra comer/
 // entregar/construir) acabam na mesma posição exata — sem nenhum offset,
 // os sprites ficam empilhados perfeitamente um em cima do outro, dando a
@@ -220,6 +245,7 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
   const walkFrame = Math.floor(performance.now() / WALK_FRAME_MS) % 2;
+  const now = world.elapsedSeconds ?? 0;
 
   for (const agent of world.agents) {
     const pos = camera.worldToScreen(agent.position.x, agent.position.y, viewW, viewH);
@@ -227,6 +253,9 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
     pos.x += offset.x;
     pos.y += offset.y;
     const moving = isAgentMoving(agent);
+
+    const h = (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom;
+    drawShadow(ctx, pos.x, pos.y, h * 0.6);
 
     if (agent.id === selectedAgentId) {
       const ringR = Math.max(11, 18 * camera.zoom);
@@ -237,18 +266,38 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
       ctx.stroke();
     }
 
+    // Partículas de ambiente/trabalho — só pra quem está vivo, chance baixa
+    // por frame de propósito (ver DUST_CHANCE_PER_FRAME/WORK_PARTICLE_...).
+    if (agent.alive) {
+      if (moving && Math.random() < DUST_CHANCE_PER_FRAME) {
+        spawnDust(agent.position.x, agent.position.y);
+      } else if (!moving && Math.random() < WORK_PARTICLE_CHANCE_PER_FRAME) {
+        if (agent.currentAction === 'mine') spawnSpark(agent.position.x, agent.position.y - 10);
+        else if (agent.currentAction === 'gatherWood') spawnChip(agent.position.x, agent.position.y - 10);
+      }
+    }
+
     const sprite = pickSprite(agent, moving, walkFrame);
     const bounds = isSpriteReady(sprite) ? spriteBounds.get(sprite) : null;
+    const flashing = agent.hitFlashAt != null && now - agent.hitFlashAt < HIT_FLASH_SECONDS;
     if (bounds) {
-      const h = (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom;
       const w = h * (bounds.w / bounds.h);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(sprite, bounds.x, bounds.y, bounds.w, bounds.h, pos.x - w / 2, pos.y - h, w, h);
+      if (flashing) {
+        // 'source-atop' só pinta em cima dos pixels já opacos do sprite
+        // acabado de desenhar — silhueta exata, sem retângulo vazando.
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = 'rgba(255, 40, 40, 0.55)';
+        ctx.fillRect(pos.x - w / 2, pos.y - h, w, h);
+        ctx.restore();
+      }
     } else {
       const radius = Math.max(2, (RADIUS_BY_STAGE[agent.lifeStage] ?? 9) * camera.zoom);
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffdd55';
+      ctx.fillStyle = flashing ? '#ff4040' : '#ffdd55';
       ctx.fill();
       ctx.strokeStyle = '#402c00';
       ctx.lineWidth = 1;

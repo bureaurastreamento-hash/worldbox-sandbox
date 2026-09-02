@@ -187,6 +187,9 @@ const hud = createHud(document.getElementById('hud'), timeState);
 const inspector = createInspector(document.getElementById('inspector'));
 const eventFeed = createEventFeed(document.getElementById('event-feed'));
 
+let lastSelectedAgentId = null;
+let lastSelectedVillageId = null;
+
 const loop = createGameLoop({
   timeState,
   update(dt) {
@@ -252,9 +255,7 @@ const loop = createGameLoop({
 
     pruneDead(world, dt);
   },
-  render() {
-    renderer.render(world, debugState, uiState.selectedAgentId, uiState.selectedVillageId);
-
+  render(realDt) {
     let selectionState = 'none';
     let selectedAgent = null;
     if (uiState.selectedAgentId) {
@@ -267,6 +268,24 @@ const loop = createGameLoop({
     const selectedVillage = uiState.selectedVillageId
       ? (world.villages.find((v) => v.id === uiState.selectedVillageId) ?? null)
       : null;
+
+    // Câmera segue a seleção nova com easing (render/camera.js:panToTarget)
+    // em vez de corte seco — só dispara na TROCA de seleção, não a cada
+    // frame (senão nunca deixaria o jogador arrastar livremente depois).
+    if (uiState.selectedAgentId !== lastSelectedAgentId || uiState.selectedVillageId !== lastSelectedVillageId) {
+      lastSelectedAgentId = uiState.selectedAgentId;
+      lastSelectedVillageId = uiState.selectedVillageId;
+      const target = selectedAgent?.position ?? selectedVillage?.center;
+      if (target) camera.panToTarget(target.x, target.y);
+    }
+
+    if (world.pendingShake) {
+      camera.triggerShake(world.pendingShake.intensity, world.pendingShake.duration);
+      world.pendingShake = null;
+    }
+    camera.tick(realDt ?? 0, canvas.width, canvas.height);
+
+    renderer.render(world, debugState, uiState.selectedAgentId, uiState.selectedVillageId, realDt ?? 0);
 
     hud.updateAgentStatus(selectedAgent, selectionState);
     inspector.update({ agent: selectedAgent, selectionState, village: selectedVillage }, world);

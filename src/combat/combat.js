@@ -34,7 +34,7 @@ export function findNearestEnemy(agent, world) {
 }
 
 // Dano mútuo de um tick de combate corpo a corpo.
-export function resolveEngagement(agent, enemy, dt) {
+export function resolveEngagement(agent, enemy, dt, world) {
   const damage = COMBAT_DAMAGE_PER_SEC * dt;
   agent.health = clamp(agent.health - damage, 0, 100);
   enemy.health = clamp(enemy.health - damage, 0, 100);
@@ -44,4 +44,10 @@ export function resolveEngagement(agent, enemy, dt) {
   // "morto por" o predador antigo (lastDamageSource nunca era limpo).
   agent.lastDamageSource = 'clan';
   enemy.lastDamageSource = 'clan';
+  // Flash vermelho no sprite (render/agentRenderer.js:HIT_FLASH_SECONDS) —
+  // opcional (`world` só chega quando o chamador já tem à mão).
+  if (world) {
+    agent.hitFlashAt = world.elapsedSeconds;
+    enemy.hitFlashAt = world.elapsedSeconds;
+  }
 }

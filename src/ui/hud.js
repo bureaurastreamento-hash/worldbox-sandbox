@@ -13,6 +13,8 @@ const ACTION_LABELS = {
   fight: 'lutando',
   flee: 'fugindo',
   raid: 'saqueando',
+  fightPredator: 'enfrentando predador',
+  fleePredator: 'fugindo de predador',
 };
 
 export function createHud(container, timeState) {

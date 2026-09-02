@@ -25,6 +25,9 @@ const ACTION_LABELS = {
   deliver: 'entregando',
   fight: 'lutando',
   flee: 'fugindo',
+  raid: 'saqueando',
+  fightPredator: 'enfrentando predador',
+  fleePredator: 'fugindo de predador',
 };
 
 const SPECIALIZATION_LABELS = { food: 'agrícola', wood: 'guerreira' };

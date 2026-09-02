@@ -21,14 +21,32 @@ export function createEventFeed(container) {
     lastLength = events.length;
     lastNewestText = newest?.text;
 
-    container.innerHTML = '';
+    // Reconstrução completa só na primeira vez (ou se o buffer encolheu,
+    // o que não deveria acontecer no jogo normal). No caso comum (chegou
+    // 1 evento novo), só o nó novo entra — os outros mantêm identidade de
+    // DOM, então a animação de entrada (CSS) toca só na linha nova, não
+    // reanima o painel inteiro a cada evento.
     const visible = events.slice(-VISIBLE_LINES).reverse();
-    for (const event of visible) {
-      const line = document.createElement('div');
-      line.className = 'event-feed-line';
-      line.textContent = event.text;
-      container.appendChild(line);
+    const shouldRebuildAll = container.children.length === 0 || container.children.length > visible.length;
+
+    if (shouldRebuildAll) {
+      container.innerHTML = '';
+      for (const event of visible) container.appendChild(makeLine(event.text, false));
+      return;
     }
+
+    const newestLine = makeLine(visible[0].text, true);
+    container.insertBefore(newestLine, container.firstChild);
+    while (container.children.length > VISIBLE_LINES) {
+      container.removeChild(container.lastChild);
+    }
+  }
+
+  function makeLine(text, animateIn) {
+    const line = document.createElement('div');
+    line.className = animateIn ? 'event-feed-line event-feed-line-enter' : 'event-feed-line';
+    line.textContent = text;
+    return line;
   }
 
   return { update };
