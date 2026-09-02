@@ -121,15 +121,22 @@ function villageNameFor(world, agent) {
   return getVillage(world, agent.villageId)?.name ?? 'algum lugar';
 }
 
+// Velocidade é por espécie desde que a fauna caiu pra 2 espécies (demônio
+// lento e pesado vs. monstro de sangue rápido e frágil) — PREDATOR_SPEED
+// virou só o valor de referência pra quem não declarar o próprio.
+function speedOf(predator) {
+  return PREDATOR_SPECIES_STATS[predator.species]?.speed ?? PREDATOR_SPEED;
+}
+
 function stepPatrol(predator, world, dt) {
   if (!predator.target) predator.target = pickPatrolTarget(predator, world);
-  const arrived = moveDirectlyToward(predator.position, predator.target, PREDATOR_SPEED, dt);
+  const arrived = moveDirectlyToward(predator.position, predator.target, speedOf(predator), dt);
   if (arrived) predator.target = null;
 }
 
 function stepFlee(predator, world, dt) {
   if (!predator.target) predator.target = { ...predator.spawnAnchor };
-  moveDirectlyToward(predator.position, predator.target, PREDATOR_SPEED, dt);
+  moveDirectlyToward(predator.position, predator.target, speedOf(predator), dt);
   if (!world.agents.some((a) => a.alive && distance(a.position, predator.position) < TILE_SIZE * 3)) {
     predator.health = clamp(predator.health + PREDATOR_HEALTH_REGEN_PER_SEC * dt, 0, predator.maxHealth);
   }
@@ -145,7 +152,7 @@ function stepChaseOrAttack(predator, world, dt, stats) {
       predator.state = 'attacking';
       return;
     }
-    moveDirectlyToward(predator.position, target.position, PREDATOR_SPEED, dt);
+    moveDirectlyToward(predator.position, target.position, speedOf(predator), dt);
     return;
   }
 

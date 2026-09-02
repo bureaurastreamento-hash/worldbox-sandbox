@@ -27,9 +27,8 @@ const VARIANTS_BY_TYPE = {
   campfire: CAMPFIRE_FILES,
   chest: CHEST_FILES,
 };
-// Urso/Lobo/Cobra/Besouro (mesmos arquivos que eram decoração parada antes)
-// agora são predadores de verdade — ver render/predatorRenderer.js. Não
-// existem mais como tipo de decoração aqui.
+// A fauna (que já foi decoração parada aqui) virou predador de verdade — ver
+// render/predatorRenderer.js. Não existe mais como tipo de decoração aqui.
 
 const sprites = {}; // filename -> Image
 for (const file of [...TREE_FILES, ...PLANT_FILES, ...CAMPFIRE_FILES, ...CHEST_FILES]) {

@@ -1,13 +1,27 @@
 // Desenha os predadores (predator/predatorAI.js) — pose parada/andando
-// (mesmo sprite, sem ciclo de quadros — os pacotes de vida selvagem não têm
-// quadro de "andando" recortado ainda, só parado) durante patrolling/
-// chasing/fleeing, e uma pose de ataque dedicada durante `attacking`.
-// Mesmo padrão de recorte-por-alpha de agentRenderer.js/decorationRenderer.js.
+// (mesmo sprite, sem ciclo de quadros) durante patrolling/chasing/fleeing, e
+// uma pose de ataque dedicada durante `attacking`. Mesmo padrão de
+// recorte-por-alpha de agentRenderer.js/decorationRenderer.js.
+//
+// Arte: Tiny RPG Character Asset Pack 02 (mesma família do Cavaleiro/Orc),
+// variantes SEM sombra do pack — o jogo desenha a própria elipse em
+// drawShadow. Um quadro estático por estado, recortado à mão do spritesheet:
+//   Demonio            = Demon_A_Idle, quadro 0
+//   DemonioAtacando    = Demon_A_Attack02, quadro 2 (espada erguida, sem o
+//                        rastro branco dos quadros seguintes, que congelado
+//                        vira um borrão)
+//   MonstroSangue      = Blood Monster_A_Idle, quadro 0
+//   MonstroSangueAtacando = Blood Monster_A_Attack01, quadro 3 (garra no alto,
+//                        mesmo critério: antes do rastro branco)
+// O pack tem Idle/Walk/Attack01/Attack02/Hurt/Death completos em 100x100 —
+// animar de verdade é possível e continua na mesa, só não foi feito aqui.
+
+import { PREDATOR_SPECIES_STATS } from '../utils/constants.js';
 
 const SPRITE_DIR = 'assets/sprites';
 
-const IDLE_FILE = { bear: 'Urso', wolf: 'Lobo', snake: 'Cobra', beatle: 'Besouro' };
-const ATTACK_FILE = { bear: 'UrsoAtacando', wolf: 'LoboAtacando', snake: 'CobraAtacando', beatle: 'BesouroAtacando' };
+const IDLE_FILE = { demon: 'Demonio', blood: 'MonstroSangue' };
+const ATTACK_FILE = { demon: 'DemonioAtacando', blood: 'MonstroSangueAtacando' };
 
 const sprites = {}; // key -> Image
 for (const [species, file] of Object.entries(IDLE_FILE)) {
@@ -90,7 +104,11 @@ export function drawPredators(ctx, world, camera) {
     if (!predator.alive) continue;
 
     const pos = camera.worldToScreen(predator.position.x, predator.position.y, viewW, viewH);
-    const size = BASE_HEIGHT * camera.zoom;
+    // renderScale preserva a proporção relativa entre espécies: o recorte por
+    // alpha sozinho normalizaria o monstro de sangue (rasteiro, 15px de
+    // conteúdo) pra mesma altura do demônio em pé (20px).
+    const scale = PREDATOR_SPECIES_STATS[predator.species]?.renderScale ?? 1;
+    const size = BASE_HEIGHT * scale * camera.zoom;
     drawShadow(ctx, pos.x, pos.y, size * 0.6);
 
     const key = predator.state === 'attacking' ? `${predator.species}Attack` : predator.species;

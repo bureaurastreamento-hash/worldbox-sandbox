@@ -316,9 +316,12 @@ export const DECORATION_CAMPFIRES_PER_VILLAGE = 1;
 // Fauna predadora (predator/): entidade separada de Agent, bem mais simples
 // (sem needs/perception/memory/utility completo) — FSM reconsiderada
 // periodicamente (predator/predatorAI.js). Raro de propósito: ~24 no mapa
-// inteiro (220x220), ~6 por espécie — pra ser um encontro perigoso pontual,
-// não uma ameaça constante.
-export const PREDATOR_COUNT_PER_SPECIES = 6;
+// inteiro (220x220), ~12 por espécie — pra ser um encontro perigoso pontual,
+// não uma ameaça constante. Eram 6 por espécie quando existiam 4 espécies;
+// ao cair pra 2 (ver PREDATOR_SPECIES_STATS), o número por espécie dobrou pra
+// manter a mesma densidade de ~24 predadores no mapa, que é o que foi
+// calibrado jogando — a decisão foi reduzir a variedade, não a ameaça.
+export const PREDATOR_COUNT_PER_SPECIES = 12;
 // Não nasce mais perto de nenhuma vila que isso — fora do alcance
 // imediato, ainda dentro do raio que um agente explorando pode topar.
 export const PREDATOR_MIN_DISTANCE_FROM_VILLAGE_TILES = 15;
@@ -329,7 +332,11 @@ export const PREDATOR_PATROL_RADIUS_TILES = 3;
 // predador, ele desiste e volta a patrulhar — evita um urso virar
 // perseguidor permanente até dentro da vila.
 export const PREDATOR_LEASH_RADIUS_TILES = 10;
-export const PREDATOR_SPEED = 50; // px/mundo por segundo — mesmo valor pras 4 espécies, simplificação deliberada
+// Velocidade agora é por espécie (PREDATOR_SPECIES_STATS.speed), não mais um
+// valor único — é o que dá corpo ao contraste "tanque lento" vs. "rápido e
+// frágil" das duas espécies. Este continua sendo a referência/média: quem não
+// declarar `speed` cai aqui.
+export const PREDATOR_SPEED = 50; // px/mundo por segundo
 export const PREDATOR_RECONSIDER_INTERVAL = 0.4; // segundos, com jitter por predador (mesmo padrão do agente)
 // Abaixo dessa fração da vida máxima, foge em vez de atacar/perseguir;
 // só volta a patrulhar depois de recuperar até essa outra fração (evita
@@ -339,14 +346,26 @@ export const PREDATOR_FLEE_RECOVER_FRACTION = 0.6;
 export const PREDATOR_HEALTH_REGEN_PER_SEC = 100 / 30; // só enquanto foge, sem ameaça por perto
 
 // Stats por espécie — valores iniciais, calibrar depois de observar
-// jogando (mesmo espírito dos outros pesos deste arquivo). Besouro é o
-// único à distância (Beatle_Slime_Shot no pack), por isso o attackRange
-// bem maior; os outros 3 são corpo a corpo.
+// jogando (mesmo espírito dos outros pesos deste arquivo).
+//
+// Eram 4 espécies (urso/lobo/cobra/besouro, pack "Retro RPG Series - Animal
+// Wildlife"); caiu pra 2 por decisão do usuário — a arte daquele pack estava
+// abaixo da régua de qualidade do resto do jogo. Os dois perfis que sobraram
+// herdam os stats que já existiam, não são números novos:
+//   demon  = o antigo perfil do urso  (tanque, lento, dano alto)
+//   blood  = o antigo perfil do lobo  (frágil, rápido, faro melhor)
+// Cobra e besouro saíram inteiros. Com o besouro foi embora o único ataque à
+// distância do jogo (attackRange 150, o cuspe do pack de origem) — perda
+// aceita explicitamente, sem substituto de qualidade disponível; hoje as duas
+// espécies são corpo a corpo.
+//
+// `renderScale` é só apresentação (render/predatorRenderer.js): o monstro de
+// sangue é um bicho rasteiro, mais baixo que o demônio em pé, e o recorte por
+// alpha sozinho normalizaria os dois pra mesma altura na tela. Preserva a
+// proporção relativa da arte de origem (15px vs. 20px de conteúdo).
 export const PREDATOR_SPECIES_STATS = {
-  bear: { health: 60, attackDamage: 15, detectionRadiusTiles: 6, attackRange: 40 },
-  wolf: { health: 35, attackDamage: 10, detectionRadiusTiles: 7, attackRange: 40 },
-  snake: { health: 20, attackDamage: 8, detectionRadiusTiles: 4, attackRange: 40 },
-  beatle: { health: 15, attackDamage: 6, detectionRadiusTiles: 6, attackRange: 150 },
+  demon: { health: 60, attackDamage: 15, detectionRadiusTiles: 6, attackRange: 40, speed: 40, renderScale: 1 },
+  blood: { health: 35, attackDamage: 10, detectionRadiusTiles: 7, attackRange: 40, speed: 62, renderScale: 0.75 },
 };
 
 // agent/actions/fleePredator.js e fightPredator.js: mesma faixa de score

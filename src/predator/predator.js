@@ -1,7 +1,9 @@
 // Fauna predadora: entidade separada de Agent, bem mais simples (sem
 // needs/perception/memory/utility completo) — ver predatorAI.js pra decisão.
-// Substitui a versão puramente decorativa que existia antes (mesmos
-// arquivos de sprite Urso/Lobo/Cobra/Besouro, ver render/predatorRenderer.js).
+// Duas espécies (demônio e monstro de sangue, Tiny RPG Character Asset Pack
+// 02); eram quatro (urso/lobo/cobra/besouro) até a arte daquele pack ser
+// descartada por qualidade — ver utils/constants.js:PREDATOR_SPECIES_STATS
+// pra quem herdou qual perfil, e render/predatorRenderer.js pros sprites.
 
 import { tileToWorld, distance } from '../utils/mathUtils.js';
 import { getTileAt, findWalkableNear } from '../world/world.js';
@@ -15,7 +17,7 @@ import {
 } from '../utils/constants.js';
 
 // Rótulo em português pro feed de eventos (predatorAI.js, lifecycle.js).
-export const SPECIES_LABEL = { bear: 'um urso', wolf: 'um lobo', snake: 'uma cobra', beatle: 'um besouro' };
+export const SPECIES_LABEL = { demon: 'um demônio', blood: 'um monstro de sangue' };
 
 export function createPredator({ id, species, position }) {
   const stats = PREDATOR_SPECIES_STATS[species];

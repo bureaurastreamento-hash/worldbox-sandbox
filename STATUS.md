@@ -4,13 +4,26 @@ Snapshot do estado atual. Sessão iniciada depois da pausa registrada em `1561b5
 
 ## 0.🚨 Estado local diverge do último commit — leia antes de qualquer coisa
 
-O usuário apagou **30 arquivos de `assets/sprites/`** manualmente (fora do git, deleção ainda não commitada — `git status` mostra 30 linhas `D`). O commit `597cf3e` (HEAD) e o remoto ainda têm esses arquivos; só a working tree local está sem eles agora. **Rodando o jogo agora, ele carrega mas com terreno/decoração/civil/minério/predadores (menos Besouro/Fogueira/Cavaleiro/Orc) todos em fallback geométrico** (círculo amarelo, triângulo verde, cor lisa) — confirmado ao vivo, 38 requisições 404 no console, zero erro fatal (o `isSpriteReady()` por-sprite segura bem).
+O usuário apagou 30 arquivos de `assets/sprites/` manualmente por qualidade abaixo da régua atual. **A parte de predador dessa pendência está resolvida e commitada** (ver §1a); o que continua em aberto são **~24 deleções não commitadas** de terreno/decoração/civil/minério.
 
-Motivo da deleção (usuário): qualidade abaixo da régua atual (Cavaleiro/Orc/Besouro, craftpix + Tiny RPG). Levantamento completo já feito nesta sessão (ver §7) — **nada foi movido ainda**, aguardando decisão do usuário sobre pack novo pra terreno/decoração/civil (só predador tem substituto pronto, `Tiny RPG Character Asset Pack 02`).
+Estado de cada metade:
+- ✅ **Predador** — resolvido. As 4 espécies viraram 2 (demônio + monstro de sangue, `Tiny RPG Character Asset Pack 02`), arte recortada e commitada, deleções de Urso/Lobo/Cobra/Besouro commitadas junto. Testado ao vivo.
+- 🔴 **Terreno / decoração / minério / personagem civil** — continua em fallback geométrico (círculo amarelo, triângulo verde, cor lisa; zero erro fatal, o `isSpriteReady()` por-sprite segura bem). Levantamento exaustivo dos 5 packs baixados **está fechado e confirmado: nenhum serve** (ver §7). O usuário vai providenciar um pack novo antes da próxima rodada dessas categorias — **não tente resolver com o que já existe.**
 
-**Não rode `git add`/commit em `assets/sprites/` até essa decisão sair** — commitar agora envia o repo pro estado quebrado.
+**Continua valendo: não rode `git add`/commit nessas ~24 deleções restantes de `assets/sprites/`.** O remoto ainda tem esses arquivos, então o GitHub Pages segue visualmente correto — commitar as deleções agora é o que quebraria o jogo publicado.
 
-## 1. O que foi implementado ou alterado nesta sessão
+## 1a. Sessão seguinte — fauna reduzida a 2 espécies + inventário de assets fechado
+
+1. **Inventário exaustivo de `assets/Assets-testes-para-o-claude-testar/`** (287 arquivos, 241 PNG, 5 packs) — desta vez abrindo e analisando as imagens de verdade, não só lendo nomes de arquivo. Dois packs não tinham aparecido em levantamentos anteriores: **Pixel Champions v3** (8 heróis, overworld 24x24 4-direções + battlers 32x32 com set completo de animação incluindo morte) e **SuperRetroWorld** (32 personagens humanos, 16x20, ciclo de caminhada 4-direções, também fornecidos já separados um por pasta). Conclusão revista mas **mantida**: nenhum serve pra terreno/decoração/civil — e o motivo real **não é resolução** (o Cavaleiro tem só 17x21px de conteúdo dentro do quadro de 100x100, mesma ordem de grandeza que os candidatos). É **estilo**: os dois packs novos são pixel art de contorno preto duro e cor chapada saturada (SNES/JRPG), enquanto a régua atual (Tiny RPG / craftpix) é sombreado suave sem contorno. Colocar os dois lado a lado briga.
+2. **Fauna predadora reduzida de 4 pra 2 espécies** (decisão do usuário): `bear`/`wolf`/`snake`/`beatle` → `demon`/`blood`, com arte do `Tiny RPG Character Asset Pack 02` (Demon_A e Blood Monster_A, mesma família do Cavaleiro/Orc). Os stats foram **redistribuídos, não inventados**: `demon` herdou o perfil do urso (60 vida, 15 dano, tanque) e `blood` o do lobo (35 vida, 10 dano, detecção 7). Cobra e besouro saíram inteiros — com o besouro foi embora o único ataque à distância do jogo (`attackRange` 150), perda aceita explicitamente pelo usuário por falta de substituto à altura.
+3. **Velocidade virou stat por espécie** (`PREDATOR_SPECIES_STATS.speed`, 40 pro demônio / 62 pro monstro) em vez do `PREDATOR_SPEED=50` único — sem isso "tanque lento vs. rápido e frágil" ficaria só na descrição, já que a diferença não apareceria em nada observável. `PREDATOR_SPEED` continua como referência/fallback.
+4. **`renderScale` por espécie** (`render/predatorRenderer.js`): o recorte por alpha sozinho normaliza todo predador pra mesma altura na tela, o que faria o monstro de sangue (bicho rasteiro, 15px de conteúdo) aparecer do tamanho do demônio em pé (20px). `renderScale` preserva a proporção da arte de origem.
+5. **`PREDATOR_COUNT_PER_SPECIES` 6 → 12** — decisão minha dentro do escopo: com 2 espécies em vez de 4, manter 6 por espécie derrubaria a população de predadores de 24 pra 12, cortando pela metade uma densidade que foi calibrada jogando. A decisão do usuário foi reduzir a **variedade**, não a ameaça.
+6. **Duas imprecisões corrigidas no `ROADMAP.md`**: o feed de eventos e os animais no mapa estavam listados na Parte 2 (planejado/bloqueado) quando já estavam implementados há sessões. Ambos movidos pra Parte 1, como o próprio arquivo instrui (feed em §1.10, fauna numa §1.13 nova).
+
+**Testado ao vivo:** jogo carrega sem nenhum erro de console; `spawnPredators` produz 24 predadores, 12 de cada espécie, com os stats certos; os 4 sprites novos carregam e desenham com o recorte e a proporção relativa corretos; monstros de sangue confirmados renderizando no mapa com sombra. **Não** foi observado um ciclo de combate completo com as espécies novas numa sessão orgânica — o código de combate não mudou (só os números por espécie), mas a confirmação ao vivo continua pendente.
+
+## 1. O que foi implementado ou alterado na sessão anterior
 
 1. **`dev-server.py`** (novo, raiz do projeto) — mesmo servidor de sempre, mas manda `Cache-Control: no-store` em toda resposta. Motivo: `python -m http.server` puro não manda header de cache nenhum, e o navegador às vezes serve uma versão em cache de um módulo JS editado recentemente — isso já causou debug perdido em mais de uma sessão (mais recentemente, atrapalhou a verificação ao vivo da Frente 2 desta sessão). **`README.md` e `CLAUDE.md` já apontam pra ele — use `python3 dev-server.py`, não mais `python -m http.server`.**
 2. **Throughput de coleta corrigido**: `gather.js`/`gatherWood.js`/`mine.js`/`fish.js`/`deliver.js` só soltavam a ação quando `carrying` passava de zero (não de `CARRY_CAPACITY` cheio) — o agente entregava ~5-10% da carga por viagem em vez de uma viagem cheia. Corrigido pra `carrying >= CARRY_CAPACITY`.
@@ -39,8 +52,8 @@ Motivo da deleção (usuário): qualidade abaixo da régua atual (Cavaleiro/Orc/
 | Life-cycle, reprodução | ✅ Funcionando |
 | Simulation LOD | ✅ Funcionando, fome/sono fora de tela agora realistas (item 7) |
 | UI/HUD/Inspetor/Feed | ✅ Funcionando, com polimento visual novo |
-| **Sprites de agente/terreno/decoração/minério** | 🔴 **Quebrado localmente** — 30 arquivos apagados, nada substituído ainda (§0) |
-| Sprites de predador | 🟡 Substituto identificado (Tiny RPG 02), não recortado/movido ainda |
+| **Sprites de terreno/decoração/minério/civil** | 🔴 **Quebrado localmente** — ~24 arquivos apagados, sem substituto em pack já baixado; aguarda pack novo do usuário (§0) |
+| Sprites de predador | ✅ Resolvido — 2 espécies com arte do Tiny RPG 02, recortada e testada ao vivo (§1a) |
 | Necessidades sociais/segurança/pertencimento | ❌ Não iniciado (só fome/sono existem) |
 | `agent.traits` | ❌ Não iniciado |
 | `defense_pact` (efeito real) | ❌ Não iniciado |
@@ -68,9 +81,7 @@ Motivo da deleção (usuário): qualidade abaixo da régua atual (Cavaleiro/Orc/
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Resolver os sprites apagados (§0) — bloqueia visual, não bloqueia lógica.** Levantamento já feito, decisão do usuário pendente:
-   - **Predador**: recortar de `Tiny RPG Character Asset Pack 02` (`Demon_A`/`Blood Monster_A` — mesma família de craftpix do Cavaleiro/Orc, tem Idle/Walk/Attack01/Attack02/Hurt/Death). Decidir: manter 4 espécies de predador com só 2 sprites (repetidos, stats diferentes) ou reduzir pra 2 espécies. Decidir também se troca o Besouro (sobreviveu, mas é da mesma qualidade grosseira dos apagados).
-   - **Terreno/decoração/minério/civil**: nenhum pack baixado serve (Kenney é a única fonte de tile e é baixa resolução demais pra render ao lado do Cavaleiro; os 3 packs de personagem humano não têm pose de trabalho nem estilo compatível). Precisa de pack novo — usuário decide se busca ou aceita provisório.
+1. **Terreno/decoração/minério/civil (§0) — bloqueia visual, não bloqueia lógica.** Levantamento fechado: nenhum dos 5 packs baixados serve (ver §1a item 1 pro motivo — é estilo, não resolução). **Aguardando o usuário providenciar um pack novo**; quando chegar, repetir o mesmo processo de levantamento + proposta por categoria antes de mover qualquer arquivo. A parte de predador já saiu (§1a).
 2. **Otimização de FPS** (diagnóstico pronto, ver item 10 de §1): pré-renderizar a camada de terreno estática num canvas offscreen (`drawTiles` some do custo por-frame, vira 1 `drawImage`); mover `scanPerception` pro ritmo de reconsideração (~0.5s) em vez de todo frame; parar de recalcular "ameaça mais próxima" em paralelo em `checkDeath` + 4 ações de combate.
 3. **Casas em tiers + rank de vila** — design já aprovado (ver `DESIGN.md` se foi anotado, senão está só nesta sessão do histórico de conversa): 3 níveis por upgrade (tier2 = +ferro, tier3 = +ouro), rank derivado Acampamento/Vila/Cidade. Precisa reconfirmar candidato de arte por tier depois do item 1.
 4. **Sessão de jogo real do usuário** (pendente de sessões anteriores, ainda não aconteceu) — só depois dos sprites resolvidos, senão a avaliação visual fica invalidada pelo fallback geométrico.

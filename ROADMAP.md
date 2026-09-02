@@ -72,6 +72,7 @@ Lista completa e detalhada de tudo que já foi implementado e tudo que está pla
 - Inspetor: score de cada ação candidata na última reconsideração (por que a IA escolheu o que escolheu), estoque/demanda/desespero da vila, população/casas/especialização, postura e tratados do clã.
 - Seleção direta de vila (sem precisar de um agente) pra inspecionar estoque/clã.
 - Raio de percepção visualizável (`[D]`).
+- **Feed de eventos** (`ui/eventFeed.js`): log de texto na tela narrando o que já acontecia por trás dos panos — guerra declarada, tratado rompido, casa construída, morador morto (de fome, em guerra ou por um predador, com a espécie citada), vila extinta, aviso de fome crítica da vila (`lifecycle.js:updateHungerWarning`, com histerese). Era a "recomendação de maior impacto" da Parte 2 e foi implementada; numa passada de polimento visual posterior, o módulo foi reescrito pra animar só a linha nova em vez de reconstruir o DOM inteiro a cada evento.
 
 ### 1.11 Decoração e arte visual
 - Decoração do mapa (árvore/planta/casa) gerada uma vez, puramente visual, sem afetar pathfinding/percepção.
@@ -90,6 +91,13 @@ Lista completa e detalhada de tudo que já foi implementado e tudo que está pla
 - **Vila presa em fome sem caminho de comércio**: postura `tense` bloqueava indevidamente a proposta de comércio — corrigido.
 - **Extinção quase-instantânea sincronizada**: todos os fundadores nasciam com fome=100 fixo, cruzavam o limiar de "comer" juntos, drenavam o estoque numa rajada e a vila inteira morria de fome em ~70-80s — corrigido dessincronizando a fome inicial dos fundadores + aumentando o estoque inicial.
 - **Ritmo de mineração/construção travado**: descoberta de montanha por acaso era lenta demais (raio de percepção pequeno, `wander.js` sem viés de busca) — corrigido subindo o raio e reduzindo o custo de casa; confirmado ao vivo funcionando de ponta a ponta.
+
+### 1.13 Fauna predadora (`predator/`, `DESIGN.md` §10)
+Fecha o item "animais no mapa", que a Parte 2 listava como bloqueado por arte — e foi bem além do "decorativo simples primeiro" que a decisão original previa: os bichos nasceram já como ameaça de verdade, não como decoração parada.
+- `Predator` é uma entidade separada de `Agent`, deliberadamente mais simples: sem needs/perception/memory/utility completo. FSM própria (`patrolling → chasing → attacking → fleeing`) com histerese na fuga e **leash** a partir do ponto de nascimento (senão um predador viraria perseguidor permanente até dentro da vila).
+- Reação do agente por papel: civil sempre foge (`fleePredator.js`), guerreiro designado enfrenta (`fightPredator.js`) a menos que a própria vida já esteja crítica. Ações novas de propósito, não reaproveitadas de `flee.js`/`fight.js` — predador não tem clã e o dano não é simétrico.
+- Efeito real na vila: morador pode morrer de verdade, com evento no feed citando a espécie. `village.distress` **não** reage — é especificamente sobre déficit de recurso, misturar fauna ali confundiria o sinal que a diplomacia usa.
+- **Redução de 4 pra 2 espécies** (sessão posterior): a arte do pack de vida selvagem (urso/lobo/cobra/besouro) ficou abaixo da régua de qualidade do resto do jogo e foi descartada. Sobraram duas, com arte do Tiny RPG Character Asset Pack 02 (mesma família do Cavaleiro/Orc): **demônio** herdou o perfil do urso (tanque, lento, dano alto) e **monstro de sangue** o do lobo (frágil, rápido, faro melhor) — os stats foram redistribuídos, não inventados. Com o besouro foi embora o único ataque à distância do jogo, perda aceita explicitamente por falta de substituto à altura. Densidade preservada (~24 no mapa: 12 por espécie em vez de 6).
 
 ---
 
@@ -111,14 +119,13 @@ Lista completa e detalhada de tudo que já foi implementado e tudo que está pla
 - **`village.founded`** (tick de fundação) — está no modelo de dados conceitual, nunca setado nem lido em lugar nenhum. Baixa prioridade (não bloqueia nada), mas seria fácil de preencher se algum dia for útil pra UI (ex.: "vila fundada há X tempo").
 
 ### 2.3 Sugestões de evolução levantadas nesta sessão (nada implementado ainda)
-- **Feed de eventos** (recomendação de maior impacto): pequeno log de texto na tela narrando o que já acontece por trás dos panos — guerra declarada, casa construída, morador morto de fome, tratado rompido, vila extinta. Ataca diretamente o "não tem nada demais pra se fazer" sem abrir sistema novo nenhum — só torna visível o que já roda. Os pontos de decisão institucional (`clanDecision.js`, `lifecycle.js`, `build.js`) já sabem exatamente quando cada evento acontece.
 - **Mais tipos de construção além de casa** — armazém (mais capacidade de estoque), torre (bônus pra guerreiros por perto), poço/fazenda (acelera produção de comida/madeira). Dá uma escada de progressão visível pra vila.
 - **Histerese na troca guerra↔paz** — já sinalizado como podendo parecer volátil numa sessão de observação longa; ajuste de sensação de jogo, não sistema novo.
 - **Conectar `defense_pact`** (ver 2.2) — mencionado aqui de novo porque é tanto uma lacuna quanto uma sugestão de evolução natural pro sistema de diplomacia já existente.
 
 ### 2.4 Bloqueado externamente (depende de arte que ainda não existe)
 - **Elfo** — sem arte própria em nenhum pack baixado até agora; decisão explícita aceita, cai no guerreiro genérico (mesmo padrão que a casa já teve enquanto não tinha sprite). Trocar é trivial em `render/agentRenderer.js:WARRIOR_*_SPRITE_KEY` assim que houver um candidato. Única pendência de arte que sobrou depois de floresta/montanha/ícone-de-minério fecharem — ver §1.11.
-- **Animais no mapa** — decisão já tomada: decorativo simples primeiro (mesmo tratamento visual de árvore/planta/casa, sem IA), comportamento "vagando sem IA de utilidade" (tipo `wander.js`, mas sem fome/vila/decisão) só numa leva futura, quando a arte estiver pronta. Não é um NPC de verdade, é ambiente.
+- **Terreno, decoração, minério e personagem civil** — a arte dessas quatro categorias foi apagada pelo usuário por estar abaixo da régua de qualidade atual, e **nenhum pack já baixado tem substituto à altura** (levantamento exaustivo dos 5 packs em `assets/Assets-testes-para-o-claude-testar/` feito e confirmado: o que existe é bonito, mas é pixel art de contorno preto duro e cor chapada, que briga com o sombreado suave do Cavaleiro/Orc/Demônio). Depende de um pack novo, que o usuário vai providenciar. Enquanto isso o jogo roda com fallback geométrico nessas categorias — ver `STATUS.md` §0.
 
 ### 2.5 Item aberto do usuário
 - A sessão anterior perguntou se havia "funções" que o usuário queria adicionar além do que os assets sobrando sugeriam — ainda sem resposta. Vale revisitar se surgir algo que não é sobre sprite nenhum.
