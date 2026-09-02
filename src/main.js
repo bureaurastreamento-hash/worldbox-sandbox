@@ -1,5 +1,7 @@
 import { createWorld, findSpawnTile, findWalkableNear, getVillage } from './world/world.js';
 import { generateDecorations } from './world/decorations.js';
+import { spawnPredators } from './predator/predator.js';
+import { updatePredator } from './predator/predatorAI.js';
 import { buildSpatialIndex } from './world/spatialIndex.js';
 import { createVillage, addResident } from './village/village.js';
 import { computeDemand, updateDistress, updateChaos } from './village/stock.js';
@@ -12,7 +14,7 @@ import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
 import { updateDecision } from './agent/decision.js';
-import { classifyAgents, stepBackgroundAgent } from './simulation/lod.js';
+import { classifyAgents, stepBackgroundAgent, feedBackgroundVillage } from './simulation/lod.js';
 import { applySeparation } from './agent/separation.js';
 import { ageAgent, checkDeath, updateVillageReproduction, updateHungerWarning, pruneDead } from './lifecycle/lifecycle.js';
 import { createTimeState } from './core/time.js';
@@ -157,6 +159,7 @@ for (let i = 0; i < clans.length; i++) {
 }
 
 world.decorations = generateDecorations(world);
+world.predators = spawnPredators(world);
 
 const camera = createCamera({
   x: homeVillage.center.x,
@@ -226,13 +229,23 @@ const loop = createGameLoop({
       dt,
     );
 
+    for (const predator of world.predators) {
+      updatePredator(predator, world, dt);
+    }
+
+    const backgroundByVillage = new Map();
     for (const agent of background) {
       stepBackgroundAgent(agent, dt);
       ageAgent(agent, dt);
       checkDeath(agent, world, dt);
+      if (!agent.alive) continue;
+      if (!backgroundByVillage.has(agent.villageId)) backgroundByVillage.set(agent.villageId, []);
+      backgroundByVillage.get(agent.villageId).push(agent);
     }
 
     for (const v of world.villages) {
+      const residents = backgroundByVillage.get(v.id);
+      if (residents) feedBackgroundVillage(v, residents, dt);
       updateVillageReproduction(v, world, dt);
       updateHungerWarning(v, world);
     }
@@ -241,7 +254,6 @@ const loop = createGameLoop({
   },
   render() {
     renderer.render(world, debugState, uiState.selectedAgentId, uiState.selectedVillageId);
-
 
     let selectionState = 'none';
     let selectedAgent = null;

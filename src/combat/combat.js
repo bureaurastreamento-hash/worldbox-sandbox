@@ -38,4 +38,10 @@ export function resolveEngagement(agent, enemy, dt) {
   const damage = COMBAT_DAMAGE_PER_SEC * dt;
   agent.health = clamp(agent.health - damage, 0, 100);
   enemy.health = clamp(enemy.health - damage, 0, 100);
+  // Marca a fonte do dano mais recente pra lifecycle.js:checkDeath escolher
+  // o texto certo no evento de morte — sem isso, um agente que sobrevive a
+  // um ataque de predador e morre depois em guerra ainda apareceria como
+  // "morto por" o predador antigo (lastDamageSource nunca era limpo).
+  agent.lastDamageSource = 'clan';
+  enemy.lastDamageSource = 'clan';
 }

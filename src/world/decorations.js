@@ -13,7 +13,6 @@ import {
   DECORATION_PLANT_CHANCE,
   DECORATION_HOUSES_PER_VILLAGE,
   DECORATION_VILLAGE_CLEARING_RADIUS,
-  DECORATION_ANIMAL_CHANCE,
   DECORATION_CHEST_CHANCE,
   DECORATION_CAMPFIRES_PER_VILLAGE,
 } from '../utils/constants.js';
@@ -42,11 +41,11 @@ export function generateDecorations(world) {
         continue; // um bicho/baú não nasce em cima da árvore/planta que já nasceu aqui
       }
 
-      // Bicho e baú: raros, mesma chance pros dois tipos de tile vegetado
-      // (ao contrário de árvore/planta, que são exclusivos por tipo).
-      if (rng.next() < DECORATION_ANIMAL_CHANCE) {
-        decorations.push({ type: 'animal', x: pos.x, y: pos.y });
-      } else if (rng.next() < DECORATION_CHEST_CHANCE) {
+      // Baú: raro, mesma chance pros dois tipos de tile vegetado (ao
+      // contrário de árvore/planta, que são exclusivos por tipo). Bicho
+      // deixou de ser decoração aqui — virou predador de verdade, ver
+      // predator/predatorSpawn.js.
+      if (rng.next() < DECORATION_CHEST_CHANCE) {
         decorations.push({ type: 'chest', x: pos.x, y: pos.y });
       }
     }

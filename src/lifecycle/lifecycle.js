@@ -2,6 +2,8 @@ import { clamp } from '../utils/mathUtils.js';
 import { createAgent } from '../agent/agent.js';
 import { addResident, getPopulationCap } from '../village/village.js';
 import { findNearestEnemy } from '../combat/combat.js';
+import { findNearestPredator } from '../combat/predatorCombat.js';
+import { SPECIES_LABEL } from '../predator/predator.js';
 import { pushEvent } from '../world/eventLog.js';
 import {
   CHILD_ADULT_AGE,
@@ -31,9 +33,10 @@ export function checkDeath(agent, world, dt) {
 
   if (agent.needs.hunger <= 0) {
     agent.health = clamp(agent.health - STARVE_HEALTH_DRAIN_PER_SEC * dt, 0, 100);
-  } else if (!findNearestEnemy(agent, world)) {
-    // sem isso, a regeneração desfaria o dano de combate no próximo tick
-    // (checkDeath roda antes de fight.js aplicar dano de novo)
+  } else if (!findNearestEnemy(agent, world) && !findNearestPredator(agent, world)) {
+    // sem isso, a regeneração desfaria o dano de combate (ou de predador)
+    // no próximo tick (checkDeath roda antes de fight.js/predatorAI.js
+    // aplicarem dano de novo)
     agent.health = clamp(agent.health + HEALTH_REGEN_PER_SEC * dt, 0, 100);
   }
 
@@ -46,7 +49,16 @@ export function checkDeath(agent, world, dt) {
     const village = world.villages.find((v) => v.id === agent.villageId);
     if (village) {
       const cause = agent.age >= MAX_AGE ? 'velhice' : agent.needs.hunger <= 0 ? 'fome' : 'combate';
-      pushEvent(world, `${village.name} perdeu um morador de ${cause}`);
+      const byPredator = cause === 'combate' && agent.lastDamageSource === 'predator';
+      if (byPredator) {
+        // Agentes não têm nome individual no jogo (só id interno) — segue o
+        // mesmo padrão dos outros eventos de morte, que também só citam a
+        // vila, não a pessoa.
+        const species = SPECIES_LABEL[agent.lastDamagePredatorSpecies] ?? 'um predador';
+        pushEvent(world, `${village.name} perdeu um morador, morto por ${species}`);
+      } else {
+        pushEvent(world, `${village.name} perdeu um morador de ${cause}`);
+      }
       if (village.population.length === 1) pushEvent(world, `${village.name} foi extinta`);
     }
   }

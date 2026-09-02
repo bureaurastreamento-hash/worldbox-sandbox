@@ -295,10 +295,9 @@ export const SPATIAL_CELL_SIZE = PERCEPTION_RADIUS * TILE_SIZE;
 // LOD: agentes fora da viewport (simulation/lod.js:classifyAgents, checa
 // contra a tela via camera.worldToScreen) rodam em modo agregado (sem
 // percepção/decisão/pathfinding — caro e inútil se ninguém tá vendo).
-// Fora de foco, as necessidades não decaem normalmente — são empurradas de
-// volta pra perto do topo (a vila "se vira sozinha" fora da tela), pra não
-// morrer tudo de fome só por estar fora do foco.
-export const BACKGROUND_NEEDS_RESTORE_PER_SEC = 100 / 15;
+// Fome/sono decaem igual a um agente `active` (simulation/lod.js:
+// stepBackgroundAgent); feedBackgroundVillage (mesmo arquivo) cobre o
+// "comer" de forma agregada por vila, sem cada um andar até o centro.
 
 // Decoração do mapa: puramente visual, gerada uma vez na criação do mundo
 // (determinística pela seed, como o terreno), sem lógica nem colisão.
@@ -309,13 +308,51 @@ export const DECORATION_HOUSES_PER_VILLAGE = 6;
 // dela legível (onde as casas ficam); casas nascem dentro desse raio.
 export const DECORATION_VILLAGE_CLEARING_RADIUS = TERRITORY_RADIUS;
 
-// Bicho decorativo (parado, sem IA) — bem mais raro que árvore/planta de
-// propósito, pra parecer um avistamento, não um zoológico; ~20-30 no mapa
-// inteiro (220x220) com esse valor. Mesma chance pra floresta e grama (ao
-// contrário de árvore/planta, que são exclusivos de um tipo de tile cada).
-// Vira predador de verdade numa leva futura — ver decorationRenderer.js.
-export const DECORATION_ANIMAL_CHANCE = 0.0015;
-// Baú: mais raro ainda, tesouro escondido sem mecânica de loot associada.
+// Baú: raro, tesouro escondido sem mecânica de loot associada.
 export const DECORATION_CHEST_CHANCE = 0.0006;
 // Fogueira: 1 por vila, mesmo padrão de DECORATION_HOUSES_PER_VILLAGE.
 export const DECORATION_CAMPFIRES_PER_VILLAGE = 1;
+
+// Fauna predadora (predator/): entidade separada de Agent, bem mais simples
+// (sem needs/perception/memory/utility completo) — FSM reconsiderada
+// periodicamente (predator/predatorAI.js). Raro de propósito: ~24 no mapa
+// inteiro (220x220), ~6 por espécie — pra ser um encontro perigoso pontual,
+// não uma ameaça constante.
+export const PREDATOR_COUNT_PER_SPECIES = 6;
+// Não nasce mais perto de nenhuma vila que isso — fora do alcance
+// imediato, ainda dentro do raio que um agente explorando pode topar.
+export const PREDATOR_MIN_DISTANCE_FROM_VILLAGE_TILES = 15;
+// Raio de patrulha ao redor do ponto de nascimento (spawnAnchor) enquanto
+// não há alvo — mesmo espírito de wander.js, só que sem perception real.
+export const PREDATOR_PATROL_RADIUS_TILES = 3;
+// Leash: se o alvo perseguido se afasta mais que isso do spawnAnchor do
+// predador, ele desiste e volta a patrulhar — evita um urso virar
+// perseguidor permanente até dentro da vila.
+export const PREDATOR_LEASH_RADIUS_TILES = 10;
+export const PREDATOR_SPEED = 50; // px/mundo por segundo — mesmo valor pras 4 espécies, simplificação deliberada
+export const PREDATOR_RECONSIDER_INTERVAL = 0.4; // segundos, com jitter por predador (mesmo padrão do agente)
+// Abaixo dessa fração da vida máxima, foge em vez de atacar/perseguir;
+// só volta a patrulhar depois de recuperar até essa outra fração (evita
+// flip-flop fugindo/atacando bem na borda do limiar).
+export const PREDATOR_FLEE_HEALTH_FRACTION = 0.25;
+export const PREDATOR_FLEE_RECOVER_FRACTION = 0.6;
+export const PREDATOR_HEALTH_REGEN_PER_SEC = 100 / 30; // só enquanto foge, sem ameaça por perto
+
+// Stats por espécie — valores iniciais, calibrar depois de observar
+// jogando (mesmo espírito dos outros pesos deste arquivo). Besouro é o
+// único à distância (Beatle_Slime_Shot no pack), por isso o attackRange
+// bem maior; os outros 3 são corpo a corpo.
+export const PREDATOR_SPECIES_STATS = {
+  bear: { health: 60, attackDamage: 15, detectionRadiusTiles: 6, attackRange: 40 },
+  wolf: { health: 35, attackDamage: 10, detectionRadiusTiles: 7, attackRange: 40 },
+  snake: { health: 20, attackDamage: 8, detectionRadiusTiles: 4, attackRange: 40 },
+  beatle: { health: 15, attackDamage: 6, detectionRadiusTiles: 6, attackRange: 150 },
+};
+
+// agent/actions/fleePredator.js e fightPredator.js: mesma faixa de score
+// de flee.js/fight.js (FLEE_SCORE=0.9/FIGHT_SCORE=0.85), mas a decisão de
+// qual delas um agente sequer considera depende do papel — civil só tem
+// fleePredator viável, guerreiro designado só tem fightPredator viável
+// (a menos que a própria vida já esteja crítica, FLEE_HEALTH_THRESHOLD).
+export const FLEE_PREDATOR_SCORE = 0.9;
+export const FIGHT_PREDATOR_SCORE = 0.85;

@@ -179,7 +179,10 @@ function pickSprite(agent, moving, walkFrame) {
   // Corpo durante o "linger" antes de pruneDead remover de vez (ver
   // DEATH_LINGER_SECONDS, lifecycle.js) — sem pose por ação, já morreu.
   if (!agent.alive) return sprites.morto;
-  if (agent.currentAction === 'fight') {
+  // fightPredator: só guerreiro designado tem essa candidata viável
+  // (agent/actions/fightPredator.js), civil nunca chega aqui — mas trata
+  // igual a 'fight' por segurança/consistência visual.
+  if (agent.currentAction === 'fight' || agent.currentAction === 'fightPredator') {
     // Guerreiro designado (agent.role, ver clan/clanDecision.js) vira o
     // warriorType de fantasia sorteado no nascimento. Um civil forçado a se
     // defender (a maioria, fora de guerra) alterna Atacando/Defendendo —
@@ -189,7 +192,9 @@ function pickSprite(agent, moving, walkFrame) {
     if (agent.role === 'warrior') return orFallback(sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]], sprites.parado);
     return orFallback([sprites.atacandoCivil, sprites.defendendoCivil][walkFrame], sprites.parado);
   }
-  if (agent.currentAction === 'flee') return orFallback(sprites.correndo, sprites.andando);
+  if (agent.currentAction === 'flee' || agent.currentAction === 'fleePredator') {
+    return orFallback(sprites.correndo, sprites.andando);
+  }
   // Levando tronco cobre a viagem inteira de volta (não só parado entregando).
   if (agent.currentAction === 'deliver' && agent.carryingType === 'wood') {
     return orFallback(sprites.levandoTronco, sprites.parado);
