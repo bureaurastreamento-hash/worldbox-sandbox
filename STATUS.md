@@ -93,3 +93,52 @@ Estado de cada metade:
 - **Rank de vila**: Acampamento → Vila → Cidade, **derivado** (população ≥20 E pelo menos 1 casa tier 2+), não um recurso separado — só muda o label exibido + 1 evento no feed na transição.
 - **Otimização de FPS**: números exatos de referência pra comparar depois de qualquer mudança — zoom=1/50 ativos: drawTiles 6.8ms, percepção 16.7ms; zoom=0.25/200 ativos: drawTiles 86-167ms, percepção 90.9ms. `separation.js` sempre <1ms, não mexer nisso achando que é o problema.
 - **Regras de disciplina de trabalho** (§4) — já salvas em memória permanente, mas reforçando aqui: uma frente por vez em sistemas acoplados, sequencial até testado ao vivo, antes de abrir a próxima.
+
+## 1b. Sessão seguinte — SpriteManager unificado (módulo isolado, não ligado no jogo)
+
+O pack novo chegou em `assets/Pers-Sprites/` (99 PNGs). Escrito um gerenciador
+de sprites/animação que lê os dois formatos do pack, **testado isoladamente
+via `sprite-lab.html` — nenhum renderer do jogo foi tocado.**
+
+Três divergências entre a especificação e os arquivos reais, todas achadas
+antes de escrever código (por isso o levantamento vem primeiro):
+
+1. **`Characters-Sheets/` não existe.** O conteúdo do Formato 2 está em
+   `Pers-Sprites/Humanos-separados/`, e são os arquivos **já separados um
+   personagem por pasta** (48x80 e 96x128 = grade **3x4**), não a folha 12x8
+   com 8 personagens que a especificação descreve. As folhas 12x8 de verdade
+   só existem na pasta de matéria-prima ignorada no git. Resolvido suportando
+   **os dois layouts com detecção automática** (decisão do usuário) — a
+   fórmula de recorte é a mesma, só muda quantos blocos cabem.
+2. **A tabela de quadros de `attack` está errada pra 3 dos 4 atores.** Diz 8;
+   Blood Monster tem 8, mas Demon tem 7, Orc e Soldier têm 6, e
+   `Soldier_Attack03` tem 9. Resolvido derivando a contagem da imagem
+   (`largura/altura`) e usando a tabela só como validação com aviso no
+   console. Walk (8), Idle (6), Hurt (4) e Death (4) batem em 100% dos
+   arquivos.
+3. **A variante no nome é opcional** (`Blood Monster_A_Walk` tem `_A`,
+   `Orc_Walk` e `Soldier_Walk` não). Parser lê da direita pra esquerda.
+
+**Armadilha que custou uma rodada:** a primeira versão detectava o Formato 1
+pela pasta (`path.includes('Pers-Sprites/')`), seguindo a especificação. Mas
+no pack os **dois formatos moram dentro de `Pers-Sprites/`** — as 32 grades
+foram classificadas como tira e desenhadas inteiras. O sinal confiável é o
+token de ação no fim do nome, não a pasta.
+
+**Testado ao vivo:** 57 folhas, 36 atores, 0 falhas; os 7 avisos de contagem
+de quadros aparecem exatamente onde previsto e em nenhum outro lugar;
+animação, troca de direção (as 4), ataque e morte-que-segura-o-último-quadro
+confirmados a olho; detecção de layout confirmada nos 4 arquivos reais
+(192x160 e 288x192 → 12x8; 96x128 e 48x80 → 3x4), incluindo os dois casos
+ambíguos por divisibilidade; recorte 12x8 confirmado produzindo 8 personagens
+distintos × 4 direções. Jogo principal recarregado depois: sem erro novo.
+
+**Próximo passo natural:** ligar no `predatorRenderer.js` primeiro (sistema
+mais isolado, e as duas espécies já usam exatamente Demon_A/Blood Monster_A),
+depois nos agentes. Nada disso foi feito ainda — a escolha do usuário nesta
+rodada foi entregar só o módulo.
+
+**Não coberto ainda:** `Pers-Sprites/Animais/` (reprovado por qualidade,
+e as tiras têm layout diferente — 4 colunas × N linhas) e a folha de tiles
+Kenney em `Vários tipos de chão-.../` (16x16 com 1px de margem), que seria um
+terceiro formato.

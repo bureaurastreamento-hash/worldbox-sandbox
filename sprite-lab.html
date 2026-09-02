@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Sprite Lab — Worldbox Sandbox</title>
+<style>
+  :root { --bg:#241d16; --panel:#33291f; --edge:#5a4732; --brass:#c9a227; --ink:#e8dcc8; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:'VT323',ui-monospace,monospace; font-size:17px; }
+  header { padding:14px 18px; border-bottom:2px solid var(--edge); display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:19px; margin:0; color:var(--brass); letter-spacing:.5px; }
+  .stats { opacity:.75; font-size:15px; }
+  .controls { display:flex; gap:6px; flex-wrap:wrap; }
+  button { font:inherit; background:var(--panel); color:var(--ink); border:1px solid var(--edge);
+           padding:5px 11px; cursor:pointer; border-radius:3px; }
+  button:hover { border-color:var(--brass); }
+  button.on { background:var(--brass); color:#241d16; border-color:var(--brass); }
+  main { padding:16px; }
+  h2 { font-size:16px; color:var(--brass); margin:22px 0 10px; border-bottom:1px solid var(--edge); padding-bottom:5px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:10px; }
+  .cell { background:var(--panel); border:1px solid var(--edge); border-radius:4px; padding:7px; text-align:center; }
+  .cell canvas { display:block; margin:0 auto; image-rendering:pixelated; background:#4e6b3f; border-radius:2px; }
+  .cell .name { font-size:14px; margin-top:5px; word-break:break-word; opacity:.9; }
+  .cell .meta { font-size:13px; opacity:.55; }
+  #errors { color:#e08a7a; font-size:15px; white-space:pre-wrap; margin-top:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SPRITE LAB</h1>
+  <div class="controls" id="stateButtons"></div>
+  <div class="controls" id="dirButtons"></div>
+  <div class="stats" id="stats">carregando…</div>
+</header>
+<main>
+  <h2 id="stripTitle">Formato 1 — tiras horizontais</h2>
+  <div class="grid" id="strips"></div>
+  <h2 id="gridTitle">Formato 2 — grade RPG 3x4</h2>
+  <div class="grid" id="grids"></div>
+  <div id="errors"></div>
+</main>
+<script type="module" src="src/render/sprites/spriteLab.js"></script>
+</body>
+</html>
