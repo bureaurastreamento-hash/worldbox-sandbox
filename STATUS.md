@@ -201,3 +201,66 @@ envolvido que o predador — ele escolhe pose por AÇÃO corrente (cortando
 (civil/guerreiro) e por estado de vida, e as poses de trabalho não existem
 nas tiras do pack novo. Precisa de decisão de design antes, não é uma
 tradução mecânica.
+
+## 1d. Sessão seguinte — agentRenderer migrado pro SpriteManager
+
+Segundo (e maior) consumidor do módulo. É o caso que justifica o gerenciador
+ter sido feito unificado: **as duas famílias de arte do agente usam formatos
+diferentes ao mesmo tempo**, e o renderer não precisa saber disso.
+
+- **Civil** → um dos 32 personagens de `Pers-Sprites/Humanos-separados/`
+  (grade RPG 3x4), escolhido por hash de `agent.id` e fixo pra vida toda.
+  Caminhada com **4 direções reais**. Estavam como círculo amarelo desde que
+  a arte antiga foi apagada.
+- **Guerreiro designado** → tiras completas de `Soldado1/` (Cavaleiro) e
+  `Monstro3/` (Orc), com idle/walk/attack/hurt/death. **O elfo deixou de ser
+  um círculo**: cai no Soldier como guerreiro genérico (segue sem arte
+  própria, decisão antiga, mas agora ao menos aparece animado).
+
+### ⚠️ Decisão que precisa da confirmação do usuário
+
+Os 32 civis são o **SuperRetroWorld**, o mesmo pack que numa rodada anterior
+foi reprovado por estilo (contorno preto duro e cor chapada, contra o
+sombreado suave do Soldier/Orc/Demon), com a instrução explícita de "não
+tente resolver o personagem civil com o que já existe". Usei assim mesmo
+porque o usuário **entregou esses arquivos dentro de `Pers-Sprites/`**, a
+pasta curada do pack novo — o que li como decisão revista. **Se não for,
+reverter é uma linha**: apagar `CIVILIAN_ACTORS` de `agentRenderer.js` faz o
+civil voltar ao fallback geométrico sem tocar em mais nada.
+
+### Decisões técnicas
+
+1. **Perda assumida: as poses de trabalho.** Cortar árvore, minerar,
+   construir, pescar, levar tronco — nenhuma existe na arte disponível. As
+   partículas de trabalho (faísca, lasca) continuam, então "está trabalhando
+   ali" ainda se lê, só não pela pose do corpo. `DESIGN.md` §8 foi atualizado:
+   o projeto voltou ao eixo "diversidade visual por indivíduo" que aquela
+   seção dizia ter abandonado, porque a alternativa era manter o círculo.
+2. **Civil morto deita e desbota** (rotação 90°, alfa 0.65) — a grade RPG não
+   tem clipe de morte e a cascata do animator deixaria o cadáver **de pé**
+   durante o `DEATH_LINGER_SECONDS`. Guerreiro tem `death` e toca normal.
+3. **`sweepViews`** — agente É podado de `world.agents` (ao contrário de
+   predador), então o Map de estado visual cresceria pra sempre numa sessão
+   longa. Varredura a cada ~10s. **A versão anterior tinha esse mesmo
+   vazamento no `lastPositions` e ninguém tinha notado.**
+4. **View reconstruída quando o ator muda** — `clanDecision.js` designa e
+   desmobiliza guerreiro em tempo de execução, então o agente troca de
+   família de arte no meio da vida.
+
+**Testado ao vivo:** console limpo (só os 7 avisos esperados de contagem de
+quadros); vila de 8 civis com rostos distintos e direções corretas na tela;
+os 10 casos do renderer exercitados chamando `drawAgents` de verdade com
+agentes sintéticos (civil parado/andando/morto, cavaleiro/orc parado e
+atacando, elfo, elfo morto, criança) — todos corretos.
+
+**Custo medido** (200 iterações, síncrono): 0.195ms/frame com 32 agentes,
+1.56ms com 200, 4.87ms com 600. Contra os 86-167ms de `drawTiles` em zoom
+baixo (§6), é ruído.
+
+**Não confirmado:** ataque e morte de guerreiro numa guerra orgânica — só no
+harness sintético, que exercita o mesmo caminho de código.
+
+**Próximo passo natural:** o terceiro formato de spritesheet (folha de tiles
+Kenney 16x16 com 1px de margem, em `Pers-Sprites/Vários tipos de chão-...`),
+que devolveria terreno e decoração — as últimas categorias em fallback
+geométrico. A arquitetura já prevê: é um objeto novo em `sheetFormats.js`.

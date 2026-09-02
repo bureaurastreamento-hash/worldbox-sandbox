@@ -1,175 +1,71 @@
-// Sprites do amigo do usuário (assets/Assets-testes-para-o-claude-testar/) —
-// papel visual por AÇÃO corrente, não por facção/clã (ver DESIGN.md §8).
-// Substitui de vez as 4 variantes antigas de pele/gênero (WMan/WGirl/BMan/
-// BGirl, assets/sprites/) — decisão do usuário, perde aquela diversidade em
-// troca de refletir visualmente o que o agente está fazendo agora.
+// Desenha os agentes via render/sprites/ (SpriteManager), com animação de
+// verdade. Substitui a leva anterior de quadros estáticos recortados à mão,
+// que tinha sido apagada por qualidade — o civil estava caindo no círculo
+// geométrico desde então.
 //
-// Um civil (`agent.role === 'civilian'`, a maioria) é "Camponês" fora de
-// combate: pose dedicada quando a ação tem uma óbvia (cortando árvore,
-// minerando, construindo, levando tronco, pescando); ações sem pose
-// específica (comer, dormir, colher comida, vagar) caem no ciclo padrão
-// parado/andando. `flee` sempre mostra o sprite de corrida dedicado. Durante
-// `fight`, um guerreiro designado (`agent.role === 'warrior'`, ver
-// clan/clanDecision.js — emergente pela demanda de defesa da vila, não fixo)
-// mostra o warriorType sorteado no nascimento (`agent.warriorType` —
-// orc/elfo/cavaleiro, fixo pra vida toda); um civil forçado a lutar alterna
-// entre atacando/defendendo (2 quadros, mesmo padrão de parado/andando) em
-// vez de virar um guerreiro de fantasia que ele não é. Fora de `fight`, o
-// guerreiro designado mostra o warriorType parado/andando o tempo todo
-// nesse papel — mesmas poses de trabalho ainda têm prioridade quando
-// aplicável (um guerreiro que também está minerando mostra minerando).
-// Morto (`!agent.alive`) sempre mostra o sprite de corpo, independente de
-// papel ou última ação — ver DEATH_LINGER_SECONDS.
+// Duas famílias de arte, dois formatos, a mesma interface:
 //
-// Mesmo tratamento de recorte por alpha de antes: as imagens têm espaço
-// vazio ao redor do personagem, calculado uma vez no load
-// (computeContentBounds), não fixado no código.
-// Pasta canônica de arte em uso (o resto do que já foi baixado fica em
-// assets/Assets-testes-para-o-claude-testar/ como matéria-prima até ser
-// selecionado e recortado pra cá — ver STATUS.md/ROADMAP.md).
+// - **Civil** (`agent.role === 'civilian'`, a maioria): um dos 32 personagens
+//   de `Pers-Sprites/Humanos-separados/`, formato grade RPG 3x4 — caminhada
+//   com 4 direções de verdade. Qual dos 32 é escolhido por hash determinístico
+//   de `agent.id`, então cada morador tem um rosto fixo pra vida toda. Isso
+//   traz de volta a diversidade visual por agente que tinha sido abandonada
+//   quando a arte passou a ser por AÇÃO corrente (DESIGN.md §8) — troca que
+//   deixou de fazer sentido, porque as poses de trabalho (cortando árvore,
+//   minerando, construindo, pescando, levando tronco) NÃO existem em nenhuma
+//   arte disponível hoje. Perde-se a pose de trabalho, ganha-se direção real
+//   e um elenco reconhecível.
+//
+// - **Guerreiro designado** (`agent.role === 'warrior'`): as tiras completas
+//   de `Soldado1/` e `Monstro3/`, com idle/walk/attack/hurt/death. Sprite de
+//   perfil, então a direção é resolvida espelhando no eixo X, não por linha
+//   de grade.
+//
+// O que se perdeu nesta migração, explicitamente: as poses dedicadas de
+// trabalho. As partículas (faísca ao minerar, lasca ao cortar) continuam,
+// então "está trabalhando ali" ainda se lê — só não pela pose do corpo.
+
 import { spawnDust, spawnSpark, spawnChip } from './particles.js';
+import { SpriteManager } from './sprites/spriteManager.js';
+import { createAnimator, directionFromVector } from './sprites/animator.js';
+import { FORMAT } from './sprites/sheetFormats.js';
+import { GRID_SHEETS, sheetsFor } from './sprites/packManifest.js';
 
-const SPRITE_DIR = 'assets/sprites';
+// warriorType -> ator. O elfo continua sem arte própria (nenhum pack baixado
+// tem uma) e cai no guerreiro genérico — decisão aceita há várias sessões,
+// ver ROADMAP.md §2.4. Antes ele caía no círculo geométrico, porque o
+// fallback apontava pra um arquivo que também não existia mais.
+const WARRIOR_ACTOR = { orc: 'Orc', cavaleiro: 'Soldier', elfo: 'Soldier' };
 
-// Vários desses arquivos não existem ainda (Camponês/Elfo ficaram sem arte
-// nova nesta rodada de reorganização visual, de propósito) — isSpriteReady()
-// abaixo trata isso graciosamente por agente, sem travar o resto do jogo.
-const SPRITE_FILES = {
-  parado: 'ComponesParado',
-  andando: 'COmponesAndando',
-  cortandoArvore: 'ComponesCortandoArvore',
-  mineirando: 'ComponesMineirando',
-  construindo: 'ComponesConstruindo',
-  levandoTronco: 'ComponesLevandoOTroncoDaArvore',
-  pescando: 'ComponesPescando',
-  morto: 'ComponesMorto',
-  atacandoCivil: 'ComponesAtacando',
-  defendendoCivil: 'ComponesDefendendoAtaque',
-  correndo: 'COrrendo',
-  orcAtacando: 'OrcAtacando',
-  elfoAtirando: 'ElfoAtirando',
-  cavaleiroAtacando: 'CavaleiroAtacando',
-  orcParado: 'OrcParado',
-  orcAndando: 'OrcAndando',
-  elfoParado: 'ElfoParado',
-  elfoAndando: 'ElfoAndando',
-  cavaleiroParado: 'CavaleiroParado',
-  cavaleiroAndando: 'CavaleiroAndando',
-};
+const CIVILIAN_ACTORS = GRID_SHEETS.map((path) => path.split('/').pop().replace(/\.png$/i, ''));
 
-// Papel de guerreiro (agent.role, ver clan/clanDecision.js) fora de fight:
-// mostra o warriorType sorteado no nascimento parado/andando, em vez do
-// ciclo padrão de Camponês — permanente enquanto durar o papel, não só
-// durante o combate em si (isso já é o WARRIOR_ATTACK_SPRITE_KEY abaixo).
-const WARRIOR_IDLE_SPRITE_KEY = { orc: 'orcParado', elfo: 'elfoParado', cavaleiro: 'cavaleiroParado' };
-const WARRIOR_WALK_SPRITE_KEY = { orc: 'orcAndando', elfo: 'elfoAndando', cavaleiro: 'cavaleiroAndando' };
-
-const WARRIOR_ATTACK_SPRITE_KEY = {
-  orc: 'orcAtacando',
-  elfo: 'elfoAtirando',
-  cavaleiro: 'cavaleiroAtacando',
-};
-
-const sprites = {}; // key -> Image
-for (const [key, file] of Object.entries(SPRITE_FILES)) {
-  const img = new Image();
-  img.src = `${SPRITE_DIR}/${file}.png`;
-  sprites[key] = img;
-}
-
-const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
-
-// Um sprite "pronto" é uma imagem que carregou com bitmap de verdade — não
-// basta checar se todo mundo carregou (like antes): com a reorganização
-// visual em andamento, várias entradas de SPRITE_FILES apontam pra arquivo
-// que não existe ainda de propósito (só parte da arte foi selecionada até
-// agora), e esperar todo mundo carregar travaria o jogo inteiro no fallback
-// geométrico pra sempre. Cada agente cai no fallback individualmente se o
-// sprite dele especificamente não carregou — o resto do jogo não é afetado.
-function isSpriteReady(img) {
-  return !!img && img.complete && img.naturalWidth > 0;
-}
-
-// `sprite ?? fallback` não funciona aqui: toda entrada de `sprites` já é um
-// objeto Image (criado no load loop acima, mesmo pra arquivo que não existe
-// ainda) — nunca é null/undefined, só "carregado" ou "quebrado". Sem essa
-// checagem, uma pose sem arte nesta rodada (ex.: cortando árvore, minerando
-// — de propósito não incluídas ainda) caía direto no círculo de fallback em
-// vez de voltar pro ciclo parado/andando como devia.
-function orFallback(sprite, fallback) {
-  return isSpriteReady(sprite) ? sprite : fallback;
-}
-
-function computeContentBounds(img) {
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-
-  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  let minX = canvas.width;
-  let minY = canvas.height;
-  let maxX = 0;
-  let maxY = 0;
-  let found = false;
-
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      if (data[(y * canvas.width + x) * 4 + 3] > 10) {
-        found = true;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-
-  if (!found) return { x: 0, y: 0, w: canvas.width, h: canvas.height };
-  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
-}
-
-Object.values(sprites).forEach((img) => {
-  img.onload = () => spriteBounds.set(img, computeContentBounds(img));
-});
-
-const WALK_FRAME_MS = 220; // troca de perna a cada tanto tempo, só enquanto anda
-const MOVE_EPSILON_SQ = 0.05 * 0.05; // px; abaixo disso conta como parado
+// Pixels de tela por pixel da arte de origem, em zoom 1. Mesma ideia do
+// ART_SCALE de predatorRenderer.js: escala uniforme em vez de altura fixa,
+// pra diferença de tamanho entre personagens sair da própria arte.
+// Calibrado pra um adulto ficar nos ~44px que a versão anterior usava.
+const ART_SCALE = 2.1;
+const SCALE_BY_STAGE = { child: 0.68, adult: 1, elder: 1 };
 
 const RADIUS_BY_STAGE = { child: 6, adult: 9, elder: 9 }; // fallback enquanto os sprites carregam
-const HEIGHT_BY_STAGE = { child: 30, adult: 44, elder: 44 }; // px de tela em zoom 1
+const HEIGHT_BY_STAGE = { child: 30, adult: 44, elder: 44 }; // só pra sombra/anel antes da arte carregar
 
-// Sombra elipse translúcida no chão — dá noção de profundidade sem precisar
-// de luz/normal maps. Uma única `ctx.ellipse`+`fill` por agente, barato.
-function drawShadow(ctx, x, y, width) {
-  ctx.beginPath();
-  ctx.ellipse(x, y, width / 2, width / 5, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-  ctx.fill();
-}
-
-// Flash vermelho rápido no agente que sofre dano (combate de clã ou
-// predador) — `agent.hitFlashAt` é o `world.elapsedSeconds` de quando o
-// último golpe aconteceu (combat.js/predatorCombat.js/predatorAI.js),
-// comparado contra o relógio atual em vez de um timer decrementado por
-// frame (mesmo padrão de DEATH_LINGER_SECONDS: sem estado extra pra manter
-// sincronizado).
+const MOVE_EPSILON = 0.05; // px de mundo por frame; abaixo disso conta como parado
 const HIT_FLASH_SECONDS = 0.15;
-
-// Poeira ao andar: chance baixa por frame (não todo frame — uma nuvem
-// constante não lê como partícula individual). Faísca/lasca só quando o
-// agente já chegou e está de fato trabalhando (!moving, ver pickSprite).
 const DUST_CHANCE_PER_FRAME = 0.06;
 const WORK_PARTICLE_CHANCE_PER_FRAME = 0.08;
 
-// Vários agentes convergindo pro mesmo ponto (centro da vila, pra comer/
-// entregar/construir) acabam na mesma posição exata — sem nenhum offset,
-// os sprites ficam empilhados perfeitamente um em cima do outro, dando a
-// impressão visual de que agentes sumiram (achado jogando, ver STATUS.md).
-// Puramente cosmético: espalha só o desenho em tela, nunca `agent.position`
-// (não afeta movimento, pathfinding nem nenhuma lógica). Determinístico por
-// `agent.id` — mesmo padrão de hash usado em decorationRenderer.js pra
+const manager = new SpriteManager();
+let spritesReady = false;
+
+manager
+  .load([...GRID_SHEETS, ...sheetsFor('Soldier'), ...sheetsFor('Orc')])
+  .then((result) => {
+    spritesReady = true;
+    if (result.failed.length) console.warn('[agentRenderer] folhas que não carregaram:', result.failed);
+  })
+  .catch((error) => console.warn('[agentRenderer] falha ao carregar sprites:', error));
+
+// Hash determinístico de id — mesmo padrão de decorationRenderer.js pra
 // variante de espécie, sem consumir a sequência de rng do mundo.
 function hashId(id) {
   let h = 0;
@@ -177,85 +73,147 @@ function hashId(id) {
   return h >>> 0;
 }
 
+// Estado de apresentação por agente. Ao contrário dos predadores, agentes SÃO
+// removidos de world.agents (lifecycle.js:pruneDead), então este Map cresceria
+// pra sempre numa sessão longa com muitos nascimentos e mortes — daí a
+// varredura periódica em sweepViews(). (O `lastPositions` da versão anterior
+// tinha exatamente esse vazamento, nunca notado porque era pequeno.)
+const views = new Map(); // agent.id -> { animator, actor, lastX, lastY, facing }
+
+function actorIdFor(agent) {
+  if (agent.role === 'warrior') return WARRIOR_ACTOR[agent.warriorType] ?? WARRIOR_ACTOR.cavaleiro;
+  return CIVILIAN_ACTORS[hashId(agent.id) % CIVILIAN_ACTORS.length];
+}
+
+function viewFor(agent) {
+  const wanted = actorIdFor(agent);
+  const existing = views.get(agent.id);
+  // O papel muda em tempo de execução (clanDecision.js designa guerreiro na
+  // guerra e desmobiliza na paz), então o ator do agente pode trocar no meio
+  // da vida — reconstrói a view quando isso acontece.
+  if (existing && existing.actorId === wanted) return existing;
+
+  const actor = manager.getActor(wanted);
+  if (!actor) return null;
+
+  const view = {
+    actorId: wanted,
+    actor,
+    animator: createAnimator(actor, { state: 'idle' }),
+    lastX: agent.position.x,
+    lastY: agent.position.y,
+    facing: 1,
+  };
+  views.set(agent.id, view);
+  return view;
+}
+
+let sweepCounter = 0;
+function sweepViews(world) {
+  if (++sweepCounter < 600) return; // ~10s a 60fps; varrer todo frame não paga
+  sweepCounter = 0;
+  const alive = new Set(world.agents.map((a) => a.id));
+  for (const id of views.keys()) if (!alive.has(id)) views.delete(id);
+}
+
+function animationStateFor(agent, moving) {
+  if (!agent.alive) return 'dead';
+  if (agent.currentAction === 'fight' || agent.currentAction === 'fightPredator') return 'attacking';
+  return moving ? 'walking' : 'idle';
+}
+
+function drawShadow(ctx, x, y, width) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, width / 2, width / 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.fill();
+}
+
+// Vários agentes convergindo pro mesmo ponto (centro da vila) acabariam
+// desenhados exatamente sobrepostos, dando a impressão de que sumiram (achado
+// jogando, ver STATUS.md). Espalha só o desenho, nunca `agent.position`.
 function stackOffset(agent, camera) {
   const h = hashId(agent.id);
-  const angle = (h % 1000) / 1000 * Math.PI * 2;
-  const dist = Math.max(2, 6 * camera.zoom); // px de tela
+  const angle = ((h % 1000) / 1000) * Math.PI * 2;
+  const dist = Math.max(2, 6 * camera.zoom);
   return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist };
 }
 
-const lastPositions = new Map(); // agent.id -> { x, y }, pra detectar movimento real
-
-function isAgentMoving(agent) {
-  const last = lastPositions.get(agent.id);
-  lastPositions.set(agent.id, { x: agent.position.x, y: agent.position.y });
-  if (!last) return false;
-
-  const dx = agent.position.x - last.x;
-  const dy = agent.position.y - last.y;
-  return dx * dx + dy * dy > MOVE_EPSILON_SQ;
+// Delta simulado, mesma justificativa de predatorRenderer.js: animação de
+// personagem representa deslocamento no mundo, então congela no pause e
+// acelera em 4x junto com a simulação (ao contrário de partículas/câmera).
+let lastElapsed = null;
+function simDelta(world) {
+  const now = world.elapsedSeconds ?? 0;
+  if (lastElapsed === null) {
+    lastElapsed = now;
+    return 0;
+  }
+  const delta = Math.max(0, Math.min(now - lastElapsed, 0.25));
+  lastElapsed = now;
+  return delta;
 }
 
-// Ação corrente (+ se está de fato se movendo agora) decide a pose. Ações
-// sem pose dedicada (eat, sleep, gather, wander) caem no fallback
-// parado/andando no final — pedido explícito do usuário, sem aproximar com
-// poses que não batem literalmente com a ação.
-function pickSprite(agent, moving, walkFrame) {
-  // Corpo durante o "linger" antes de pruneDead remover de vez (ver
-  // DEATH_LINGER_SECONDS, lifecycle.js) — sem pose por ação, já morreu.
-  if (!agent.alive) return sprites.morto;
-  // fightPredator: só guerreiro designado tem essa candidata viável
-  // (agent/actions/fightPredator.js), civil nunca chega aqui — mas trata
-  // igual a 'fight' por segurança/consistência visual.
-  if (agent.currentAction === 'fight' || agent.currentAction === 'fightPredator') {
-    // Guerreiro designado (agent.role, ver clan/clanDecision.js) vira o
-    // warriorType de fantasia sorteado no nascimento. Um civil forçado a se
-    // defender (a maioria, fora de guerra) alterna Atacando/Defendendo —
-    // mesmo padrão de 2 quadros que Parado/Andando já usam pra caminhada —
-    // em vez de virar um guerreiro de fantasia igual a quem foi de fato
-    // designado pra lutar.
-    if (agent.role === 'warrior') return orFallback(sprites[WARRIOR_ATTACK_SPRITE_KEY[agent.warriorType]], sprites.parado);
-    return orFallback([sprites.atacandoCivil, sprites.defendendoCivil][walkFrame], sprites.parado);
-  }
-  if (agent.currentAction === 'flee' || agent.currentAction === 'fleePredator') {
-    return orFallback(sprites.correndo, sprites.andando);
-  }
-  // Levando tronco cobre a viagem inteira de volta (não só parado entregando).
-  if (agent.currentAction === 'deliver' && agent.carryingType === 'wood') {
-    return orFallback(sprites.levandoTronco, sprites.parado);
-  }
-  if (!moving) {
-    if (agent.currentAction === 'gatherWood') return orFallback(sprites.cortandoArvore, sprites.parado);
-    if (agent.currentAction === 'mine') return orFallback(sprites.mineirando, sprites.parado);
-    if (agent.currentAction === 'fish') return orFallback(sprites.pescando, sprites.parado);
-    if (agent.currentAction === 'build') return orFallback(sprites.construindo, sprites.parado);
-  }
-  // Guerreiro designado (agent.role, ver clan/clanDecision.js) mostra o
-  // warriorType parado/andando em vez do ciclo padrão de Camponês, mesmo
-  // fora de fight — mas só quando não há uma pose de trabalho mais
-  // específica (checagem acima já retornou nesse caso).
-  if (agent.role === 'warrior') {
-    const key = moving ? WARRIOR_WALK_SPRITE_KEY[agent.warriorType] : WARRIOR_IDLE_SPRITE_KEY[agent.warriorType];
-    return orFallback(sprites[key], sprites.parado);
-  }
-  return moving ? [sprites.parado, sprites.andando][walkFrame] : sprites.parado;
+function drawFallbackCircle(ctx, agent, pos, camera, flashing) {
+  const radius = Math.max(2, (RADIUS_BY_STAGE[agent.lifeStage] ?? 9) * camera.zoom);
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = flashing ? '#ff4040' : '#ffdd55';
+  ctx.fill();
+  ctx.strokeStyle = '#402c00';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 export function drawAgents(ctx, world, camera, selectedAgentId) {
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
-  const walkFrame = Math.floor(performance.now() / WALK_FRAME_MS) % 2;
   const now = world.elapsedSeconds ?? 0;
+  const dt = simDelta(world);
+  sweepViews(world);
 
   for (const agent of world.agents) {
     const pos = camera.worldToScreen(agent.position.x, agent.position.y, viewW, viewH);
     const offset = stackOffset(agent, camera);
     pos.x += offset.x;
     pos.y += offset.y;
-    const moving = isAgentMoving(agent);
 
-    const h = (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom;
-    drawShadow(ctx, pos.x, pos.y, h * 0.6);
+    const flashing = agent.hitFlashAt != null && now - agent.hitFlashAt < HIT_FLASH_SECONDS;
+    const view = spritesReady ? viewFor(agent) : null;
+
+    if (!view) {
+      drawShadow(ctx, pos.x, pos.y, (HEIGHT_BY_STAGE[agent.lifeStage] ?? 44) * camera.zoom * 0.6);
+      drawFallbackCircle(ctx, agent, pos, camera, flashing);
+      continue;
+    }
+
+    const dx = agent.position.x - view.lastX;
+    const dy = agent.position.y - view.lastY;
+    view.lastX = agent.position.x;
+    view.lastY = agent.position.y;
+    const moved = Math.hypot(dx, dy) > MOVE_EPSILON;
+
+    const isGrid = view.actor.format === FORMAT.GRID;
+    if (moved) {
+      // Grade tem as 4 direções desenhadas; tira é de perfil e só espelha.
+      if (isGrid) view.animator.setDirection(directionFromVector(dx, dy));
+      else if (Math.abs(dx) > MOVE_EPSILON) view.facing = dx < 0 ? -1 : 1;
+    }
+
+    view.animator.setState(animationStateFor(agent, moved));
+    view.animator.update(dt);
+
+    const rect = view.animator.currentFrame(manager);
+    if (!rect) {
+      drawFallbackCircle(ctx, agent, pos, camera, flashing);
+      continue;
+    }
+
+    const stageScale = SCALE_BY_STAGE[agent.lifeStage] ?? 1;
+    const h = rect.sh * ART_SCALE * stageScale * camera.zoom;
+    const w = rect.sw * ART_SCALE * stageScale * camera.zoom;
+
+    if (agent.alive) drawShadow(ctx, pos.x, pos.y, w * 0.6);
 
     if (agent.id === selectedAgentId) {
       const ringR = Math.max(11, 18 * camera.zoom);
@@ -266,42 +224,38 @@ export function drawAgents(ctx, world, camera, selectedAgentId) {
       ctx.stroke();
     }
 
-    // Partículas de ambiente/trabalho — só pra quem está vivo, chance baixa
-    // por frame de propósito (ver DUST_CHANCE_PER_FRAME/WORK_PARTICLE_...).
     if (agent.alive) {
-      if (moving && Math.random() < DUST_CHANCE_PER_FRAME) {
+      if (moved && Math.random() < DUST_CHANCE_PER_FRAME) {
         spawnDust(agent.position.x, agent.position.y);
-      } else if (!moving && Math.random() < WORK_PARTICLE_CHANCE_PER_FRAME) {
+      } else if (!moved && Math.random() < WORK_PARTICLE_CHANCE_PER_FRAME) {
         if (agent.currentAction === 'mine') spawnSpark(agent.position.x, agent.position.y - 10);
         else if (agent.currentAction === 'gatherWood') spawnChip(agent.position.x, agent.position.y - 10);
       }
     }
 
-    const sprite = pickSprite(agent, moving, walkFrame);
-    const bounds = isSpriteReady(sprite) ? spriteBounds.get(sprite) : null;
-    const flashing = agent.hitFlashAt != null && now - agent.hitFlashAt < HIT_FLASH_SECONDS;
-    if (bounds) {
-      const w = h * (bounds.w / bounds.h);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sprite, bounds.x, bounds.y, bounds.w, bounds.h, pos.x - w / 2, pos.y - h, w, h);
-      if (flashing) {
-        // 'source-atop' só pinta em cima dos pixels já opacos do sprite
-        // acabado de desenhar — silhueta exata, sem retângulo vazando.
-        ctx.save();
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = 'rgba(255, 40, 40, 0.55)';
-        ctx.fillRect(pos.x - w / 2, pos.y - h, w, h);
-        ctx.restore();
-      }
-    } else {
-      const radius = Math.max(2, (RADIUS_BY_STAGE[agent.lifeStage] ?? 9) * camera.zoom);
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = flashing ? '#ff4040' : '#ffdd55';
-      ctx.fill();
-      ctx.strokeStyle = '#402c00';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    // Um civil não tem clipe de morte (a grade RPG só traz caminhada), então
+    // a cascata do animator o deixaria de pé durante o DEATH_LINGER_SECONDS —
+    // um cadáver em posição de sentido. Deita e desbota nesse caso; o
+    // guerreiro, que tem `death` de verdade, toca a animação normalmente.
+    const fallen = !agent.alive && view.animator.clipName !== 'death';
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(pos.x, pos.y);
+    if (fallen) {
+      ctx.rotate(Math.PI / 2);
+      ctx.globalAlpha = 0.65;
     }
+    ctx.scale(view.facing, 1);
+    ctx.drawImage(rect.image, rect.sx, rect.sy, rect.sw, rect.sh, -w / 2, -h, w, h);
+
+    if (flashing) {
+      // 'source-atop' só pinta sobre os pixels opacos do sprite recém
+      // desenhado — silhueta exata, sem retângulo vazando.
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = 'rgba(255, 40, 40, 0.55)';
+      ctx.fillRect(-w / 2, -h, w, h);
+    }
+    ctx.restore();
   }
 }
