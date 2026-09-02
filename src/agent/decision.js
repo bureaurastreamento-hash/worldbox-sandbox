@@ -33,11 +33,21 @@ function reconsider(agent, world) {
   }
 
   const currentScore = scores[agent.currentAction];
+  // Isento de margem quando a ação ATUAL é wander (o fallback) — qualquer
+  // necessidade real deve conseguir reclamar a vez assim que wander deixar
+  // de valer a pena, sem esperar "esvaziar" a necessidade até zero. Bug
+  // real corrigido aqui: checava `type` (a candidata) em vez de
+  // `agent.currentAction` (a atual) — o oposto do que este comentário (e o
+  // do topo do arquivo) sempre descreveu. Na prática, sair de wander pra
+  // qualquer ação real sempre pagava a margem inteira, e qualquer ação real
+  // podia ser roubada de volta por wander sem pagar margem nenhuma — risco
+  // de oscilação sempre que um score real cai perto do baseline de wander
+  // (0.05), sem precisar do bug do carrying pra acontecer.
+  const margin = agent.currentAction === 'wander' ? 0 : INTERRUPT_MARGIN;
   let challenger = null;
 
   for (const type of Object.keys(scores)) {
     if (type === agent.currentAction) continue;
-    const margin = type === 'wander' ? 0 : INTERRUPT_MARGIN;
     if (scores[type] > currentScore + margin && (!challenger || scores[type] > scores[challenger])) {
       challenger = type;
     }

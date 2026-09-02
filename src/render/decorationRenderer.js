@@ -17,10 +17,26 @@ const SPRITE_DIR = 'assets/sprites';
 
 const TREE_FILES = ['ArvoreComum', 'Pinheiro', 'ArvoreAzulada'];
 const PLANT_FILES = ['Arbusto', 'Sebe'];
-const VARIANTS_BY_TYPE = { tree: TREE_FILES, plant: PLANT_FILES };
+// Fauna ambiente (`Retro RPG Series - Animal Wildlife`) — decorativa por
+// enquanto (parada, sem IA), mesmo tratamento visual de árvore/planta.
+// Vira predador de verdade numa leva futura (ver STATUS.md/ROADMAP.md) —
+// esses mesmos arquivos devem ser reaproveitados, não substituídos, quando
+// isso acontecer.
+const ANIMAL_FILES = ['Urso', 'Lobo', 'Cobra', 'Besouro'];
+// Fogueira/baú (`SuperRetroWorld_CharacterPack_Full`) — decoração nova,
+// sem mecânica nenhuma associada (baú não é loot de verdade hoje).
+const CAMPFIRE_FILES = ['Fogueira'];
+const CHEST_FILES = ['Bau'];
+const VARIANTS_BY_TYPE = {
+  tree: TREE_FILES,
+  plant: PLANT_FILES,
+  animal: ANIMAL_FILES,
+  campfire: CAMPFIRE_FILES,
+  chest: CHEST_FILES,
+};
 
 const sprites = {}; // filename -> Image
-for (const file of [...TREE_FILES, ...PLANT_FILES]) {
+for (const file of [...TREE_FILES, ...PLANT_FILES, ...ANIMAL_FILES, ...CAMPFIRE_FILES, ...CHEST_FILES]) {
   const img = new Image();
   img.src = `${SPRITE_DIR}/${file}.png`;
   sprites[file] = img;
@@ -132,8 +148,14 @@ function drawHouseSprite(ctx, x, y, size) {
   ctx.drawImage(houseRoofSprite, x - half, y - size, size, half);
 }
 
-const PLACEHOLDER_BY_TYPE = { tree: drawTreePlaceholder, plant: drawPlantPlaceholder };
-const BASE_SIZE_BY_TYPE = { tree: 26, plant: 12, house: 30 }; // px de tela em zoom 1
+const PLACEHOLDER_BY_TYPE = {
+  tree: drawTreePlaceholder,
+  plant: drawPlantPlaceholder,
+  animal: drawPlantPlaceholder,
+  campfire: drawPlantPlaceholder,
+  chest: drawPlantPlaceholder,
+};
+const BASE_SIZE_BY_TYPE = { tree: 26, plant: 12, house: 30, animal: 22, campfire: 14, chest: 16 }; // px de tela em zoom 1
 
 export function drawDecorations(ctx, world, camera) {
   if (!world.decorations?.length) return;

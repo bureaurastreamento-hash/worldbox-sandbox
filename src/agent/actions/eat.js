@@ -10,13 +10,18 @@
 import { urgency, applyEffect } from '../needs.js';
 import { getVillage } from '../../world/world.js';
 import { addStock } from '../../village/stock.js';
-import { EAT_FOOD_PER_SEC, EAT_RESTORE_PER_FOOD } from '../../utils/constants.js';
+import { EAT_FOOD_PER_SEC, EAT_RESTORE_PER_FOOD, EAT_URGENCY_WEIGHT } from '../../utils/constants.js';
 import { moveToward, clearMovement } from '../movement.js';
 
 export function score(agent, world) {
   const village = getVillage(world, agent.villageId);
   if (!village || (village.stock.food ?? 0) <= 0) return 0; // nada pra comer agora
-  return urgency(agent.needs.hunger);
+  // Peso > 1: sem isso, comer só supera o trabalho corrente (INTERRUPT_MARGIN
+  // em decision.js) com a fome já bem baixa — na prática o agente só larga
+  // o que está fazendo pra comer perto da crise, sem folga de tempo de
+  // viagem até o centro da vila. Valor inicial, calibrar depois de observar
+  // jogando (mesmo padrão dos outros pesos deste arquivo/vizinhos).
+  return urgency(agent.needs.hunger) * EAT_URGENCY_WEIGHT;
 }
 
 export function step(agent, world, dt) {

@@ -14,6 +14,12 @@ export const TIME_SPEEDS = [1, 2, 4];
 
 export const AGENT_SPEED = 60; // px de mundo por segundo
 
+// Separação leve entre agentes (agent/separation.js) — só pros `active` do
+// LOD. Raio pequeno (~1/3 de TILE_SIZE=32): só desfaz aglomerações de
+// verdade, não interfere em agentes só andando perto um do outro.
+export const SEPARATION_RADIUS = 10; // px de mundo
+export const SEPARATION_STRENGTH = 30; // px/s de empurrão no pico de sobreposição
+
 // Subido de 8 pra 12: mineração/construção nunca decolavam numa sessão de
 // ~1h (STATUS.md) porque agent/actions/mine.js só considera um depósito de
 // montanha depois que o agente já viu o tile com a própria percepção — e
@@ -79,6 +85,12 @@ export const FOUNDER_HUNGER_MAX = 100;
 // observar jogando (ver STATUS.md).
 export const EAT_FOOD_PER_SEC = 1;
 export const EAT_RESTORE_PER_FOOD = 100 / 15 / EAT_FOOD_PER_SEC;
+
+// Multiplica a urgência de fome em eat.js:score — sem isso, comer só supera
+// o trabalho corrente (INTERRUPT_MARGIN, decision.js) com a fome já baixa
+// o bastante pra não sobrar folga de viagem até a vila. Valor inicial pra
+// calibrar jogando (achado numa sessão de diagnóstico ao vivo, ver STATUS.md).
+export const EAT_URGENCY_WEIGHT = 1.8;
 
 // Abaixo de 1: sobrevivência pessoal deve normalmente vencer trabalho
 // comunitário antes de virar crítica (ver agent/actions/gather.js).
@@ -232,6 +244,14 @@ export const DISTRESS_WAR_THRESHOLD_SECONDS = 60;
 // estado padrão de toda vila especializada enquanto o comércio bootstrapa.
 export const DISTRESS_CHAOS_THRESHOLD_SECONDS = 240;
 export const CHAOS_NEEDS_DECAY_MULTIPLIER = 1.6; // fome/sono decaem mais rápido em colapso
+
+// Aviso visível de fome crítica no feed (lifecycle.js:updateHungerWarning),
+// antes de alguém efetivamente morrer — não é o mesmo sinal de `distress`
+// (que é sobre estoque/demanda institucional); esse é sobre a fome média dos
+// moradores de verdade. Histerese (limiar de disparo mais baixo que o de
+// reset) evita reavisar a cada tick enquanto a vila segue em crise.
+export const VILLAGE_HUNGER_WARNING_THRESHOLD = 30; // fome média < isso dispara o aviso
+export const VILLAGE_HUNGER_RECOVERY_THRESHOLD = 45; // fome média > isso permite avisar de novo
 // Só troca de parceiro de comércio por outro cuja demanda pelo recurso seja
 // pelo menos isso mais alta que a do parceiro atual — evita ficar trocando
 // de parceiro a cada reconsideração por uma diferença mínima.
@@ -288,3 +308,14 @@ export const DECORATION_HOUSES_PER_VILLAGE = 6;
 // Nenhuma árvore/planta nasce mais perto da vila que isso, pra manter a área
 // dela legível (onde as casas ficam); casas nascem dentro desse raio.
 export const DECORATION_VILLAGE_CLEARING_RADIUS = TERRITORY_RADIUS;
+
+// Bicho decorativo (parado, sem IA) — bem mais raro que árvore/planta de
+// propósito, pra parecer um avistamento, não um zoológico; ~20-30 no mapa
+// inteiro (220x220) com esse valor. Mesma chance pra floresta e grama (ao
+// contrário de árvore/planta, que são exclusivos de um tipo de tile cada).
+// Vira predador de verdade numa leva futura — ver decorationRenderer.js.
+export const DECORATION_ANIMAL_CHANCE = 0.0015;
+// Baú: mais raro ainda, tesouro escondido sem mecânica de loot associada.
+export const DECORATION_CHEST_CHANCE = 0.0006;
+// Fogueira: 1 por vila, mesmo padrão de DECORATION_HOUSES_PER_VILLAGE.
+export const DECORATION_CAMPFIRES_PER_VILLAGE = 1;

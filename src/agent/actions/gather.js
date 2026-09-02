@@ -15,7 +15,13 @@ function isSafeGrass(world, agent) {
 }
 
 export function score(agent, world) {
-  if (agent.carrying > 0) return 0; // já tem carga; ver deliver.js
+  // Só solta a ação quando a carga está cheia — commitment real até
+  // CARRY_CAPACITY, não a cada fração de unidade colhida (bug real: `> 0`
+  // deixava o agente abandonar a colheita assim que carregava qualquer
+  // coisa, porque deliver.js pontua fixo 0.8 e esmagava qualquer score
+  // parcial de gather; resultado era viagem de ~5-10% da carga em vez de
+  // cheia, throughput real bem abaixo do esperado — ver STATUS.md).
+  if (agent.carrying >= CARRY_CAPACITY) return 0;
   const village = getVillage(world, agent.villageId);
   if (!village || village.specialization !== 'food') return 0; // vila madeireira não colhe comida
   const known = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent));

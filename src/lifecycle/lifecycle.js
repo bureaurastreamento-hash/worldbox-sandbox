@@ -15,6 +15,8 @@ import {
   REPRO_ELIGIBLE_HUNGER,
   REPRO_FOOD_DEMAND_MAX,
   DEATH_LINGER_SECONDS,
+  VILLAGE_HUNGER_WARNING_THRESHOLD,
+  VILLAGE_HUNGER_RECOVERY_THRESHOLD,
 } from '../utils/constants.js';
 
 export function ageAgent(agent, dt) {
@@ -97,6 +99,27 @@ export function updateVillageReproduction(village, world, dt) {
   if (b === a) return;
 
   tryReproduce(a, b, world, village);
+}
+
+// Chamado uma vez por vila por tick: avisa no feed quando a fome média dos
+// moradores vivos cruza um limiar crítico, antes de alguém efetivamente
+// morrer (village.distress é sobre estoque/demanda institucional, não sobre
+// a fome individual de verdade — os dois podem discordar, ex.: estoque preso
+// em trânsito de comércio enquanto quem já está na vila passa fome). Usa
+// histerese (village.hungerWarningActive) pra disparar só na transição, não
+// a cada tick enquanto a vila segue abaixo do limiar.
+export function updateHungerWarning(village, world) {
+  const residents = village.population.map((id) => world.agents.find((a) => a.id === id)).filter((a) => a?.alive);
+  if (residents.length === 0) return;
+
+  const avgHunger = residents.reduce((sum, a) => sum + a.needs.hunger, 0) / residents.length;
+
+  if (!village.hungerWarningActive && avgHunger < VILLAGE_HUNGER_WARNING_THRESHOLD) {
+    village.hungerWarningActive = true;
+    pushEvent(world, `${village.name} está com fome crítica`);
+  } else if (village.hungerWarningActive && avgHunger > VILLAGE_HUNGER_RECOVERY_THRESHOLD) {
+    village.hungerWarningActive = false;
+  }
 }
 
 // Remove agentes mortos de world.agents e da população de sua vila — não no

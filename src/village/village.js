@@ -41,6 +41,7 @@ export function createVillage({ id, name, center, specialization = 'food' }) {
     demand,
     distress: { food: 0, wood: 0 }, // só CRITICAL_RESOURCES; ver village/stock.js:updateDistress
     inChaos: false, // colapso interno — derivado da distress, ver village/stock.js:updateChaos
+    hungerWarningActive: false, // fome média crítica já avisada no feed — ver lifecycle.js:updateHungerWarning
     raidTargetVillageId: null, // ordem institucional de saque, ver clan/clanDecision.js e agent/actions/raid.js
     buildings: [],
     population: [],

@@ -20,7 +20,7 @@ function isSafeWater(world, agent) {
 }
 
 export function score(agent, world) {
-  if (agent.carrying > 0) return 0; // já tem carga; ver deliver.js
+  if (agent.carrying >= CARRY_CAPACITY) return 0; // só solta a ação com a carga cheia; ver gather.js pro porquê do `>= CARRY_CAPACITY` (não `> 0`)
   const village = getVillage(world, agent.villageId);
   if (!village) return 0;
   const known = recallNearest(agent.memory, agent.position, isSafeWater(world, agent));

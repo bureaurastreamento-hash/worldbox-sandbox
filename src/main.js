@@ -13,7 +13,8 @@ import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
 import { updateDecision } from './agent/decision.js';
 import { classifyAgents, stepBackgroundAgent } from './simulation/lod.js';
-import { ageAgent, checkDeath, updateVillageReproduction, pruneDead } from './lifecycle/lifecycle.js';
+import { applySeparation } from './agent/separation.js';
+import { ageAgent, checkDeath, updateVillageReproduction, updateHungerWarning, pruneDead } from './lifecycle/lifecycle.js';
 import { createTimeState } from './core/time.js';
 import { createGameLoop } from './core/gameLoop.js';
 import { createCamera } from './render/camera.js';
@@ -220,6 +221,11 @@ const loop = createGameLoop({
       updateDecision(agent, world, dt);
     }
 
+    applySeparation(
+      active.filter((a) => a.alive),
+      dt,
+    );
+
     for (const agent of background) {
       stepBackgroundAgent(agent, dt);
       ageAgent(agent, dt);
@@ -228,12 +234,14 @@ const loop = createGameLoop({
 
     for (const v of world.villages) {
       updateVillageReproduction(v, world, dt);
+      updateHungerWarning(v, world);
     }
 
     pruneDead(world, dt);
   },
   render() {
     renderer.render(world, debugState, uiState.selectedAgentId, uiState.selectedVillageId);
+
 
     let selectionState = 'none';
     let selectedAgent = null;

@@ -7,11 +7,16 @@
 import { addStock } from '../../village/stock.js';
 import { getVillage } from '../../world/world.js';
 import { moveToward, clearMovement } from '../movement.js';
+import { CARRY_CAPACITY } from '../../utils/constants.js';
 
 export const SCORE_WHEN_CARRYING = 0.8; // alto e fixo, mas ainda interrompível por fome/sono crítica
 
+// Só vale a pena entregar com a carga cheia — `> 0` deixava o agente
+// entregar frações de ~5-10% da carga a cada viagem (bug real, ver
+// gather.js:score); `>= CARRY_CAPACITY` espelha o gate do lado da coleta,
+// fechando o ciclo pretendido: colhe até encher, entrega uma vez, repete.
 export function score(agent) {
-  return agent.carrying > 0 ? SCORE_WHEN_CARRYING : 0;
+  return agent.carrying >= CARRY_CAPACITY ? SCORE_WHEN_CARRYING : 0;
 }
 
 export function step(agent, world, dt) {

@@ -13,6 +13,9 @@ import {
   DECORATION_PLANT_CHANCE,
   DECORATION_HOUSES_PER_VILLAGE,
   DECORATION_VILLAGE_CLEARING_RADIUS,
+  DECORATION_ANIMAL_CHANCE,
+  DECORATION_CHEST_CHANCE,
+  DECORATION_CAMPFIRES_PER_VILLAGE,
 } from '../utils/constants.js';
 
 function isInsideAnyVillageClearing(pos, villages) {
@@ -27,18 +30,25 @@ export function generateDecorations(world) {
   for (let ty = 0; ty < world.height; ty++) {
     for (let tx = 0; tx < world.width; tx++) {
       const tile = world.tiles[ty][tx];
-      const chance =
-        tile.type === TILE_TYPES.FOREST
-          ? DECORATION_TREE_CHANCE
-          : tile.type === TILE_TYPES.GRASS
-            ? DECORATION_PLANT_CHANCE
-            : 0;
-      if (chance === 0 || rng.next() >= chance) continue;
+      const isVegetated = tile.type === TILE_TYPES.FOREST || tile.type === TILE_TYPES.GRASS;
+      if (!isVegetated) continue;
 
       const pos = tileToWorld(tx, ty, TILE_SIZE);
       if (isInsideAnyVillageClearing(pos, world.villages)) continue;
 
-      decorations.push({ type: tile.type === TILE_TYPES.FOREST ? 'tree' : 'plant', x: pos.x, y: pos.y });
+      const chance = tile.type === TILE_TYPES.FOREST ? DECORATION_TREE_CHANCE : DECORATION_PLANT_CHANCE;
+      if (rng.next() < chance) {
+        decorations.push({ type: tile.type === TILE_TYPES.FOREST ? 'tree' : 'plant', x: pos.x, y: pos.y });
+        continue; // um bicho/baú não nasce em cima da árvore/planta que já nasceu aqui
+      }
+
+      // Bicho e baú: raros, mesma chance pros dois tipos de tile vegetado
+      // (ao contrário de árvore/planta, que são exclusivos por tipo).
+      if (rng.next() < DECORATION_ANIMAL_CHANCE) {
+        decorations.push({ type: 'animal', x: pos.x, y: pos.y });
+      } else if (rng.next() < DECORATION_CHEST_CHANCE) {
+        decorations.push({ type: 'chest', x: pos.x, y: pos.y });
+      }
     }
   }
 
@@ -49,6 +59,15 @@ export function generateDecorations(world) {
       const dist = rng.range(0, clearingPx * 0.8);
       decorations.push({
         type: 'house',
+        x: village.center.x + Math.cos(angle) * dist,
+        y: village.center.y + Math.sin(angle) * dist,
+      });
+    }
+    for (let i = 0; i < DECORATION_CAMPFIRES_PER_VILLAGE; i++) {
+      const angle = rng.range(0, Math.PI * 2);
+      const dist = rng.range(0, clearingPx * 0.4); // mais perto do centro que as casas
+      decorations.push({
+        type: 'campfire',
         x: village.center.x + Math.cos(angle) * dist,
         y: village.center.y + Math.sin(angle) * dist,
       });
