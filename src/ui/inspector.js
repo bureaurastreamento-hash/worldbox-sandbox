@@ -106,7 +106,10 @@ export function createInspector(container) {
     const roleLabel = SPECIALIZATION_LABELS[village.specialization] ?? village.specialization;
     const chaosLabel = village.inChaos ? ' — EM COLAPSO INTERNO' : '';
     villageTitleEl.textContent = `Vila — ${village.name} (${roleLabel})${chaosLabel}`;
-    villagePopEl.textContent = `${village.population.length} / ${getPopulationCap(village)} (${village.buildings.length} casa${village.buildings.length === 1 ? '' : 's'})`;
+    // village.buildings conta TODOS os tipos (prefeitura/celeiro/depósito/casa) —
+    // a linha de população fala só de casas, que são o que mexe no teto.
+    const houseCount = village.buildings.filter((b) => b.type === 'house').length;
+    villagePopEl.textContent = `${village.population.length} / ${getPopulationCap(village)} (${houseCount} casa${houseCount === 1 ? '' : 's'})`;
     villageStockEl.innerHTML = '';
     for (const type of Object.keys(village.capacity)) {
       const stock = Math.floor(village.stock[type] ?? 0);
