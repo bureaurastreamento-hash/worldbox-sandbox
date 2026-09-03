@@ -69,6 +69,17 @@ export const PERCEPTION_RADIUS = 12; // tiles
 // decide quando o ciclo caro roda.
 export const RECONSIDER_INTERVAL = 0.5;
 
+// Sistema de neurônios (agent/neuron.js). Chance de a escolha ficar restrita
+// à faixa de prioridade mais urgente; no resto das vezes todos os neurônios
+// ativos concorrem. É o que dá variação sem deixar o agente ignorar uma
+// necessidade crítica — os 20% são exploração, não burrice.
+export const NEURON_TOP_PRIORITY_CHANCE = 0.8;
+
+// Traços (agent/traits.js): quantos sorteios de traço permanente cada agente
+// faz ao nascer, e a chance de cada um pegar. Na Fase D isto vira herança.
+export const TRAIT_COUNT_MAX = 2;
+export const TRAIT_CHANCE = 0.35;
+
 // Teto de agentes que podem fazer o ciclo caro (percepção + memória +
 // pontuar as ações) no MESMO frame, como fração do total. Válvula de
 // segurança contra picos, não o mecanismo principal: `decisionTimer` já nasce

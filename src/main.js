@@ -13,6 +13,7 @@ import { proposeTreaty, signTreaty } from './clan/diplomacy.js';
 import { updateClanDecision } from './clan/clanDecision.js';
 import { createAgent } from './agent/agent.js';
 import { updateNeeds } from './agent/needs.js';
+import { updateTraits } from './agent/traits.js';
 import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
 import { reconsider, stepAction } from './agent/decision.js';
@@ -270,6 +271,9 @@ function simulationUpdate(dt) {
 
       const village = getVillage(world, agent.villageId);
       updateNeeds(agent.needs, village?.inChaos ? dt * CHAOS_NEEDS_DECAY_MULTIPLIER : dt);
+      // Traço temporário tem que expirar na hora certa, não na próxima vez
+      // que o agente pensar — por isso fica no laço barato, não na cognição.
+      updateTraits(agent, dt);
       ageAgent(agent, dt);
       checkDeath(agent, world, dt);
       if (!agent.alive) continue;

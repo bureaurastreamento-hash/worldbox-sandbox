@@ -232,7 +232,7 @@ Medido nesta sessão: com **todos** os ~54 agentes ativos, 180s simulados levam 
 | # | Fase | Por que aqui |
 |---|---|---|
 | **A** | **Escala e LOD** — time-slicing ✅, simulação zoom-agnóstica ✅, world-gen em grade ✅, índices ✅ · LOD de render por zoom ⬜, pooling ⬜ | Pré-requisito de tudo: sem margem de CPU e sem mais agentes, todo sistema novo colapsa a economia (§3.2). Também resolve a contradição do §3.3 e já entrega ganho visível (mapa inteiro vivo). **Parcialmente entregue — ver §3.6.** |
-| **B** | **Neurônios + traços** — `canFire`, faixas de prioridade, pesos, `NeuronModifier`, `agent.traits` | Traços e neurônios são o mesmo sistema visto de dois lados: um traço *é* um modificador de neurônio. Fazer junto evita refazer `decision.js` duas vezes. Barato em CPU. |
+| **B** | **Neurônios + traços** ✅ | Traços e neurônios são o mesmo sistema visto de dois lados: um traço *é* um modificador de neurônio. **Entregue — ver §3.8.** |
 | **C** | **Navegação** — HPA*, flow fields, pushing anti-preso | Depende de chunks (fase A). Flow fields só valem a pena quando houver movimento em massa (migração, fase E). |
 | **D** | **Genética** — cromossomos, alelos, sinergia, herança, mutação | Depende de traços (fase B) pra ter o que herdar. |
 | **E** | **Território e expansão** — reivindicação por célula, colonização, migração, ocupação de vila extinta | **É o que o usuário mais sente falta** ("vilas ficam vazias"). Depende de A (agentes suficientes) e C (navegação em massa). |
@@ -278,6 +278,24 @@ O "jogo parado" que o usuário relata é atacado principalmente por **E, G e H**
 **Medido:** travessia longa **3.5ms → 0.98ms** (3.6x), e o HPA* ainda acha **19 de 20** caminhos contra 11 de 20 do A* plano, que desiste ao estourar o orçamento. Flow field: **17.8ms uma vez por destino, 0.116µs por unidade** — 50 unidades no mesmo destino custam 17.8ms contra ~175ms de busca individual.
 
 **Não resolvido, e honesto registrar:** o custo por agente da simulação ficou **inconsistente entre medições** (350 agentes custaram 14ms num teste, 511 custaram 6.8ms em outro). Há um fator não isolado — a densidade por vila é parte da explicação (`perception.agents` e `agent/separation.js` são quadráticos na densidade local), mas não explica tudo. `VILLAGE_COUNT` ficou em **24** por prudência, não por limite medido.
+
+### 3.8 Fase B — neurônios e traços (entregue)
+
+- **`agent/neuron.js`** — faixas de prioridade (Idle/Growth/Cognitive/Survival/Immediate), `canFire` com limiar, e escolha 80/20. O registro é um mapa de **dados** sobre as ações que já existem, não uma reescrita dos 16 módulos: a lógica de cada ação continua sendo dela, e aqui mora só a faixa e o limiar.
+- **`agent/traits.js`** — 7 traços com três eixos de influência: `attributes` (base das Fases F/G), `neuronWeight` (multiplica o peso) e `neuronPriority` (promove a faixa — o modificador mais forte do sistema). Permanentes e temporários com prazo, com `refreshTraitEffects` cacheando os modificadores consolidados pra a consulta ser O(1).
+- **`agent/decision.js`** — a regra de interrupção agora tem dois casos: faixa mais alta interrompe na hora, mesma faixa exige a margem anti-oscilação de sempre.
+- **`ui/hud.js`** mostra os traços do agente selecionado.
+
+**Dois erros medidos e corrigidos, que são a parte instrutiva:**
+
+1. **Prioridade não é propriedade da AÇÃO.** Pôr `eat` numa faixa fixa de SURVIVAL fez a fome vencer qualquer trabalho sempre que pudesse disparar: 46% dos agentes comendo ao mesmo tempo, **22 de 24 vilas extintas em 135s**. Comer não é urgente; comer *com fome crítica* é. Daí `urgentAbove`: a faixa **escala com o peso**, e abaixo do limiar a ação compete normalmente (que é como o jogo sempre foi calibrado).
+2. **Peso não é probabilidade.** Sorteio proporcional ao peso fazia uma ação valendo 0.3 ser escolhida 27% das vezes contra outra valendo 0.8 — o agente passava um quarto do tempo fazendo a segunda melhor coisa. Custou população (~250 → ~133) e 15 vilas. Com o peso **ao quadrado**, a mesma opção cai pra 12% e a variedade continua existindo.
+
+**Medido:** reconsideração a **0.017ms por agente** (critério: < 1ms). População estável em ~205 entre 288s e 468s. Traços diferenciam comportamento de forma verificável: `restless` explora **11.4%** do tempo contra **4.8%** de quem não tem traço.
+
+**Limitação honesta:** o multiplicador de peso só muda algo quando há **competição dentro da faixa**. `coward` tem `fleePredator: 1.5`, mas fugir é IMMEDIATE e costuma estar sozinho na faixa — o multiplicador não altera a escolha. Traços que mexem em **prioridade** têm efeito muito maior que os que mexem em peso.
+
+**Custo assumido:** população de ~205 contra ~250 da fase anterior. Parte é o preço da variedade (o agente às vezes faz a segunda melhor coisa, que é o pedido), parte não foi isolada.
 
 ### 3.5 Critérios de aceite transversais
 

@@ -1,4 +1,5 @@
 import { TIME_SPEEDS } from '../utils/constants.js';
+import { traitLabels } from '../agent/traits.js';
 
 const ACTION_LABELS = {
   wander: 'vagando',
@@ -98,7 +99,12 @@ export function createHud(container, timeState) {
 
     const roleSuffix = agent.role === 'warrior' ? ' (guerreiro)' : '';
     actionEl.textContent = (ACTION_LABELS[agent.currentAction] ?? '–') + roleSuffix;
-    ageEl.textContent = `${Math.floor(agent.age)} (${STAGE_LABELS[agent.lifeStage] ?? '–'})`;
+    // Traços na mesma linha da idade: são o que explica por que ESTE morador
+    // decide diferente do vizinho, então precisam ser visíveis pra a decisão
+    // dele poder ser conferida — mesma razão de o inspetor mostrar os scores.
+    const traits = traitLabels(agent);
+    const traitSuffix = traits.length > 0 ? ` · ${traits.join(', ')}` : '';
+    ageEl.textContent = `${Math.floor(agent.age)} (${STAGE_LABELS[agent.lifeStage] ?? '–'})${traitSuffix}`;
     hungerFill.style.width = `${agent.needs.hunger}%`;
     sleepFill.style.width = `${agent.needs.sleep}%`;
     healthFill.style.width = `${agent.health}%`;

@@ -1,6 +1,7 @@
 import { createNeeds } from './needs.js';
 import { createMemory } from './memory.js';
 import { WARRIOR_TYPES } from '../utils/constants.js';
+import { rollTraits, refreshTraitEffects } from './traits.js';
 
 export function createAgent({
   id,
@@ -11,7 +12,7 @@ export function createAgent({
   warriorType,
   rng,
 }) {
-  return {
+  const agent = {
     id,
     position: { x: position.x, y: position.y },
     // 'orc' | 'elfo' | 'cavaleiro' — sprite de combate (render/agentRenderer.js),
@@ -50,5 +51,21 @@ export function createAgent({
     health: 100,
     deathLinger: 0, // segundos desde a morte; ver DEATH_LINGER_SECONDS e lifecycle.js:pruneDead
     role: 'civilian', // 'civilian' | 'warrior' — emergente pela demanda de defesa, ver clan/clanDecision.js
+    // Traços PERMANENTES (ids de agent/traits.js). Sorteados aqui hoje; na
+    // Fase D passam a ser herdados dos pais. São o que faz dois moradores na
+    // mesma situação decidirem diferente.
+    traits: rollTraits(rng),
+    tempTraits: [], // com prazo — gancho pros efeitos de status (ver traits.js)
+    // Preenchidos por refreshTraitEffects logo abaixo: `attributes` são os
+    // números do personagem (base das Fases F/G), `traitEffects` é o cache de
+    // modificadores que o sistema de neurônios consulta em O(1).
+    attributes: null,
+    traitEffects: null,
   };
+
+  // Consolida os modificadores dos traços uma vez, no nascimento. É este
+  // cache que o sistema de neurônios lê em O(1) — sem ele, cada pontuação de
+  // cada ação teria que varrer a lista de traços do agente.
+  refreshTraitEffects(agent);
+  return agent;
 }
