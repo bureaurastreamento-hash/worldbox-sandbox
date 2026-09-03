@@ -1,4 +1,5 @@
 import { TILE_SIZE } from '../utils/constants.js';
+import { buildDecorTextures, DECOR_ART_SCALE } from './terrain/decorTextures.js';
 import { getClan } from '../world/world.js';
 import { getStance } from '../clan/clan.js';
 import { canTrade } from '../clan/diplomacy.js';
@@ -11,6 +12,10 @@ const STANCE_COLORS = {
   neutral: { fill: 'rgba(90, 140, 200, 0.12)', stroke: 'rgba(90, 140, 200, 0.45)' },
   allied: { fill: 'rgba(80, 180, 120, 0.14)', stroke: 'rgba(80, 180, 120, 0.5)' },
 };
+
+// Altura da prefeitura (34px de arte x DECOR_ART_SCALE) mais uma folga, pra
+// o rótulo ficar acima do telhado em vez de atravessá-lo.
+const LABEL_OFFSET_PX = 34 * DECOR_ART_SCALE + 6;
 
 const STANCE_LABELS = { war: ' · guerra', tense: ' · tensão', neutral: '', allied: ' · aliada' };
 
@@ -93,11 +98,10 @@ export function drawVillages(ctx, world, camera, selectedVillageId) {
       ctx.stroke();
     }
 
-    ctx.fillStyle = '#c9432b';
-    ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);
-    ctx.strokeStyle = '#5c1a0e';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(pos.x - size / 2, pos.y - size / 2, size, size);
+    // O quadrado vermelho que marcava o centro saiu: a PREFEITURA
+    // (village/buildings.js) agora ocupa esse ponto e comunica a mesma coisa
+    // com arte de verdade. Mantido só o anel de seleção e o rótulo — o
+    // marcador ficava desenhado por cima do telhado da própria prefeitura.
 
     ctx.fillStyle = '#fff';
     ctx.font = '11px sans-serif';
@@ -117,7 +121,50 @@ export function drawVillages(ctx, world, camera, selectedVillageId) {
     ctx.fillText(
       `${roleIcon} ${village.name} — 🌾 ${food}/${foodCap} · 🪵 ${wood}/${woodCap}${suffix}${tradeSuffix}${chaosSuffix}${extinctSuffix}`,
       pos.x,
-      pos.y - size / 2 - 4,
+      pos.y - LABEL_OFFSET_PX * camera.zoom,
     );
+  }
+}
+
+// Prédios da vila (village/buildings.js). Desenhados aqui e não em
+// decorationRenderer.js porque pertencem à VILA, não ao mundo — o renderer de
+// decoração lê `world.decorations`, que é outra coisa.
+//
+// Ancorados no pé, como todo o resto que fica em pé no chão (personagens,
+// árvores), pra a ordem de sobreposição ficar coerente.
+const BUILDING_TEXTURE = {
+  townhall: 'Prefeitura',
+  house: 'Casa',
+  granary: 'Celeiro',
+  depot: 'Deposito',
+};
+
+let buildingTextures = null;
+
+export function drawBuildings(ctx, world, camera) {
+  if (!buildingTextures) buildingTextures = buildDecorTextures();
+
+  const viewW = ctx.canvas.width;
+  const viewH = ctx.canvas.height;
+  ctx.imageSmoothingEnabled = false;
+
+  for (const village of world.villages) {
+    for (const building of village.buildings) {
+      const pos = camera.worldToScreen(building.x, building.y, viewW, viewH);
+      if (pos.x < -80 || pos.x > viewW + 80 || pos.y < -80 || pos.y > viewH + 80) continue;
+
+      const texture = buildingTextures[BUILDING_TEXTURE[building.type]];
+      if (!texture) continue;
+
+      const h = texture.height * DECOR_ART_SCALE * camera.zoom;
+      const w = texture.width * DECOR_ART_SCALE * camera.zoom;
+
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y, w * 0.4, w * 0.16, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.fill();
+
+      ctx.drawImage(texture, pos.x - w / 2, pos.y - h, w, h);
+    }
   }
 }

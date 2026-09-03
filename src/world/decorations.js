@@ -11,7 +11,6 @@ import {
   TILE_SIZE,
   DECORATION_TREE_CHANCE,
   DECORATION_PLANT_CHANCE,
-  DECORATION_HOUSES_PER_VILLAGE,
   DECORATION_VILLAGE_CLEARING_RADIUS,
   DECORATION_CHEST_CHANCE,
   DECORATION_CAMPFIRES_PER_VILLAGE,
@@ -53,15 +52,10 @@ export function generateDecorations(world) {
 
   for (const village of world.villages) {
     const clearingPx = DECORATION_VILLAGE_CLEARING_RADIUS * TILE_SIZE;
-    for (let i = 0; i < DECORATION_HOUSES_PER_VILLAGE; i++) {
-      const angle = rng.range(0, Math.PI * 2);
-      const dist = rng.range(0, clearingPx * 0.8);
-      decorations.push({
-        type: 'house',
-        x: village.center.x + Math.cos(angle) * dist,
-        y: village.center.y + Math.sin(angle) * dist,
-      });
-    }
+    // As casas decorativas saíram daqui: eram puramente visuais e não tinham
+    // vínculo nenhum com `village.buildings`, então o jogador via casinhas
+    // numa vila que mecanicamente tinha zero prédios. Agora prédio é
+    // entidade de verdade, com posição e função — ver village/buildings.js.
     for (let i = 0; i < DECORATION_CAMPFIRES_PER_VILLAGE; i++) {
       const angle = rng.range(0, Math.PI * 2);
       const dist = rng.range(0, clearingPx * 0.4); // mais perto do centro que as casas

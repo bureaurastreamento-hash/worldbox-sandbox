@@ -41,6 +41,15 @@ function blob(ctx, cx, cy, r, color) {
   ctx.fill();
 }
 
+
+// Telhas: linhas horizontais escuras no telhado. Sem elas o telhado é a maior
+// área chapada do prédio, e chapadura grande é exatamente o que fazia o mapa
+// inteiro parecer cartoon antes.
+function shingle(ctx, x0, y0, w, h, color) {
+  ctx.fillStyle = color;
+  for (let y = y0 + 2; y < y0 + h; y += 3) ctx.fillRect(x0, y, w, 1);
+}
+
 // Árvore frondosa: copa de bolhas sobrepostas com sombra própria embaixo-
 // direita e aro claro em cima-esquerda.
 function paintBroadleaf(ctx, w, h, tone) {
@@ -175,6 +184,16 @@ function paintHouse(ctx, w, h) {
   ctx.fillStyle = '#a55a44'; // água iluminada
   ctx.fill();
 
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(peakX, 0);
+  ctx.lineTo(w, wallTop);
+  ctx.lineTo(0, wallTop);
+  ctx.closePath();
+  ctx.clip();
+  shingle(ctx, 0, 0, w, wallTop, 'rgba(60, 25, 18, 0.35)');
+  ctx.restore();
+
   rect(ctx, 0, wallTop - 1, w, 1, '#5e2f24'); // beiral
 }
 
@@ -188,6 +207,136 @@ function paintChest(ctx, w, h) {
   const bandX = Math.floor(w / 2) - 1;
   rect(ctx, bandX, 0, 2, h, '#c9a94f');
   rect(ctx, bandX, lidH - 1, 2, 2, '#e6cd7a');
+}
+
+
+// --- prédios da vila -------------------------------------------------
+//
+// Quatro silhuetas deliberadamente DIFERENTES, não variações de cor: o
+// jogador tem que saber o que é cada prédio de relance, em zoom baixo, sem
+// legenda. Casa é a referência (telhado de duas águas); prefeitura é mais
+// alta e tem torre com bandeira; celeiro tem telhado curvo e porta larga;
+// depósito é baixo, de pedra, com caixotes do lado de fora.
+
+function paintTownhall(ctx, w, h) {
+  const wallTop = Math.floor(h * 0.45);
+  const wallH = h - wallTop;
+
+  // Corpo de pedra clara — institucional, contrasta com a madeira das casas.
+  rect(ctx, 1, wallTop, w - 2, wallH, '#a9a294');
+  rect(ctx, 1, wallTop, 1, wallH, '#c4bdae');
+  rect(ctx, w - 2, wallTop, 1, wallH, '#7d776b');
+  for (let y = wallTop + 2; y < h - 2; y += 3) rect(ctx, 2, y, w - 4, 1, '#948d80');
+
+  // Porta dupla com arco
+  const doorW = Math.max(4, Math.floor(w * 0.28));
+  const doorX = Math.floor((w - doorW) / 2);
+  const doorH = Math.floor(wallH * 0.66);
+  rect(ctx, doorX, h - doorH, doorW, doorH, '#54402a');
+  rect(ctx, doorX + Math.floor(doorW / 2), h - doorH, 1, doorH, '#3b2c1d');
+
+  // Telhado
+  const peakX = w / 2;
+  ctx.beginPath();
+  ctx.moveTo(peakX, wallTop - Math.floor(h * 0.3));
+  ctx.lineTo(w, wallTop);
+  ctx.lineTo(0, wallTop);
+  ctx.closePath();
+  ctx.fillStyle = '#4d5f7a';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(peakX, wallTop - Math.floor(h * 0.3));
+  ctx.lineTo(0, wallTop);
+  ctx.lineTo(peakX, wallTop);
+  ctx.closePath();
+  ctx.fillStyle = '#5f7492';
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(peakX, wallTop - Math.floor(h * 0.3));
+  ctx.lineTo(w, wallTop);
+  ctx.lineTo(0, wallTop);
+  ctx.closePath();
+  ctx.clip();
+  shingle(ctx, 0, 0, w, wallTop, 'rgba(25, 35, 55, 0.35)');
+  ctx.restore();
+
+  // Mastro e bandeira — o detalhe que marca "aqui é a sede".
+  const mastX = Math.floor(peakX);
+  rect(ctx, mastX, 0, 1, Math.floor(h * 0.2), '#4a4033');
+  rect(ctx, mastX + 1, 1, 3, 2, '#b8452f');
+}
+
+function paintGranary(ctx, w, h) {
+  const wallTop = Math.floor(h * 0.42);
+  const wallH = h - wallTop;
+
+  rect(ctx, 1, wallTop, w - 2, wallH, '#b08a4e');
+  rect(ctx, 1, wallTop, 1, wallH, '#c9a366');
+  rect(ctx, w - 2, wallTop, 1, wallH, '#8a6a39');
+
+  // Porta larga de celeiro, com o X de tábuas
+  const doorW = Math.floor(w * 0.5);
+  const doorX = Math.floor((w - doorW) / 2);
+  const doorY = h - Math.floor(wallH * 0.7);
+  rect(ctx, doorX, doorY, doorW, h - doorY, '#6b4c2a');
+  ctx.strokeStyle = '#8f6a3c';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(doorX, doorY);
+  ctx.lineTo(doorX + doorW, h);
+  ctx.moveTo(doorX + doorW, doorY);
+  ctx.lineTo(doorX, h);
+  ctx.stroke();
+
+  // Telhado CURVO (arco) — a silhueta que distingue celeiro de casa mesmo
+  // reduzido a poucos pixels.
+  ctx.beginPath();
+  ctx.moveTo(0, wallTop);
+  ctx.quadraticCurveTo(w / 2, -h * 0.12, w, wallTop);
+  ctx.closePath();
+  ctx.fillStyle = '#8f5a3c';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, wallTop);
+  ctx.quadraticCurveTo(w / 2, -h * 0.12, w / 2, wallTop);
+  ctx.closePath();
+  ctx.fillStyle = '#a86e49';
+  ctx.fill();
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, wallTop);
+  ctx.quadraticCurveTo(w / 2, -h * 0.12, w, wallTop);
+  ctx.closePath();
+  ctx.clip();
+  shingle(ctx, 0, 0, w, wallTop, 'rgba(60, 32, 20, 0.3)');
+  ctx.restore();
+
+  rect(ctx, 0, wallTop - 1, w, 1, '#5e3a26');
+}
+
+function paintDepot(ctx, w, h) {
+  const wallTop = Math.floor(h * 0.5);
+  const wallH = h - wallTop;
+
+  // Baixo e de pedra — lê como armazém, não como moradia.
+  rect(ctx, 2, wallTop, w - 4, wallH, '#8a8377');
+  rect(ctx, 2, wallTop, 1, wallH, '#a49d90');
+  rect(ctx, w - 3, wallTop, 1, wallH, '#6a645a');
+  for (let y = wallTop + 2; y < h - 1; y += 3) {
+    for (let x = 3; x < w - 3; x += 4) rect(ctx, x, y, 3, 1, '#79736a');
+  }
+
+  // Telhado plano com beiral
+  rect(ctx, 0, wallTop - 3, w, 3, '#5c5f66');
+  rect(ctx, 0, wallTop - 3, w, 1, '#797d85');
+
+  // Caixotes empilhados do lado de fora — o sinal de "aqui guarda coisa".
+  rect(ctx, 1, h - 4, 4, 4, '#8a6236');
+  rect(ctx, 1, h - 4, 4, 1, '#a87c46');
+  rect(ctx, w - 6, h - 3, 3, 3, '#8a6236');
+  rect(ctx, w - 6, h - 3, 3, 1, '#a87c46');
 }
 
 let cache = null;
@@ -215,9 +364,27 @@ export function buildDecorTextures() {
   paintFern(fern.getContext('2d'), 11, 9);
   cache.Sebe = fern;
 
-  const house = makeCanvas(18, 16);
-  paintHouse(house.getContext('2d'), 18, 16);
+  // Prédios são autorados grandes o bastante pra DOMINAR a silhueta de um
+  // morador (~20px de arte): uma casa menor que quem mora nela lê como
+  // maquete. O tamanho vem da arte, não de uma escala maior, pra a densidade
+  // de pixel continuar igual à dos personagens e do terreno.
+  const house = makeCanvas(24, 22);
+  paintHouse(house.getContext('2d'), 24, 22);
   cache.Casa = house;
+
+  // Prefeitura é maior de propósito: é o prédio que ancora a vila na leitura
+  // do mapa, e escala é o jeito mais barato de comunicar hierarquia.
+  const townhall = makeCanvas(34, 34);
+  paintTownhall(townhall.getContext('2d'), 34, 34);
+  cache.Prefeitura = townhall;
+
+  const granary = makeCanvas(28, 24);
+  paintGranary(granary.getContext('2d'), 28, 24);
+  cache.Celeiro = granary;
+
+  const depot = makeCanvas(26, 20);
+  paintDepot(depot.getContext('2d'), 26, 20);
+  cache.Deposito = depot;
 
   const chest = makeCanvas(10, 9);
   paintChest(chest.getContext('2d'), 10, 9);

@@ -414,3 +414,93 @@ carregamento; o laço de render faz um `drawImage` e nada mais.
 
 **Zoom baixo continua sendo o gargalo** (80ms): a otimização real que falta é
 pré-renderizar o terreno num canvas offscreen por chunk, que segue no roadmap.
+
+## 1g. FPS, prédios com função e fim do amontoado no centro
+
+Três pedidos numa rodada, tratados como três frentes.
+
+### Frente 1 — FPS (terrain/terrainChunks.js)
+
+O terreno é assado em blocos offscreen de 32x32 tiles, na resolução de
+autoria (16px/tile). O terreno é **estático**, então desenhar os mesmos ~40
+mil tiles 60 vezes por segundo era refazer trabalho idêntico.
+
+| zoom | antes desta rodada | agora |
+|---|---|---|
+| 1 | 4.65ms | **0.01ms** |
+| 0.25 | 80ms | **0.06ms** |
+| 0.1 | — | **0.20ms** |
+
+O gargalo de FPS mais antigo do projeto acabou. Detalhe: a ondulação da água
+só é desenhada acima de `WATER_ANIM_MIN_ZOOM` (0.6) — abaixo disso um tile
+tem <19px de tela e a ondulação é um traço de 1px, imperceptível, mas
+custaria um `drawImage` por tile de água justamente no zoom em que existem
+dezenas de milhares deles.
+
+### Frente 2 — Prédios viraram entidades (village/buildings.js)
+
+**A raiz do amontoado não era visual.** `village.buildings` era um CONTADOR
+(lista de `{type:'house'}` sem posição, usada só como `.length`), e as casas
+no mapa eram decoração puramente visual, sem vínculo nenhum: o jogador via
+casinhas numa vila que mecanicamente tinha zero prédios. Como nenhum prédio
+tinha lugar, **`eat`, `deliver` e `build` miravam todos `village.center`** —
+três das ações mais frequentes do jogo no mesmo pixel.
+
+Agora cada prédio tem posição e função:
+
+| Tipo | Efeito | Quem vai lá |
+|---|---|---|
+| Prefeitura | marco institucional, fallback de destino | — (nasce com a vila, no centro) |
+| Casa | +5 teto de população | quem vai **dormir** |
+| Celeiro | +40 capacidade de comida | quem vai **comer** e quem entrega comida |
+| Depósito | +30 capacidade de madeira/minério | quem entrega madeira e minério |
+
+`build.js` escolhe **o tipo pela carência real** da vila (teto de população →
+espaço de comida → espaço de material) e constrói num terreno escolhido, não
+no centro. Vila nasce com prefeitura + celeiro: sem celeiro não haveria onde
+comer no minuto 1, e voltaríamos à espiral de fome do §1e.
+
+### Frente 3 — Destinos diferentes, e ponto de parada por agente
+
+Cada agente para num ponto do **anel** em volta do prédio, escolhido por hash
+do próprio id — não no centro exato dele. O espalhamento não é cosmético
+forçado: é consequência de os destinos serem diferentes.
+
+Fechado também o TODO que estava no `sleep.js` **desde a fatia 2** ("dorme
+onde estiver; isso entra quando existir vila/casa"). É a maior alavanca
+isolada, porque sono é constante e as casas ficam espalhadas.
+
+**Medido** (Vila 1, loop pausado, avanço manual):
+
+| | antes | depois |
+|---|---|---|
+| agentes | 13 | 17 |
+| pares empilhados (<12px) | 19 | **7** |
+| % dos pares possíveis | 24% | **5%** |
+| distância média ao centro | — | 163px (~5 tiles) |
+
+~5x menos amontoamento **com mais gente**. Não some por completo, e não
+deveria: quem compartilha destino ainda se junta perto dele.
+
+Efeitos conferidos ao vivo: teto de população 30+4x5=50; comida 100+40=140;
+madeira 100+30=130; prédios colocados com espaçamento mínimo respeitado.
+
+### Arte
+
+Quatro silhuetas deliberadamente diferentes, não variações de cor — o jogador
+tem que identificar cada prédio de relance, em zoom baixo, sem legenda:
+prefeitura de pedra clara com telhado azul e mastro; casa de madeira com
+telhado de duas águas; celeiro com **telhado curvo** e porta larga em X;
+depósito baixo de pedra com caixotes fora. Telhas (linhas escuras) em todos
+os telhados — telhado é a maior área do prédio, e área chapada grande era
+exatamente o que fazia o mapa parecer cartoon.
+
+O quadrado vermelho que marcava o centro da vila saiu: a prefeitura ocupa
+esse ponto e comunica o mesmo com arte de verdade (o marcador ficava
+desenhado por cima do próprio telhado).
+
+**Pendência conhecida:** construção continua dependendo de pedra, que depende
+de mineração, que é lenta — numa sessão curta a vila fica só com prefeitura +
+celeiro. Já era assim antes (§8 do DESIGN.md), mas agora incomoda mais,
+porque casa/depósito são o que espalha. Vale calibrar o custo ou a
+disponibilidade de pedra numa próxima rodada.

@@ -7,6 +7,7 @@
 import { addStock } from '../../village/stock.js';
 import { getVillage } from '../../world/world.js';
 import { moveToward, clearMovement } from '../movement.js';
+import { destinationFor, approachPoint } from '../../village/buildings.js';
 import { CARRY_CAPACITY } from '../../utils/constants.js';
 
 export const SCORE_WHEN_CARRYING = 0.8; // alto e fixo, mas ainda interrompível por fome/sono crítica
@@ -24,7 +25,13 @@ export function step(agent, world, dt) {
   if (!village) return;
 
   if (!agent.target) {
-    agent.target = { x: village.center.x, y: village.center.y };
+    // Comida vai pro celeiro; madeira e minério vão pro depósito. Cada
+    // destino tem seu prédio, então as entregas se espalham em vez de
+    // convergirem todas pro centro — e o fallback (prefeitura) garante que
+    // ninguém fique sem onde entregar antes de a vila construir os prédios.
+    const type = agent.carryingType === 'food' ? 'granary' : 'depot';
+    const target = destinationFor(village, type, agent.position);
+    agent.target = target.type ? approachPoint(target, agent) : { x: target.x, y: target.y };
   }
 
   const status = moveToward(agent, world, dt, agent.target);

@@ -303,14 +303,13 @@ export const SPATIAL_CELL_SIZE = PERCEPTION_RADIUS * TILE_SIZE;
 // (determinística pela seed, como o terreno), sem lógica nem colisão.
 export const DECORATION_TREE_CHANCE = 0.08; // por tile de floresta
 export const DECORATION_PLANT_CHANCE = 0.04; // por tile de grama
-export const DECORATION_HOUSES_PER_VILLAGE = 6;
 // Nenhuma árvore/planta nasce mais perto da vila que isso, pra manter a área
 // dela legível (onde as casas ficam); casas nascem dentro desse raio.
 export const DECORATION_VILLAGE_CLEARING_RADIUS = TERRITORY_RADIUS;
 
 // Baú: raro, tesouro escondido sem mecânica de loot associada.
 export const DECORATION_CHEST_CHANCE = 0.0006;
-// Fogueira: 1 por vila, mesmo padrão de DECORATION_HOUSES_PER_VILLAGE.
+// Fogueira: 1 por vila.
 export const DECORATION_CAMPFIRES_PER_VILLAGE = 1;
 
 // Fauna predadora (predator/): entidade separada de Agent, bem mais simples

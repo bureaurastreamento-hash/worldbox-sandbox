@@ -5,10 +5,13 @@ import {
   MINING_RESOURCES,
   REPRO_COOLDOWN_MIN,
   TERRITORY_RADIUS,
-  VILLAGE_POP_CAP,
-  HOUSE_POP_BONUS,
   STARTING_FOOD_STOCK,
 } from '../utils/constants.js';
+import { addBuilding, findBuildingSpot, getPopulationCap } from './buildings.js';
+
+// getPopulationCap mora em village/buildings.js (é efeito de prédio), mas
+// continua sendo importado daqui pelo resto do jogo.
+export { getPopulationCap };
 
 // specialization: 'food' | 'wood' — decide qual dos dois recursos os
 // moradores desta vila colhem (gather.js/gatherWood.js só pontuam > 0 pro
@@ -53,9 +56,14 @@ export function addResident(village, agentId) {
   village.population.push(agentId);
 }
 
-// Teto de população efetivo — base + bônus por casa construída
-// (agent/actions/build.js). Usado tanto pra pontuar a decisão de construir
-// quanto pro gate de reprodução (lifecycle.js), pra não duplicar a fórmula.
-export function getPopulationCap(village) {
-  return VILLAGE_POP_CAP + village.buildings.length * HOUSE_POP_BONUS;
+// Prédios fundacionais: toda vila nasce com prefeitura (no centro) e um
+// celeiro. O celeiro não é opcional — sem ele não haveria onde comer no
+// minuto 1, e a vila voltaria a morrer de fome antes de construir o primeiro,
+// exatamente a espiral corrigida em §1e do STATUS.md. Chamada de main.js
+// depois de o mundo existir, porque a colocação precisa checar terreno andável.
+export function foundVillageBuildings(world, village, rng) {
+  addBuilding(village, 'townhall', village.center.x, village.center.y);
+
+  const spot = findBuildingSpot(world, village, rng);
+  if (spot) addBuilding(village, 'granary', spot.x, spot.y);
 }

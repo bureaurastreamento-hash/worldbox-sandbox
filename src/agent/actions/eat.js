@@ -12,6 +12,7 @@ import { getVillage } from '../../world/world.js';
 import { addStock } from '../../village/stock.js';
 import { EAT_FOOD_PER_SEC, EAT_RESTORE_PER_FOOD, EAT_URGENCY_WEIGHT } from '../../utils/constants.js';
 import { moveToward, clearMovement } from '../movement.js';
+import { destinationFor, approachPoint } from '../../village/buildings.js';
 
 export function score(agent, world) {
   const village = getVillage(world, agent.villageId);
@@ -29,7 +30,11 @@ export function step(agent, world, dt) {
   if (!village) return;
 
   if (!agent.target) {
-    agent.target = { x: village.center.x, y: village.center.y };
+    // Come no CELEIRO, não no centro da vila — e num ponto do anel em volta
+    // dele, escolhido por agente. Antes todo mundo mirava o mesmo pixel do
+    // centro, e a vila virava uma pilha de moradores sobrepostos.
+    const granary = destinationFor(village, 'granary', agent.position);
+    agent.target = granary.type ? approachPoint(granary, agent) : { x: granary.x, y: granary.y };
   }
 
   const status = moveToward(agent, world, dt, agent.target);

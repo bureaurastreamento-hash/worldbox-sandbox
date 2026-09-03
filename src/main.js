@@ -3,7 +3,7 @@ import { generateDecorations } from './world/decorations.js';
 import { spawnPredators } from './predator/predator.js';
 import { updatePredator } from './predator/predatorAI.js';
 import { buildSpatialIndex } from './world/spatialIndex.js';
-import { createVillage, addResident } from './village/village.js';
+import { createVillage, addResident, foundVillageBuildings } from './village/village.js';
 import { computeDemand, updateDistress, updateChaos } from './village/stock.js';
 import { updateTrade } from './village/trade.js';
 import { createClan, addVillage as addVillageToClan, setStance } from './clan/clan.js';
@@ -161,6 +161,12 @@ for (let i = 0; i < clans.length; i++) {
       }
     }
   }
+}
+
+// Prédios fundacionais (prefeitura + celeiro) antes da decoração, pra a
+// decoração já poder evitar o espaço deles se um dia precisar.
+for (const village of world.villages) {
+  foundVillageBuildings(world, village, world.rng);
 }
 
 world.decorations = generateDecorations(world);
