@@ -23,6 +23,7 @@ import {
   VILLAGE_WOOD_CAPACITY,
   VILLAGE_MINERAL_CAPACITY,
   MINING_RESOURCES,
+  BUILD_NEED_THRESHOLD,
 } from '../utils/constants.js';
 import { isWalkable } from '../world/tile.js';
 import { getTileAt } from '../world/world.js';
@@ -35,11 +36,23 @@ export const BUILDING = {
     // e o destino de fallback de qualquer ação cujo prédio próprio não exista.
     buildable: false,
   },
+  // Casa é a única construção que NÃO custa pedra, e isso é deliberado.
+  //
+  // Com pedra no custo, o ciclo de crescimento não fechava: pedra depende de
+  // achar uma cordilheira, e medindo 5 mundos a exploração achou uma em
+  // apenas 2 deles. Nos outros a vila batia no teto de população e ficava
+  // presa lá pra sempre — um teto sem escada, pior que não ter teto nenhum
+  // (população média caiu de 57.6 para 44.3 no teste). Uma cabana de madeira
+  // numa vila jovem também é o que faz sentido: pedra é para infraestrutura.
+  //
+  // Assim, crescer depende de madeira (que toda vila consegue) e a pedra
+  // continua sendo o gargalo real do celeiro e do depósito — os prédios que
+  // ampliam ESTOQUE, onde a progressão por minério ainda vale.
   house: {
     label: 'Casa',
     buildable: true,
-    wood: 20,
-    stone: 12,
+    wood: 25,
+    stone: 0,
     popBonus: 5, // teto de população
   },
   granary: {
@@ -150,11 +163,32 @@ export function countByType(village, type) {
 // Ordem de prioridade deliberada: teto de população primeiro (sem gente, a
 // vila não faz mais nada), depois espaço pra comida (estoque transbordando é
 // trabalho jogado fora), depois espaço pra material.
+//
+// Devolve `null` quando NADA está apertado. Antes o fallback era `'house'`,
+// o que contradizia o "carência real" deste comentário: a vila sempre tinha
+// um próximo prédio, mesmo sem precisar de nenhum, e `build.js` pontuava por
+// uma pressão populacional que raramente chegava perto do teto. Agora
+// construir é uma candidata que só existe quando há de fato um gargalo.
 export function nextBuildingType(village) {
-  if (village.population.length >= getPopulationCap(village) * 0.75) return 'house';
+  if (village.population.length >= getPopulationCap(village) * BUILD_NEED_THRESHOLD) return 'house';
   if (village.stock.food >= village.capacity.food * 0.9) return 'granary';
   if (village.stock.wood >= village.capacity.wood * 0.9) return 'depot';
-  return 'house';
+  return null;
+}
+
+// O quão apertado está o gargalo que `nextBuildingType` apontou, de 0 a 1 —
+// é isto que `build.js` usa pra pontuar, em vez de sempre a pressão
+// populacional. Sem isso, uma vila com o celeiro transbordando pontuava
+// construir pela população (que podia estar folgada) e nunca construía o
+// celeiro que ela precisava.
+export function buildingNeed(village, type) {
+  if (type === 'granary') return clamp01(village.stock.food / village.capacity.food);
+  if (type === 'depot') return clamp01(village.stock.wood / village.capacity.wood);
+  return clamp01(village.population.length / getPopulationCap(village));
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
 }
 
 // --- efeitos dos prédios sobre os limites da vila ---------------------

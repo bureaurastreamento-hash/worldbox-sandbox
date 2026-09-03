@@ -19,13 +19,14 @@ import {
   addBuilding,
   findBuildingSpot,
   nextBuildingType,
-  getPopulationCap,
+  buildingNeed,
 } from '../../village/buildings.js';
-import { addStock } from '../../village/stock.js';
+import { addStock, hasFoodSurplus } from '../../village/stock.js';
 import { pushEvent } from '../../world/eventLog.js';
 import { moveToward, clearMovement } from '../movement.js';
 
 function canAfford(village, type) {
+  if (!type) return false; // nenhuma carência agora — nada a pagar
   const spec = BUILDING[type];
   return village.stock.wood >= spec.wood && village.stock.stone >= spec.stone;
 }
@@ -34,10 +35,30 @@ export function score(agent, world) {
   if (agent.carrying > 0) return 0; // ocupado entregando outra coisa
   const village = getVillage(world, agent.villageId);
   if (!village) return 0;
-  if (!canAfford(village, nextBuildingType(village))) return 0;
 
-  const pressure = Math.min(1, village.population.length / getPopulationCap(village));
-  return pressure * BUILD_SCORE_WEIGHT;
+  // Mesma trava de explorar e minerar (village/stock.js:hasFoodSurplus):
+  // construir tem peso acima de `gather` quando o gargalo é real, e sem esta
+  // condição isso vira gente construindo casa enquanto a vila passa fome —
+  // medido, população média caiu de 57.6 pra 35.3 com 3 vilas extintas na
+  // primeira versão em que construir passou a funcionar de fato.
+  if (!hasFoodSurplus(village)) return 0;
+
+  const type = nextBuildingType(village);
+  if (!canAfford(village, type)) return 0;
+
+  // Pontua pela carência DO PRÉDIO ESCOLHIDO, não pela pressão populacional
+  // sempre. Antes, uma vila com o celeiro transbordando pontuava construir
+  // pela população — que podia estar folgada — e o celeiro nunca saía.
+  //
+  // `nextBuildingType` já garante que a carência passou de
+  // BUILD_NEED_THRESHOLD, então o score começa perto do teto em vez de num
+  // valor baixo. É isso que faz construir vencer colher quando o gargalo é
+  // real: com a fórmula antiga (pop/teto sobre um teto base de 30), uma vila
+  // de 19 pessoas pontuava 0.32 contra os 0.55 de gather, e CONSTRUIR NUNCA
+  // VENCIA — medido num mundo com 64 de pedra em estoque e zero prédios
+  // construídos. O gargalo nunca foi o custo da pedra, como o STATUS.md
+  // supunha.
+  return buildingNeed(village, type) * BUILD_SCORE_WEIGHT;
 }
 
 export function step(agent, world, dt) {
@@ -68,20 +89,35 @@ export function step(agent, world, dt) {
   const type = agent.buildType ?? 'house';
   const spec = BUILDING[type];
 
-  if (agent.buildProgress === 0) {
-    // Reconfere na chegada: outro agente pode ter começado (e gasto o
-    // estoque) primeiro entre o momento em que este saiu e o de chegar.
-    if (!canAfford(village, type)) {
-      clearMovement(agent, world);
-      agent.buildType = null;
-      return;
-    }
-    addStock(village, 'wood', -spec.wood);
-    addStock(village, 'stone', -spec.stone);
+  // Reconfere na chegada só pra não gastar 15s de trabalho à toa — mas NÃO
+  // debita nada aqui.
+  if (!canAfford(village, type)) {
+    clearMovement(agent, world);
+    agent.buildProgress = 0;
+    agent.buildType = null;
+    return;
   }
 
   agent.buildProgress += dt;
   if (agent.buildProgress >= BUILD_WORK_SECONDS) {
+    // O recurso sai do estoque AGORA, ao completar — não na chegada.
+    //
+    // Debitar na chegada era um vazamento silencioso que sozinho impedia
+    // qualquer prédio de existir. A obra exige BUILD_WORK_SECONDS de trabalho
+    // CONTÍNUO, mas o agente é interrompido o tempo todo (fome, predador,
+    // guerra): quando isso acontece, decision.js zera `agent.target`, o step
+    // seguinte escolhe outro canteiro e reseta `buildProgress` — e debita a
+    // madeira DE NOVO. Cada tentativa abortada queimava o custo inteiro sem
+    // deixar nada, e o estoque de madeira ficava oscilando logo abaixo do
+    // custo pra sempre (medido: 17-29 de madeira contra um custo de 25, 175
+    // agente-ticks escolhendo construir, zero prédios em 5 mundos).
+    //
+    // Debitando na conclusão, uma obra abandonada custa só o tempo de quem a
+    // tentou, que é o que já se paga em qualquer outra ação interrompida.
+    // Dois agentes concluindo juntos também deixam de ser um problema: o
+    // segundo simplesmente reprova no canAfford acima.
+    addStock(village, 'wood', -spec.wood);
+    addStock(village, 'stone', -spec.stone);
     addBuilding(village, type, agent.target.x, agent.target.y);
     agent.buildProgress = 0;
     agent.buildType = null;

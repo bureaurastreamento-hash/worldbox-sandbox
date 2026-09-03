@@ -1,5 +1,10 @@
 import { clamp } from '../utils/mathUtils.js';
-import { TRADE_DEFICIT_DEMAND_MIN, DISTRESS_CHAOS_THRESHOLD_SECONDS, CRITICAL_RESOURCES } from '../utils/constants.js';
+import {
+  TRADE_DEFICIT_DEMAND_MIN,
+  DISTRESS_CHAOS_THRESHOLD_SECONDS,
+  CRITICAL_RESOURCES,
+  DEVELOPMENT_MIN_FOOD_FRACTION,
+} from '../utils/constants.js';
 
 export function addStock(village, type, amount) {
   const cap = village.capacity[type] ?? Infinity;
@@ -8,6 +13,28 @@ export function addStock(village, type, amount) {
 
 // Estoque baixo -> demanda alta -> puxa o score de ações que suprem o
 // recurso pra cima, pra todos os moradores (ver agent/actions/gather.js).
+// A vila está alimentada o bastante pra gastar mão de obra em DESENVOLVIMENTO
+// (explorar, minerar, construir) em vez de em sobrevivência?
+//
+// Esta é a regra mais aprendida na marra deste projeto, e por isso mora num
+// lugar só: toda ação que não produz comida e ganha peso alto o bastante pra
+// vencer `gather`/`fish` acaba matando de fome as vilas madeireiras, que não
+// têm produção própria de comida. Aconteceu três vezes seguidas, com três
+// ações diferentes (explore, mine, build), cada uma medida como extinção de
+// vila antes de ser corrigida. Em vez de repetir a trava em cada módulo, a
+// condição é declarada aqui e consultada pelos três.
+//
+// É sobre ESTOQUE, não sobre `distress`: distress só acumula depois do
+// déficit se firmar e leva muito tempo pra zerar, então usá-lo desligava o
+// desenvolvimento permanentemente (medido — as quatro vilas ficavam em
+// distress leve e crônico ao mesmo tempo, e a mineração nunca mais ligava).
+// O estoque volta a subir assim que alguém colhe, que é o sinal certo.
+export function hasFoodSurplus(village, minFraction = DEVELOPMENT_MIN_FOOD_FRACTION) {
+  const capacity = village.capacity?.food ?? 0;
+  if (capacity <= 0) return false;
+  return (village.stock.food ?? 0) >= capacity * minFraction;
+}
+
 export function computeDemand(village) {
   for (const type of Object.keys(village.capacity)) {
     const cap = village.capacity[type];

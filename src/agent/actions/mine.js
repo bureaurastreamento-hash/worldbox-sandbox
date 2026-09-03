@@ -6,7 +6,14 @@
 // de montanha, não a lógica.
 
 import { TILE_TYPES } from '../../world/tile.js';
-import { TILE_SIZE, CARRY_CAPACITY, GATHER_RATE, MINE_SCORE_WEIGHT, MINING_RESOURCES } from '../../utils/constants.js';
+import {
+  TILE_SIZE,
+  CARRY_CAPACITY,
+  GATHER_RATE,
+  MINE_SCORE_WEIGHT,
+  MINING_RESOURCES,
+} from '../../utils/constants.js';
+import { hasFoodSurplus } from '../../village/stock.js';
 import { recallNearest } from '../memory.js';
 import { recallVillageSite } from '../../village/knowledge.js';
 import { getVillage, findWalkableNear } from '../../world/world.js';
@@ -70,21 +77,23 @@ export function score(agent, world) {
   const village = getVillage(world, agent.villageId);
   if (!village) return 0;
 
-  // Vila com fome sustentada não minera. Minério é material de construção e
-  // está fora de CRITICAL_RESOURCES de propósito — não pode custar a
-  // sobrevivência de ninguém.
+  // Só minera com o celeiro num nível mínimo. Minério é material de
+  // construção e está fora de CRITICAL_RESOURCES de propósito — não pode
+  // custar a sobrevivência de ninguém.
   //
-  // Isto era uma falha latente que só aparecia agora: a demanda por minério
-  // fica quase sempre perto de 1 (o estoque vive vazio), então `mine` pontua
-  // ~0.35 de forma constante, enquanto `fish` (0.4 x demanda de comida) só
-  // chega perto disso com o celeiro já quase vazio. Numa vila MADEIREIRA,
-  // que não produz comida própria e depende de pescar, isso significa minerar
-  // enquanto se passa fome. Antes quase nenhuma vila conhecia um depósito, e
-  // `mine` pontuava 0 na prática; com o quadro de descobertas
-  // (village/knowledge.js) a mineração virou possível de verdade e a falha
-  // apareceu — medido: 678 agente-segundos minerando contra 236 pescando, e
-  // as duas vilas madeireiras do teste morreram de fome.
-  if ((village.distress?.food ?? 0) > 0) return 0;
+  // Isto era uma falha latente que só apareceu quando o quadro de
+  // descobertas (village/knowledge.js) tornou a mineração possível de
+  // verdade: a demanda por minério fica quase sempre perto de 1 (o estoque
+  // vive vazio), então `mine` pontua ~0.35 de forma constante, enquanto
+  // `fish` (0.4 x demanda de comida) só chega perto disso com o celeiro já
+  // quase vazio. Numa vila MADEIREIRA, que não produz comida própria e
+  // depende de pescar, isso significa minerar passando fome — medido, 678
+  // agente-segundos minerando contra 236 pescando, com as duas vilas
+  // madeireiras do teste morrendo de fome.
+  //
+  // A regra mora em village/stock.js:hasFoodSurplus — a mesma que trava
+  // explorar e construir, pelo mesmo motivo, declarada num lugar só.
+  if (!hasFoodSurplus(village)) return 0;
 
   return bestChoice(agent, world, village)?.score ?? 0;
 }

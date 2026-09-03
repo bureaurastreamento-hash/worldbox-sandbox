@@ -121,6 +121,11 @@ export const VILLAGE_MINERAL_CAPACITY = 50;
 // demais por agente-hora, testado e confirmado atrasando o bootstrap de
 // food/wood o bastante pra causar extinção por velhice sem reprodução.
 export const MINE_SCORE_WEIGHT = 0.35;
+// Fração mínima do celeiro pra a vila gastar mão de obra em DESENVOLVIMENTO
+// (explorar, minerar, construir) em vez de em comida. Trava de sobrevivência,
+// não de calibragem — ver village/stock.js:hasFoodSurplus, onde a regra é
+// declarada uma vez e consultada pelas três ações.
+export const DEVELOPMENT_MIN_FOOD_FRACTION = 0.3;
 // Proporção de cada minério nos tiles de montanha (world/terrain.js) —
 // cumulativo: stone até 0.6, coal até 0.8, iron até 0.95, gold o resto.
 export const MOUNTAIN_RESOURCE_WEIGHTS = { stone: 0.6, coal: 0.2, iron: 0.15, gold: 0.05 };
@@ -210,13 +215,28 @@ export const DEATH_LINGER_SECONDS = 3;
 // ainda depende de descoberta por acaso e some rápido no primeiro consumo;
 // custo menor dá mais chance real de uma casa completar numa sessão comum,
 // sem zerar o gate de recurso (ainda exige acumular estoque de verdade).
-export const HOUSE_WOOD_COST = 20;
-export const HOUSE_STONE_COST = 12;
-export const HOUSE_POP_BONUS = 5; // por casa construída
+// (HOUSE_WOOD_COST / HOUSE_STONE_COST / HOUSE_POP_BONUS viviam aqui e eram
+// CÓDIGO MORTO — quando os prédios viraram entidades com tipo próprio, os
+// custos passaram a morar na tabela BUILDING de village/buildings.js e nada
+// mais importava estas. O STATUS.md chegou a listar "baixar HOUSE_STONE_COST"
+// como próximo passo pra destravar a construção: mexer nelas não teria efeito
+// nenhum. Removidas pra não voltarem a enganar; o custo de cada prédio é a
+// tabela BUILDING, e só ela.)
 export const BUILD_WORK_SECONDS = 15; // trabalho contínuo no centro da vila até completar
 // Como GATHER_SCORE_WEIGHT: sobrevivência pessoal ainda deve vencer antes
 // de virar crítica.
-export const BUILD_SCORE_WEIGHT = 0.5;
+// Acima de GATHER_SCORE_WEIGHT (0.55) no topo da faixa, de propósito: um
+// gargalo real de construção DEVE conseguir puxar gente da colheita, senão a
+// vila fica presa no teto pra sempre. Como `nextBuildingType` só aponta um
+// prédio quando a carência já passou de BUILD_NEED_THRESHOLD, o score real
+// fica entre 0.45 (carência de 75%) e 0.6 (no teto) — vence colher só quando
+// o aperto é de verdade.
+export const BUILD_SCORE_WEIGHT = 0.6;
+
+// Quão cheio um limite precisa estar pra a vila querer construir. Abaixo
+// disso `nextBuildingType` devolve null e construir nem entra na lista de
+// candidatas.
+export const BUILD_NEED_THRESHOLD = 0.75;
 
 // Idades em segundos de tempo simulado (mesmo relógio dos needs), não anos —
 // pra dar pra observar uma vida inteira numa sessão de teste.
@@ -252,7 +272,22 @@ export const REPRO_ELIGIBLE_HUNGER = 50; // não reproduz com fome abaixo disso
 // como o maior bloqueador de reprodução (quase metade das tentativas),
 // contribuindo pra população inteira morrer de velhice sem repor.
 export const REPRO_FOOD_DEMAND_MAX = 0.9;
-export const VILLAGE_POP_CAP = 30;
+// Teto de população de uma vila SEM nenhuma casa construída. Era 30, contra
+// AGENT_COUNT=8 fundadores e uma população observada que estabiliza em 15-19
+// — ou seja, o teto nunca era alcançado, a pressão populacional em
+// `build.js` ficava em 0.3-0.6, e construir casa nunca vencia colher. Pior,
+// era circular: a casa AUMENTA o teto, então cada casa construída derrubaria
+// a pressão ainda mais.
+//
+// Com 18, o teto fica logo acima da população que uma vila alcança sozinha,
+// então ela SENTE o aperto e construir vira o que DESIGN.md §8 descreve: o
+// que destrava o crescimento, em vez de bônus para um limite inalcançável.
+// Crescer passa a depender de construir, que é a progressão pretendida.
+//
+// 14 foi testado antes e era apertado demais: virava um teto sem escada nas
+// vilas que não conseguiam madeira a tempo, e a população média caiu de 57.6
+// pra 43. O valor certo é o que a vila encosta, não o que a prende.
+export const VILLAGE_POP_CAP = 18;
 
 export const TERRITORY_RADIUS = 10; // tiles
 

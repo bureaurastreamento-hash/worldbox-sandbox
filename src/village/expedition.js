@@ -33,6 +33,7 @@ import {
 import { findWalkableNear } from '../world/world.js';
 import { distance } from '../utils/mathUtils.js';
 import { reportDiscoveries } from './knowledge.js';
+import { hasFoodSurplus } from './stock.js';
 import { destinationFor } from './buildings.js';
 
 function hashId(id) {
@@ -76,8 +77,10 @@ export function expeditionCapacity(village) {
 // dissolvida e refundada a cada oscilação de estoque.
 export function canAffordExpedition(village) {
   if (expeditionCapacity(village) === 0) return false;
-  const capacity = village.capacity?.food ?? 0;
-  return capacity > 0 && (village.stock.food ?? 0) >= capacity * EXPLORE_MIN_FOOD_FRACTION;
+  // Mesma regra de minerar e construir (village/stock.js:hasFoodSurplus), com
+  // um limiar próprio: uma expedição tira o membro da economia por ~1min, bem
+  // mais que uma viagem de mineração, então exige uma folga maior.
+  return hasFoodSurplus(village, EXPLORE_MIN_FOOD_FRACTION);
 }
 
 export function canJoin(village, agent) {
