@@ -180,6 +180,80 @@ uma conversa de design própria antes de virar tarefa.
 
 ---
 
+## Parte 3 — Plano de integração dos sistemas do WorldBox (`pesquisawolrd.md`)
+
+Pedido do usuário: integrar os sistemas fundamentais do WorldBox descritos em `pesquisawolrd.md` e transformar o jogo numa experiência "rica, caótica, evolutiva e escalável". Esta parte é a análise do que existe, o que muda e em que ordem — a ordem de fases **difere** da proposta original, pelos motivos em §3.2.
+
+### 3.1 Mapeamento: o que já existe, o que refatorar, o que é novo
+
+| Sistema pedido | Estado real neste projeto |
+|---|---|
+| IA por prioridades e pesos | **Já existe, melhor que a referência.** `agent/decision.js` é utility AI com scores contínuos. A `pesquisawolrd.md` descreve o WorldBox como **FSM**, que é *mais simples* do que temos. O que falta são as 3 camadas ao redor: condição de ativação explícita (`canFire`), **faixas de prioridade**, e **modificadores externos**. É refatoração, não substituição. |
+| FSM | Existe só no predador (`predator/predatorAI.js`), e ali é adequado. |
+| Time-slicing de decisão | **Não existe.** Hoje todo agente `active` reconsidera a cada `RECONSIDER_INTERVAL`. |
+| HPA* | **Não existe.** `world/pathfinding.js` é A* plano com orçamento de 3000 nós e min-heap. |
+| Flow fields | **Não existe.** |
+| Correção de presos | **Já existe**, e é bom: `agent/stuck.js` (timer de não-progresso + bloqueio de tile na memória do agente). Falta a força de desempate ("pushing") — `agent/separation.js` faz algo parecido, mas só anti-empilhamento. |
+| Chunks espaciais | **Parcial.** `world/spatialIndex.js` (buckets pra consulta de vizinhança) e `render/terrain/terrainChunks.js` (blocos de render 32×32). Não há chunk de *simulação* com dirty flags. |
+| Traços (`traits`) | **Não existe.** Está no modelo de dados do `DESIGN.md` §3 desde o começo, nunca implementado. |
+| Genética / cromossomos | **Não existe.** Herança hoje é zero — `warriorType` é sorteado do zero em cada nascimento. |
+| Território / reivindicação | **Colisão de nome, cuidado.** `world/claims.js` existe mas é **reserva de tile de colheita**, não território. Território hoje é só um raio fixo (`TERRITORY_RADIUS`) sem células reivindicáveis. |
+| Colonização / migração | **Não existe.** Vilas nascem no world-gen e nunca mais mudam. É a causa direta de "vilas extintas ficam vazias". |
+| Lealdade / rebelião | **Não existe**, e depende de uma camada inteira que também não existe (ver abaixo). |
+| Planos diplomáticos (plots) | **Não existe.** `clan/clanDecision.js` tem guerra/paz/comércio por desespero econômico, mas sem custos, prestígio ou pré-requisitos. |
+| Opinião diplomática numérica | **Não existe.** Hoje a postura é um enum (`war`/`tense`/`neutral`/`allied`), sem score contínuo. |
+| LOD de simulação | **Existe e CONTRADIZ a especificação.** `simulation/lod.js` só simula agentes na viewport. A spec pedida diz explicitamente: simulação 100% independente do zoom. Ver §3.3. |
+| LOD de renderização | **Não existe.** Sempre desenhado no detalhe máximo. |
+| Object pooling | Existe só pra partículas (`render/particles.js`). |
+
+**A lacuna mais grave, que a proposta original não considera:** não existe **nenhuma camada de personagem político**. Não há `leader`, `king`, atributos (Diplomacia/Guerra/Administração), `prestige`, tesouro, cultura, religião nem espécie de agente. As fórmulas de lealdade, sucessão e plots da `pesquisawolrd.md` são todas *funções sobre essa camada*. Sem ela, as Fases 4 e 5 do plano original não têm sobre o que operar. Por isso entra uma fase própria antes delas.
+
+**Colisão de nomes a evitar:** `gold` hoje é um **minério** (`MINING_RESOURCES`), não moeda. Os plots exigem ouro como **tesouro do reino**. São coisas diferentes e precisam de nomes diferentes (`treasury` pro dinheiro).
+
+### 3.2 A restrição que reordena tudo: o orçamento de tempo de agente
+
+Ver `DESIGN.md` §11.6 e `STATUS.md` §5b. A economia **não tem folga**: todo o tempo dos moradores já está comprometido, e nesta sessão quatro ações novas (`explore`, `mine`, `build`, `patrol`) derrubaram as vilas, uma a uma, até existir um teto de mão de obra (`village/stock.js:canDevelop`).
+
+Isso é decisivo pro plano: **migração, colonização, reivindicação de território e rebelião são todas atividades que consomem tempo de agente.** Adicionadas sobre a economia atual, elas repetem o mesmo colapso. Duas consequências:
+
+1. Toda ação nova passa por `canDevelop` (ou um orçamento equivalente) desde o primeiro commit, não como correção depois.
+2. **Aumentar a produção não resolve** — a economia é homeostática (mais comida abaixa o score de colher). O que resolve é aumentar a *quantidade de agentes*, e isso é o que torna a fase de escala um **pré-requisito**, não a última fase.
+
+### 3.3 A contradição do LOD, e como resolver
+
+A spec pedida diz: *"a simulação roda a plena fidelidade em TODO o mapa, independentemente do zoom"* e *"nunca use o zoom como gatilho para adormecer entidades"*. É exatamente o que `simulation/lod.js` faz hoje.
+
+Isso não é um bug — foi feito porque simular todo mundo era caro demais. A saída correta é a da própria `pesquisawolrd.md`: **trocar o gate de viewport por time-slicing**. Todos os agentes são simulados sempre; o que se distribui é *quando cada um reconsidera*, numa fila circular. Custo por frame fica constante e independente do zoom.
+
+Medido nesta sessão: com **todos** os ~54 agentes ativos, 180s simulados levam ~30s reais — ou seja ~6× tempo real. Com time-slicing a 15% e percepção mais barata, a margem para escalar é grande, mas "milhares" exige as três coisas juntas (time-slicing, chunks com dirty flag, e HPA* pra pathfinding não explodir).
+
+### 3.4 Ordem de fases proposta (difere da original)
+
+| # | Fase | Por que aqui |
+|---|---|---|
+| **A** | **Escala e LOD** — time-slicing, simulação zoom-agnóstica, LOD de render por zoom, pooling | Pré-requisito de tudo: sem margem de CPU e sem mais agentes, todo sistema novo colapsa a economia (§3.2). Também resolve a contradição do §3.3 e já entrega ganho visível (mapa inteiro vivo). |
+| **B** | **Neurônios + traços** — `canFire`, faixas de prioridade, pesos, `NeuronModifier`, `agent.traits` | Traços e neurônios são o mesmo sistema visto de dois lados: um traço *é* um modificador de neurônio. Fazer junto evita refazer `decision.js` duas vezes. Barato em CPU. |
+| **C** | **Navegação** — HPA*, flow fields, pushing anti-preso | Depende de chunks (fase A). Flow fields só valem a pena quando houver movimento em massa (migração, fase E). |
+| **D** | **Genética** — cromossomos, alelos, sinergia, herança, mutação | Depende de traços (fase B) pra ter o que herdar. |
+| **E** | **Território e expansão** — reivindicação por célula, colonização, migração, ocupação de vila extinta | **É o que o usuário mais sente falta** ("vilas ficam vazias"). Depende de A (agentes suficientes) e C (navegação em massa). |
+| **F** | **Camada política** — líder por vila, atributos, dinastia, prestígio, tesouro, cultura | **Fase nova, não estava no plano original.** É o pré-requisito de G e H. |
+| **G** | **Lealdade e rebelião** — índice, modificadores, gatilhos, guerra civil | Fórmulas diretas sobre F. |
+| **H** | **Diplomacia e plots** — opinião numérica, planos com pré-requisitos, IA geopolítica | Fórmulas diretas sobre F. É o "caos" pedido, e chega por último porque é o mais dependente. |
+
+O "jogo parado" que o usuário relata é atacado principalmente por **E, G e H** — mas nenhuma delas se sustenta sem **A** e **F**.
+
+### 3.5 Critérios de aceite transversais
+
+Valem pra toda fase, e vêm das lições medidas nesta sessão:
+
+- **Nenhuma fase é "pronta" sem 5 seeds × 600s** de medição (ver `ARCHITECTURE.md`, avisos de método). 180s esconde extinção total.
+- **População não pode regredir** contra o baseline da fase anterior. Se regredir, o sistema novo está consumindo tempo de agente sem orçamento.
+- **Nenhum sistema novo pode desviar mão de obra sem passar por um orçamento** (`canDevelop` ou equivalente).
+- Todo sistema que sorteia usa **rng própria** (`${seed}-nome`), senão A/B com a mesma seed deixa de ser comparável.
+- O jogo continua sem build step, JS vanilla, Canvas 2D. **Adaptações obrigatórias da `pesquisawolrd.md`**, que é escrita pra Unity/C#: `ScriptableObject` → módulo de dados JS puro; DOTS/ECS/`NativeArray` → *Structure of Arrays* com `TypedArray`; Burst/Job System → sem equivalente (Web Worker é o análogo, mas só se medir necessidade); `[Flags] Enum` → bitmask com inteiros.
+
+---
+
 ## Como usar esta lista
 
 A Parte 1 é o registro histórico completo — não deveria precisar mudar, só crescer conforme novas fatias forem fechadas (mova o item daqui pra Parte 1 quando implementado e testado). A Parte 2 é o backlog vivo — prioridades devem ser decididas em conversa, não assumidas por ordem de aparição aqui. Este arquivo não substitui `STATUS.md` (snapshot da sessão mais recente, com bugs/decisões técnicas específicas) nem `DESIGN.md` (design vivo, com o raciocínio por trás de cada decisão) — é só o mapa de tudo junto, pra não perder o fio de nada.
