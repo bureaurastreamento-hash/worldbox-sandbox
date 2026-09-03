@@ -10,6 +10,7 @@
 // isso mudar, getClanVillage precisa virar getClanVillages (agregando).
 
 import { getStance, setStance } from './clan.js';
+import { getAgent } from '../world/world.js';
 import { proposeTreaty, signTreaty, hasTreaty, breakTreaty } from './diplomacy.js';
 import { pushEvent } from '../world/eventLog.js';
 import {
@@ -51,7 +52,7 @@ function isClanAtWar(clan) {
 // construir — muda o bônus de score em fight/raid, o sprite, e a reação a
 // predador. Em guerra a fração sobe pra WARRIOR_ROLE_FRACTION.
 function updateWarriorRoles(village, world, atWar) {
-  const members = village.population.map((id) => world.agents.find((a) => a.id === id)).filter((a) => a?.alive);
+  const members = village.population.map((id) => getAgent(world, id)).filter((a) => a?.alive);
   const eligible = members.filter((a) => a.lifeStage !== 'child');
 
   // Criança nunca é guerreiro, nem que tenha sido promovida antes de crescer

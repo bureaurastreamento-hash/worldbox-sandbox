@@ -35,6 +35,27 @@ export function getTileAt(world, tx, ty) {
   return world.tiles[ty][tx];
 }
 
+// Índice de agente por id, reconstruído uma vez por tick (main.js).
+//
+// Sem ele, `world.agents.find(a => a.id === id)` aparecia dentro de laços por
+// vila, por clã e por predador — ou seja O(n) DENTRO de um laço O(n), o que
+// torna o tick inteiro O(n²). Com dezenas de agentes ninguém percebia; com
+// centenas é o gargalo dominante, e era o principal impedimento pra escalar.
+export function rebuildAgentIndex(world) {
+  const byId = new Map();
+  for (const agent of world.agents) byId.set(agent.id, agent);
+  world.agentsById = byId;
+  return byId;
+}
+
+// O fallback pro `find` linear não é preciosismo: `lifecycle.js:tryReproduce`
+// insere agentes no meio do tick, depois do índice ter sido construído, e um
+// recém-nascido precisa ser encontrável no mesmo tick em que nasceu.
+export function getAgent(world, id) {
+  if (id === null || id === undefined) return null;
+  return world.agentsById?.get(id) ?? world.agents.find((a) => a.id === id) ?? null;
+}
+
 export function getVillage(world, villageId) {
   return world.villages.find((v) => v.id === villageId) ?? null;
 }

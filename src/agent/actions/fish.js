@@ -34,13 +34,13 @@ export function score(agent, world) {
   if (agent.carrying >= CARRY_CAPACITY) return 0; // só solta a ação com a carga cheia; ver gather.js pro porquê do `>= CARRY_CAPACITY` (não `> 0`)
   const village = getVillage(world, agent.villageId);
   if (!village) return 0;
-  const known = recallNearest(agent.memory, agent.position, isSafeWater(world, agent), avoid(agent, world));
+  const known = recallNearest(agent.memory, agent.position, isSafeWater(world, agent), avoid(agent, world), TILE_TYPES.WATER);
   if (!known) return 0;
   return (village.demand.food ?? 0) * FISH_SCORE_WEIGHT;
 }
 
 function findFishTile(agent, world) {
-  const entry = recallNearest(agent.memory, agent.position, isSafeWater(world, agent), avoid(agent, world));
+  const entry = recallNearest(agent.memory, agent.position, isSafeWater(world, agent), avoid(agent, world), TILE_TYPES.WATER);
   if (!entry) return null;
   // Reserva o tile de ÁGUA, não o ponto de pesca na margem: dois pescadores
   // podem ficar em margens diferentes, mas o pesqueiro é o disputado.

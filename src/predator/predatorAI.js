@@ -26,7 +26,7 @@ import {
   PREDATOR_HEALTH_REGEN_PER_SEC,
 } from '../utils/constants.js';
 import { pushEvent } from '../world/eventLog.js';
-import { getVillage } from '../world/world.js';
+import { getVillage, getAgent } from '../world/world.js';
 import { SPECIES_LABEL } from './predator.js';
 
 const LEASH_RADIUS_PX = PREDATOR_LEASH_RADIUS_TILES * TILE_SIZE;
@@ -56,7 +56,7 @@ function pickTarget(predator, world, stats) {
   // já tem alvo? mantém se ainda vivo e o alvo continua dentro da leash
   // (medida a partir do spawnAnchor do predador, não da posição dele agora).
   if (predator.targetAgentId) {
-    const current = world.agents.find((a) => a.id === predator.targetAgentId && a.alive);
+    const current = ((t) => (t?.alive ? t : null))(getAgent(world, predator.targetAgentId));
     if (current && distance(current.position, predator.spawnAnchor) <= LEASH_RADIUS_PX) return current;
   }
 
@@ -143,7 +143,7 @@ function stepFlee(predator, world, dt) {
 }
 
 function stepChaseOrAttack(predator, world, dt, stats) {
-  const target = world.agents.find((a) => a.id === predator.targetAgentId && a.alive);
+  const target = ((t) => (t?.alive ? t : null))(getAgent(world, predator.targetAgentId));
   if (!target) return; // sumiu; próxima reconsideração resolve
 
   const d = distance(predator.position, target.position);

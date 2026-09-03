@@ -8,7 +8,6 @@
 import { ACTION_TYPES } from './actions/actionTypes.js';
 import { BASE_SCORE as WANDER_BASE_SCORE } from './actions/wander.js';
 
-const RECONSIDER_INTERVAL = 0.5;
 const INTERRUPT_MARGIN = 0.15;
 
 function highestScoring(scores) {
@@ -19,7 +18,10 @@ function highestScoring(scores) {
   return best;
 }
 
-function reconsider(agent, world) {
+// Reavalia todas as candidatas e possivelmente troca a ação corrente. É a
+// parte CARA do ciclo (pontua ~15 ações), e por isso quem decide QUANDO ela
+// roda é o escalonador (simulation/scheduler.js), não este módulo.
+export function reconsider(agent, world) {
   const scores = {};
   for (const type of Object.keys(ACTION_TYPES)) {
     scores[type] = ACTION_TYPES[type].score(agent, world);
@@ -59,13 +61,10 @@ function reconsider(agent, world) {
   }
 }
 
-export function updateDecision(agent, world, dt) {
-  agent.decisionTimer -= dt;
-  if (agent.decisionTimer <= 0) {
-    agent.decisionTimer += RECONSIDER_INTERVAL;
-    reconsider(agent, world);
-  }
-
+// Executa um passo da ação já escolhida. É a parte BARATA, e roda todo frame
+// pra todo agente vivo — é o que faz o movimento continuar suave mesmo nos
+// frames em que o agente não reconsidera nada.
+export function stepAction(agent, world, dt) {
   const action = ACTION_TYPES[agent.currentAction];
   if (action) action.step(agent, world, dt);
 }

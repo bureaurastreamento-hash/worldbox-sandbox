@@ -1,4 +1,4 @@
-import { createWorld, findSpawnTile, findWalkableNear, getVillage } from './world/world.js';
+import { createWorld, findWalkableNear, getVillage, rebuildAgentIndex } from './world/world.js';
 import { generateDecorations } from './world/decorations.js';
 import { spawnPredators } from './predator/predator.js';
 import { updatePredator } from './predator/predatorAI.js';
@@ -14,13 +14,8 @@ import { createAgent } from './agent/agent.js';
 import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
-import { updateDecision } from './agent/decision.js';
-import {
-  classifyAgents,
-  stepBackgroundAgent,
-  feedBackgroundVillage,
-  produceBackgroundVillage,
-} from './simulation/lod.js';
+import { reconsider, stepAction } from './agent/decision.js';
+import { createCognitionBudget, dueForCognition } from './simulation/scheduler.js';
 import { applySeparation } from './agent/separation.js';
 import { updateStuck } from './agent/stuck.js';
 import { ageAgent, checkDeath, updateVillageReproduction, updateHungerWarning, pruneDead } from './lifecycle/lifecycle.js';
@@ -40,8 +35,6 @@ import {
   AGENT_COUNT,
   FOUNDER_AGE,
   VILLAGE_COUNT,
-  SECOND_VILLAGE_MIN_DIST,
-  SECOND_VILLAGE_MAX_DIST,
   CLAN_COLORS,
   INITIAL_STANCE_WEIGHTS,
   NEUTRAL_TRADE_TREATY_CHANCE,
@@ -105,23 +98,48 @@ const specializations = [];
 for (let i = 0; i < VILLAGE_COUNT; i++) specializations.push(i % 2 === 0 ? 'food' : 'wood');
 world.rng.shuffle(specializations);
 
-// A 1ª vila nasce perto do centro do mapa; as demais espalhadas em ângulos
-// uniformes ao redor dela (com jitter), pra não ficarem todas do mesmo lado.
-const firstSpawn = findSpawnTile(world);
+// Vilas distribuídas numa GRADE com jitter, cobrindo o mapa inteiro.
+//
+// Substituiu o anel: as vilas nasciam todas num raio de 70-100 tiles em volta
+// da primeira, o que funcionava pra 4 mas não tem onde colocar 36 — e deixava
+// o resto do mapa permanentemente vazio. A grade escala com VILLAGE_COUNT
+// sozinha, mantém um espaçamento previsível (o lado da célula) e ainda parece
+// orgânica por causa do jitter dentro de cada célula.
+//
+// A 1ª vila continua a mais próxima do centro do mapa: é onde a câmera abre.
+const cols = Math.ceil(Math.sqrt(VILLAGE_COUNT));
+const rows = Math.ceil(VILLAGE_COUNT / cols);
+const cellW = world.width / cols;
+const cellH = world.height / rows;
+
+const slots = [];
+for (let row = 0; row < rows; row++) {
+  for (let col = 0; col < cols; col++) {
+    if (slots.length >= VILLAGE_COUNT) break;
+    // Jitter só no miolo da célula (20%-80%): encostar na borda aproximaria
+    // duas vilas vizinhas mais do que o espaçamento da grade promete.
+    const tx = Math.round((col + world.rng.range(0.2, 0.8)) * cellW);
+    const ty = Math.round((row + world.rng.range(0.2, 0.8)) * cellH);
+    slots.push({
+      tx: clamp(tx, 8, world.width - 9),
+      ty: clamp(ty, 8, world.height - 9),
+    });
+  }
+}
+
+// Ordena pela distância ao centro só pra decidir quem é a "Vila 1" (a que a
+// câmera enquadra na abertura) — a posição de cada uma já está sorteada.
+const centerTx = world.width / 2;
+const centerTy = world.height / 2;
+slots.sort(
+  (a, b) => (a.tx - centerTx) ** 2 + (a.ty - centerTy) ** 2 - ((b.tx - centerTx) ** 2 + (b.ty - centerTy) ** 2),
+);
+
 const villages = [];
 const clans = [];
 
 for (let i = 0; i < VILLAGE_COUNT; i++) {
-  let tx, ty;
-  if (i === 0) {
-    tx = firstSpawn.tx;
-    ty = firstSpawn.ty;
-  } else {
-    const angle = ((i - 1) / (VILLAGE_COUNT - 1)) * Math.PI * 2 + world.rng.range(-0.3, 0.3);
-    const dist = world.rng.range(SECOND_VILLAGE_MIN_DIST, SECOND_VILLAGE_MAX_DIST);
-    tx = clamp(Math.round(firstSpawn.tx + Math.cos(angle) * dist), 8, world.width - 9);
-    ty = clamp(Math.round(firstSpawn.ty + Math.sin(angle) * dist), 8, world.height - 9);
-  }
+  const { tx, ty } = slots[i];
 
   const village = spawnVillage({
     id: `village-${i + 1}`,
@@ -212,6 +230,10 @@ function simulationUpdate(dt) {
     if (dt <= 0) return;
     world.elapsedSeconds += dt;
 
+    // Antes de qualquer laço por vila/clã: eles procuram agentes por id, e sem
+    // índice isso é O(n) dentro de O(n). Ver world/world.js:rebuildAgentIndex.
+    rebuildAgentIndex(world);
+
     for (const v of world.villages) {
       computeDemand(v);
       updateDistress(v, dt);
@@ -229,14 +251,16 @@ function simulationUpdate(dt) {
     updateTrade(world, dt);
 
     world.spatialIndex = buildSpatialIndex(world.agents);
-    const { active, background } = classifyAgents(world, camera, canvas.width, canvas.height);
 
-    for (const agent of active) {
-      scanPerception(agent, world);
-      for (const tile of agent.perception.tiles) {
-        remember(agent.memory, tile);
-      }
-      decayMemory(agent.memory, dt);
+    // UM laço, sobre TODO agente vivo — a câmera não decide mais quem existe.
+    // O que era caro (percepção, memória, pontuar as ações) acontece só
+    // quando o agente reconsidera; o resto é todo frame pra todo mundo. Ver
+    // simulation/scheduler.js.
+    const budget = createCognitionBudget(world.agents.length, dt);
+    const alive = [];
+
+    for (const agent of world.agents) {
+      if (!agent.alive) continue;
 
       const village = getVillage(world, agent.villageId);
       updateNeeds(agent.needs, village?.inChaos ? dt * CHAOS_NEEDS_DECAY_MULTIPLIER : dt);
@@ -244,38 +268,34 @@ function simulationUpdate(dt) {
       checkDeath(agent, world, dt);
       if (!agent.alive) continue;
 
-      updateDecision(agent, world, dt);
+      if (dueForCognition(agent, dt, budget)) {
+        scanPerception(agent, world);
+        for (const tile of agent.perception.tiles) {
+          remember(agent.memory, tile);
+        }
+        // Recebe o tempo acumulado desde a última cognição, não o `dt` do
+        // frame: o decaimento tem que depender do tempo passado, não da
+        // frequência com que este bloco é chamado.
+        decayMemory(agent.memory, agent.timeSinceCognition);
+        agent.timeSinceCognition = 0;
+        reconsider(agent, world);
+      }
+
+      stepAction(agent, world, dt);
       // Depois da ação, não antes: mede o resultado do passo que acabou de
       // rodar. Cancela o alvo e marca o tile como sem-saída se o agente ficar
       // parado sem progredir em nada (ver agent/stuck.js).
       updateStuck(agent, world, dt);
+      alive.push(agent);
     }
 
-    applySeparation(
-      active.filter((a) => a.alive),
-      dt,
-    );
+    applySeparation(alive, dt);
 
     for (const predator of world.predators) {
       updatePredator(predator, world, dt);
     }
 
-    const backgroundByVillage = new Map();
-    for (const agent of background) {
-      stepBackgroundAgent(agent, dt);
-      ageAgent(agent, dt);
-      checkDeath(agent, world, dt);
-      if (!agent.alive) continue;
-      if (!backgroundByVillage.has(agent.villageId)) backgroundByVillage.set(agent.villageId, []);
-      backgroundByVillage.get(agent.villageId).push(agent);
-    }
-
     for (const v of world.villages) {
-      const residents = backgroundByVillage.get(v.id);
-      if (residents) {
-        produceBackgroundVillage(v, residents, dt);
-        feedBackgroundVillage(v, residents, dt);
-      }
       updateExpedition(world, v, dt);
       updateVillageReproduction(v, world, dt);
       updateHungerWarning(v, world);

@@ -33,7 +33,7 @@ import {
   EXPEDITION_JOIN_RADIUS_TILES,
   EXPEDITION_FORMATION_RADIUS,
 } from '../utils/constants.js';
-import { findWalkableNear } from '../world/world.js';
+import { findWalkableNear, getAgent } from '../world/world.js';
 import { distance } from '../utils/mathUtils.js';
 import { reportDiscoveries } from './knowledge.js';
 import { hasFoodSurplus, canDevelop } from './stock.js';
@@ -196,7 +196,7 @@ export function updateExpedition(world, village, dt) {
   exp.elapsed += dt;
 
   const members = exp.memberIds
-    .map((id) => world.agents.find((a) => a.id === id))
+    .map((id) => getAgent(world, id))
     .filter((a) => a?.alive);
 
   // Teto de duração: um alvo que virou inalcançável (ilha, cordilheira
@@ -237,7 +237,7 @@ export function updateExpedition(world, village, dt) {
 // ordem da expedição.
 function prune(world, village, exp) {
   exp.memberIds = exp.memberIds.filter((id) => {
-    const agent = world.agents.find((a) => a.id === id);
+    const agent = getAgent(world, id);
     if (!agent || !agent.alive || agent.currentAction !== 'explore') {
       if (agent) agent.expeditionVillageId = null;
       return false;

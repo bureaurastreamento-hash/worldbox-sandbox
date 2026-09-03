@@ -39,6 +39,11 @@ export function createAgent({
     currentAction: null,
     lastScores: null, // snapshot dos scores da última reconsideração (decision.js), pra ui/inspector.js
     decisionTimer, // jitter por agente para não recalcular todos no mesmo tick
+    // Tempo simulado acumulado desde a última cognição. O decaimento de
+    // memória recebe ISTO, não o dt do frame — senão esquecer passaria a
+    // depender da frequência com que o agente é escalonado
+    // (simulation/scheduler.js), e não do tempo que de fato passou.
+    timeSinceCognition: 0,
     age,
     lifeStage: 'child', // corrigido pelo primeiro ageAgent() do tick, ver lifecycle.js
     alive: true,

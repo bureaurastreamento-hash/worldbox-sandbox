@@ -28,13 +28,13 @@ export function score(agent, world) {
   if (agent.carrying >= CARRY_CAPACITY) return 0; // só solta a ação com a carga cheia; ver gather.js pro porquê do `>= CARRY_CAPACITY` (não `> 0`)
   const village = getVillage(world, agent.villageId);
   if (!village || village.specialization !== 'wood') return 0; // vila agrícola não colhe madeira
-  const known = recallNearest(agent.memory, agent.position, isSafeForest(world, agent), avoid(agent, world));
+  const known = recallNearest(agent.memory, agent.position, isSafeForest(world, agent), avoid(agent, world), TILE_TYPES.FOREST);
   if (!known) return 0;
   return (village.demand.wood ?? 0) * GATHER_SCORE_WEIGHT;
 }
 
 function findGatherTile(agent, world) {
-  const entry = recallNearest(agent.memory, agent.position, isSafeForest(world, agent), avoid(agent, world));
+  const entry = recallNearest(agent.memory, agent.position, isSafeForest(world, agent), avoid(agent, world), TILE_TYPES.FOREST);
   if (!entry) return null;
   // Reserva na hora de escolher: é o que impede o próximo agente a decidir de
   // mirar esta mesma árvore.

@@ -231,7 +231,7 @@ Medido nesta sessão: com **todos** os ~54 agentes ativos, 180s simulados levam 
 
 | # | Fase | Por que aqui |
 |---|---|---|
-| **A** | **Escala e LOD** — time-slicing, simulação zoom-agnóstica, LOD de render por zoom, pooling | Pré-requisito de tudo: sem margem de CPU e sem mais agentes, todo sistema novo colapsa a economia (§3.2). Também resolve a contradição do §3.3 e já entrega ganho visível (mapa inteiro vivo). |
+| **A** | **Escala e LOD** — time-slicing ✅, simulação zoom-agnóstica ✅, world-gen em grade ✅, índices ✅ · LOD de render por zoom ⬜, pooling ⬜ | Pré-requisito de tudo: sem margem de CPU e sem mais agentes, todo sistema novo colapsa a economia (§3.2). Também resolve a contradição do §3.3 e já entrega ganho visível (mapa inteiro vivo). **Parcialmente entregue — ver §3.6.** |
 | **B** | **Neurônios + traços** — `canFire`, faixas de prioridade, pesos, `NeuronModifier`, `agent.traits` | Traços e neurônios são o mesmo sistema visto de dois lados: um traço *é* um modificador de neurônio. Fazer junto evita refazer `decision.js` duas vezes. Barato em CPU. |
 | **C** | **Navegação** — HPA*, flow fields, pushing anti-preso | Depende de chunks (fase A). Flow fields só valem a pena quando houver movimento em massa (migração, fase E). |
 | **D** | **Genética** — cromossomos, alelos, sinergia, herança, mutação | Depende de traços (fase B) pra ter o que herdar. |
@@ -241,6 +241,24 @@ Medido nesta sessão: com **todos** os ~54 agentes ativos, 180s simulados levam 
 | **H** | **Diplomacia e plots** — opinião numérica, planos com pré-requisitos, IA geopolítica | Fórmulas diretas sobre F. É o "caos" pedido, e chega por último porque é o mais dependente. |
 
 O "jogo parado" que o usuário relata é atacado principalmente por **E, G e H** — mas nenhuma delas se sustenta sem **A** e **F**.
+
+### 3.6 Fase A — o que foi entregue e o que falta
+
+**Entregue e medido:**
+
+- **LOD de simulação por viewport REMOVIDO** (`simulation/lod.js` deletado). A câmera não decide mais quem existe: todo agente é simulado a plena fidelidade sempre. Isso também apagou a simulação agregada de vilas fora de tela (`feedBackgroundVillage`/`produceBackgroundVillage`), que era uma segunda física paralela e uma fonte crônica de divergência.
+- **Time-slicing de cognição** (`simulation/scheduler.js`). O caro (percepção, memória, pontuar ~15 ações) roda só na reconsideração; o barato (needs, envelhecer, passo da ação, travamento) roda todo frame pra todo mundo. A percepção era o desperdício principal — varria ~450 tiles por agente **por frame** pra usar o resultado uma vez a cada 0.5s.
+- **Fatia derivada do relógio SIMULADO, não do frame**, e o teto por frame acompanha o `dt`. Sem isso o comportamento mudaria com o framerate e com o multiplicador de velocidade (em 4x os agentes pensariam menos).
+- **Três índices que eram O(n²)**: `world.agentsById` (havia `world.agents.find` dentro de laços por vila/clã/predador), `agent.memory.byType` (`recallNearest` varria a memória inteira ~7x por reconsideração), e índice espacial próprio pra `separation` (era O(n²) sobre todos os vivos).
+- **`checkDeath` não procura ameaça com vida cheia** — não há o que regenerar, e eram duas varreduras por agente por frame gastas à toa.
+- **World-gen em grade com jitter** — o anel de 70-100 tiles em volta da primeira vila não tinha onde colocar mais que umas poucas, e deixava o resto do mapa vazio pra sempre.
+- **`VILLAGE_COUNT` 4 → 20** (~250 agentes), medido estável em 600s: 262 → 258 → 249 moradores, 4 de 20 vilas extintas. Simulação a **2.72ms/frame** contra um orçamento de 16.7ms; **179 FPS ao vivo**.
+
+**O que falta pra fechar a fase (e é o que destrava o alvo de 500):**
+
+- **LOD de RENDERIZAÇÃO por zoom** — não existe: o jogo desenha todo agente com sprite completo em qualquer zoom. Com 36 vilas (~450 agentes) a simulação ainda cabe (13.3ms), mas não sobra nada pra renderização e a aba fica sem resposta. É o próximo passo imediato.
+- **Object pooling** além de partículas.
+- **Estrutura de chunks com portais** (preparação pra HPA*, Fase C).
 
 ### 3.5 Critérios de aceite transversais
 

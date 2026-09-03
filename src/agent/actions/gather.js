@@ -35,13 +35,13 @@ export function score(agent, world) {
   if (agent.carrying >= CARRY_CAPACITY) return 0;
   const village = getVillage(world, agent.villageId);
   if (!village || village.specialization !== 'food') return 0; // vila madeireira não colhe comida
-  const known = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent), avoid(agent, world));
+  const known = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent), avoid(agent, world), TILE_TYPES.GRASS);
   if (!known) return 0;
   return (village.demand.food ?? 0) * GATHER_SCORE_WEIGHT;
 }
 
 function findGatherTile(agent, world) {
-  const entry = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent), avoid(agent, world));
+  const entry = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent), avoid(agent, world), TILE_TYPES.GRASS);
   if (!entry) return null;
   // Reserva na hora de escolher: é o que impede o próximo agente a decidir de
   // mirar este mesmo tile.

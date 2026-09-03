@@ -1,4 +1,5 @@
 import { clamp } from '../utils/mathUtils.js';
+import { getAgent } from '../world/world.js';
 import {
   TRADE_DEFICIT_DEMAND_MIN,
   DISTRESS_CHAOS_THRESHOLD_SECONDS,
@@ -46,7 +47,7 @@ export const DEVELOPMENT_ACTIONS = ['explore', 'mine', 'build', 'patrol'];
 export function countDevelopmentWorkers(village, world) {
   let n = 0;
   for (const id of village.population) {
-    const agent = world.agents.find((a) => a.id === id);
+    const agent = getAgent(world, id);
     if (agent?.alive && DEVELOPMENT_ACTIONS.includes(agent.currentAction)) n++;
   }
   village.devWorkers = n;

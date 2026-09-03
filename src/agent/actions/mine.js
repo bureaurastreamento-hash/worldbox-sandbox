@@ -45,7 +45,7 @@ function isSafeDeposit(world, agent, resource) {
 // O quadro é o fallback — sem ele, cada morador teria que redescobrir
 // sozinho a mesma cordilheira, e a maioria nunca descobria.
 function findDeposit(agent, world, village, resource) {
-  const own = recallNearest(agent.memory, agent.position, isSafeDeposit(world, agent, resource), avoid(agent, world));
+  const own = recallNearest(agent.memory, agent.position, isSafeDeposit(world, agent, resource), avoid(agent, world), TILE_TYPES.MOUNTAIN);
   if (own) return own;
 
   const told = recallVillageSite(village, resource, agent.position, (s) =>

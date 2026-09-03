@@ -4,6 +4,7 @@ import { addResident, getPopulationCap } from '../village/village.js';
 import { findNearestEnemy } from '../combat/combat.js';
 import { findNearestPredator } from '../combat/predatorCombat.js';
 import { releaseClaim } from '../world/claims.js';
+import { getAgent } from '../world/world.js';
 import { SPECIES_LABEL } from '../predator/predator.js';
 import { pushEvent } from '../world/eventLog.js';
 import {
@@ -34,6 +35,12 @@ export function checkDeath(agent, world, dt) {
 
   if (agent.needs.hunger <= 0) {
     agent.health = clamp(agent.health - STARVE_HEALTH_DRAIN_PER_SEC * dt, 0, 100);
+  } else if (agent.health >= 100) {
+    // Vida cheia: não há o que regenerar, então nem vale procurar ameaça.
+    // As duas buscas abaixo custam uma varredura de predadores e da percepção
+    // POR AGENTE POR FRAME, e a esmagadora maioria dos agentes está com vida
+    // cheia na maior parte do tempo — era o segundo maior custo do tick
+    // (medido: 2.2ms com 324 agentes) gasto quase inteiramente à toa.
   } else if (!findNearestEnemy(agent, world) && !findNearestPredator(agent, world)) {
     // sem isso, a regeneração desfaria o dano de combate (ou de predador)
     // no próximo tick (checkDeath roda antes de fight.js/predatorAI.js
@@ -121,7 +128,7 @@ export function updateVillageReproduction(village, world, dt) {
   if ((village.demand.food ?? 0) > REPRO_FOOD_DEMAND_MAX) return;
 
   const eligible = village.population
-    .map((id) => world.agents.find((a) => a.id === id))
+    .map((id) => getAgent(world, id))
     .filter((a) => a && canReproduce(a));
 
   if (eligible.length < REPRO_MIN_ADULTS) return;
@@ -144,7 +151,7 @@ export function updateVillageReproduction(village, world, dt) {
 // histerese (village.hungerWarningActive) pra disparar só na transição, não
 // a cada tick enquanto a vila segue abaixo do limiar.
 export function updateHungerWarning(village, world) {
-  const residents = village.population.map((id) => world.agents.find((a) => a.id === id)).filter((a) => a?.alive);
+  const residents = village.population.map((id) => getAgent(world, id)).filter((a) => a?.alive);
   if (residents.length === 0) return;
 
   const avgHunger = residents.reduce((sum, a) => sum + a.needs.hunger, 0) / residents.length;

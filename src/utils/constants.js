@@ -29,6 +29,18 @@ export const SEPARATION_STRENGTH = 30; // px/s de empurrão no pico de sobreposi
 // outro recurso) explorando.
 export const PERCEPTION_RADIUS = 12; // tiles
 
+// Intervalo de tempo SIMULADO entre reconsiderações de um agente. Antes vivia
+// privado em agent/decision.js; virou constante compartilhada quando o
+// escalonamento de cognição (simulation/scheduler.js) passou a ser quem
+// decide quando o ciclo caro roda.
+export const RECONSIDER_INTERVAL = 0.5;
+
+// Teto de agentes que podem fazer o ciclo caro (percepção + memória +
+// pontuar as ações) no MESMO frame, como fração do total. Válvula de
+// segurança contra picos, não o mecanismo principal: `decisionTimer` já nasce
+// com jitter e espalha as fases sozinho. Ver simulation/scheduler.js.
+export const MAX_COGNITION_FRACTION = 0.15;
+
 // 5 (original) provou ser pouca gente pra cobrir sobrevivência + economia +
 // reprodução ao mesmo tempo, especialmente com minério universal e
 // diplomacia dinâmica competindo por atenção — testado e confirmado
@@ -397,7 +409,25 @@ export const VILLAGE_POP_CAP = 30;
 
 export const TERRITORY_RADIUS = 10; // tiles
 
-export const VILLAGE_COUNT = 4; // total de vilas/clãs no mundo (1 vila por clã)
+// Fase A (escala): 4 -> 20. Com a população de equilíbrio medida em ~12-13
+// por vila, 20 vilas dão ~250 agentes.
+//
+// 36 (~450 agentes) foi testado e a SIMULAÇÃO aguenta (13.3ms/frame contra um
+// orçamento de 16.7ms), mas aí não sobra nada pra renderização — ao vivo a
+// aba fica sem resposta. Subir daqui depende do LOD de RENDERIZAÇÃO por zoom,
+// que ainda não existe: hoje o jogo desenha todo agente com sprite completo
+// em qualquer zoom. Esse é o próximo passo da Fase A, e é o que destrava o
+// alvo de 500.
+//
+// Não dá pra chegar lá engordando a vila em vez de multiplicá-la: o equilíbrio
+// por vila é fixado pelas taxas de nascimento/morte e pela economia, não pelo
+// teto (ver VILLAGE_POP_CAP). Mais vilas também é o que torna território,
+// migração e diplomacia interessantes — com 4 clãs o mapa é um tabuleiro
+// pequeno demais pra qualquer geopolítica.
+//
+// A colocação passou de anel pra grade com jitter (main.js) — o anel só sabia
+// posicionar poucas vilas em volta da primeira.
+export const VILLAGE_COUNT = 20; // total de vilas/clãs no mundo (1 vila por clã)
 // Distância de cada vila (exceto a primeira, que nasce perto do centro do
 // mapa) até o centro — espalhadas em ângulos uniformes ao redor da 1ª,
 // com jitter. Não existe mais distância especial pra pares destinados à
