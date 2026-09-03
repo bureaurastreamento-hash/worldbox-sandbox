@@ -366,6 +366,31 @@ export const PARTNER_SWITCH_MARGIN = 0.2;
 // com um pequeno bônus de prioridade pra combate/saque (ver
 // WARRIOR_ROLE_SCORE_BONUS). Reverte pra civil quando a paz volta.
 export const WARRIOR_ROLE_FRACTION = 0.3;
+
+// Fração de adultos que permanece guerreiro EM TEMPO DE PAZ (com piso de 1
+// por vila). Antes era zero implícito: a paz revertia todo mundo pra
+// 'civilian', e o mundo passava a maior parte do tempo sem nenhum guerreiro
+// — o jogador nunca via um soldado, e, pior, nenhum predador era enfrentado
+// por ninguém (fightPredator.js exige role === 'warrior'; civil só foge).
+// Ver o comentário longo em clan/clanDecision.js:updateWarriorRoles.
+export const WARRIOR_GARRISON_FRACTION = 0.15;
+
+// Patrulha (agent/actions/patrol.js). A primeira versão ficava logo acima de
+// wander (0.05), na ideia de que patrulhar substituiria o ÓCIO do guerreiro
+// sem custar economia. Medido: nunca rodou uma única vez — os agentes nunca
+// ficam ociosos (numa amostragem de 180s, `wander` não aparece nenhuma vez;
+// sempre há colher, comer, dormir ou entregar pontuando mais). Pontuar acima
+// do ócio, num mundo sem ócio, é pontuar zero.
+//
+// Com 0.45 fica ABAIXO de gather quando a vila precisa mesmo de comida
+// (0.55 x demanda alta) e ACIMA dele quando a demanda está moderada. O
+// comportamento que emerge disso é o certo: a guarnição vai pra roça quando
+// aperta e volta a rondar o perímetro quando a vila está confortável.
+export const PATROL_SCORE = 0.45;
+// Quão longe do centro o guerreiro ronda, como fração de TERRITORY_RADIUS.
+// Perto do limite do território de propósito: o ponto é cruzar com quem se
+// aproxima antes de chegar nas casas.
+export const PATROL_RADIUS_FRACTION = 0.8;
 // Somado a FIGHT_SCORE/RAID_SCORE só pra quem tem role 'warrior' — pequeno
 // de propósito, é prioridade extra pra quem já foi designado, não uma
 // reescrita do equilíbrio entre economia e combate (RAID_SCORE já fica

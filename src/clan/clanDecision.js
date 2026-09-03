@@ -19,6 +19,7 @@ import {
   TRADE_SURPLUS_DEMAND_MAX,
   PARTNER_SWITCH_MARGIN,
   WARRIOR_ROLE_FRACTION,
+  WARRIOR_GARRISON_FRACTION,
 } from '../utils/constants.js';
 
 function getClanVillage(world, clan) {
@@ -30,25 +31,52 @@ function isClanAtWar(clan) {
 }
 
 // Atribui/revoga agent.role = 'warrior' pra uma fração dos adultos elegíveis
-// da vila — ver WARRIOR_ROLE_FRACTION. Chamado nas transições de postura
-// (escalar pra guerra / voltar pra paz) e a cada reconsideração enquanto a
-// guerra continua (topa quem cresceu — filho virou adulto — sem mexer em
-// quem já é guerreiro, evitando flicker de papel a cada chamada).
+// da vila. Chamado a cada reconsideração do clã, em guerra ou em paz.
+//
+// EM PAZ TAMBÉM EXISTE GUERREIRO, e isso é uma correção, não uma feature
+// nova. Antes, a paz revertia TODO mundo pra 'civilian', então o mundo
+// passava a maior parte do tempo com zero guerreiros. Duas consequências,
+// nenhuma delas intencional:
+//   - o jogador simplesmente nunca via um soldado (reportado jogando);
+//   - NINGUÉM NUNCA ENFRENTAVA PREDADOR. agent/actions/fightPredator.js
+//     exige role === 'warrior'; civil só tem fleePredator. Sem guerra de
+//     clã, os 24 predadores do mapa eram literalmente incontestados — matavam
+//     moradores e nada respondia. Efeito colateral de amarrar o papel só à
+//     guerra, não uma decisão de design (DESIGN.md §9 descreve o papel como
+//     emergente pela "demanda de defesa da vila", e predador é demanda de
+//     defesa).
+//
+// A guarnição de paz é pequena (WARRIOR_GARRISON_FRACTION, com piso de 1) e
+// custa quase nada em economia: `role` não impede ninguém de colher ou
+// construir — muda o bônus de score em fight/raid, o sprite, e a reação a
+// predador. Em guerra a fração sobe pra WARRIOR_ROLE_FRACTION.
 function updateWarriorRoles(village, world, atWar) {
   const members = village.population.map((id) => world.agents.find((a) => a.id === id)).filter((a) => a?.alive);
+  const eligible = members.filter((a) => a.lifeStage !== 'child');
 
-  if (!atWar) {
-    for (const agent of members) agent.role = 'civilian';
+  // Criança nunca é guerreiro, nem que tenha sido promovida antes de crescer
+  // ao contrário (não acontece hoje, mas o invariante é barato de manter).
+  for (const agent of members) {
+    if (agent.lifeStage === 'child') agent.role = 'civilian';
+  }
+
+  const fraction = atWar ? WARRIOR_ROLE_FRACTION : WARRIOR_GARRISON_FRACTION;
+  const target = eligible.length === 0 ? 0 : Math.max(1, Math.round(eligible.length * fraction));
+
+  const warriors = eligible.filter((a) => a.role === 'warrior');
+
+  // Desmobiliza o excedente ao voltar da guerra: a guarnição de paz é menor
+  // que o efetivo de guerra, então sobra gente. Sem isso, uma vila que
+  // guerreou uma vez ficaria com efetivo de guerra pra sempre.
+  if (warriors.length > target) {
+    for (const agent of warriors.slice(target)) agent.role = 'civilian';
     return;
   }
 
-  const eligible = members.filter((a) => a.lifeStage !== 'child');
-  const target = Math.round(eligible.length * WARRIOR_ROLE_FRACTION);
-  const alreadyWarriors = eligible.filter((a) => a.role === 'warrior').length;
-  if (alreadyWarriors >= target) return;
-
+  // Não mexe em quem já é guerreiro (evita flicker de papel a cada chamada);
+  // só completa o efetivo com quem cresceu ou nasceu desde a última vez.
   const candidates = world.rng.shuffle(eligible.filter((a) => a.role !== 'warrior'));
-  for (let i = 0; i < candidates.length && alreadyWarriors + i < target; i++) {
+  for (let i = 0; i < candidates.length && warriors.length + i < target; i++) {
     candidates[i].role = 'warrior';
   }
 }
@@ -192,6 +220,11 @@ export function updateClanDecision(clan, world, dt) {
 
   const village = getClanVillage(world, clan);
   if (!village || village.population.length === 0) return; // vila extinta não decide nada (ver reconsiderRelationship)
+
+  // Efetivo militar é reavaliado SEMPRE, não só nas transições de postura —
+  // é o que mantém a guarnição de paz existindo e absorve quem nasceu ou
+  // virou adulto desde a última reconsideração.
+  updateWarriorRoles(village, world, isClanAtWar(clan));
 
   for (const other of world.clans) {
     if (other.id === clan.id) continue;

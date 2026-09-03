@@ -1,5 +1,6 @@
 import * as wander from './wander.js';
 import * as explore from './explore.js';
+import * as patrol from './patrol.js';
 import * as eat from './eat.js';
 import * as sleep from './sleep.js';
 import * as gather from './gather.js';
@@ -19,6 +20,7 @@ import * as fleePredator from './fleePredator.js';
 export const ACTION_TYPES = {
   wander,
   explore,
+  patrol,
   eat,
   sleep,
   gather,
