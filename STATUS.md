@@ -2,15 +2,28 @@
 
 Snapshot do estado atual. Sessão iniciada depois da pausa registrada em `1561b59`. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Commits desta sessão: `1561b59`..`597cf3e` (5 commits, todos pushados) — **mais uma leva de deleções locais não commitadas, ver §0 abaixo, é o item mais urgente**. Contexto de antes desta sessão (reorganização visual completa, especialização de vila, diplomacia dinâmica, minério/construção) não é repetido em detalhe — ver `DESIGN.md` e o histórico de commits até `1561b59`.
 
-## 0.🚨 Estado local diverge do último commit — leia antes de qualquer coisa
+## 0. ✅ Pendência de arte encerrada — `assets/sprites/` está em dia
 
-O usuário apagou 30 arquivos de `assets/sprites/` manualmente por qualidade abaixo da régua atual. **A parte de predador dessa pendência está resolvida e commitada** (ver §1a); o que continua em aberto são **~24 deleções não commitadas** de terreno/decoração/civil/minério.
+**Resolvida.** Durante várias sessões esta seção avisava pra NÃO commitar as
+deleções de `assets/sprites/`, porque o remoto ainda precisava daqueles
+arquivos pro jogo publicado não quebrar. Isso deixou de valer: terreno,
+decoração, minério e prédios passaram a ser **arte procedural**
+(`src/render/terrain/`), e os personagens vêm do `SpriteManager`
+(`assets/Pers-Sprites/`). Nenhum dos 24 arquivos era mais carregado por
+código — conferido um a um antes de commitar.
 
-Estado de cada metade:
-- ✅ **Predador** — resolvido. As 4 espécies viraram 2 (demônio + monstro de sangue, `Tiny RPG Character Asset Pack 02`), arte recortada e commitada, deleções de Urso/Lobo/Cobra/Besouro commitadas junto. Testado ao vivo.
-- 🔴 **Terreno / decoração / minério / personagem civil** — continua em fallback geométrico (círculo amarelo, triângulo verde, cor lisa; zero erro fatal, o `isSpriteReady()` por-sprite segura bem). Levantamento exaustivo dos 5 packs baixados **está fechado e confirmado: nenhum serve** (ver §7). O usuário vai providenciar um pack novo antes da próxima rodada dessas categorias — **não tente resolver com o que já existe.**
+O que sobrou em `assets/sprites/`: `Fogueira.png` (única arte de arquivo que
+o `decorationRenderer` ainda usa) e os recortes estáticos de Cavaleiro/Orc,
+que ficaram órfãos quando o `agentRenderer` migrou pras tiras do pack — dá
+pra remover numa limpeza futura, não atrapalham nada.
 
-**Continua valendo: não rode `git add`/commit nessas ~24 deleções restantes de `assets/sprites/`.** O remoto ainda tem esses arquivos, então o GitHub Pages segue visualmente correto — commitar as deleções agora é o que quebraria o jogo publicado.
+**Bug pré-existente encontrado ao conferir:** `ui/inspector.js` carrega os
+ícones de minério de `assets/Assets-testes-para-o-claude-testar/Pedra1.png`
+(e Carvao/Ferro/Ouro) — uma pasta **ignorada no git**, e onde esses arquivos
+**não existem**. Ou seja, os ícones da lista de estoque do inspetor estão
+quebrados hoje, e estavam antes desta limpeza. Já existe substituto pronto:
+`render/terrain/oreTextures.js` gera exatamente esses quatro minérios. Não
+corrigido nesta rodada por estar fora do escopo pedido.
 
 ## 1a. Sessão seguinte — fauna reduzida a 2 espécies + inventário de assets fechado
 
