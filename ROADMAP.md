@@ -141,6 +141,24 @@ Fecha o item "animais no mapa", que a Parte 2 listava como bloqueado por arte �
 - **Elfo** — segue sem arte própria em nenhum pack baixado; decisão explícita aceita, cai no guerreiro genérico (hoje o `Soldier` do pack novo, com animação completa). Deixou de ser urgente: enquanto a arte antiga estava apagada, o elfo caía no círculo geométrico; agora ele ao menos aparece como guerreiro animado. Trocar continua trivial em `render/agentRenderer.js:WARRIOR_ACTOR` assim que houver candidato.
 - **Folha de tiles Kenney não usada** — `Pers-Sprites/Vários tipos de chão-.../roguelikeSheet_transparent.png` (16x16 com 1px de margem) seria um terceiro formato de spritesheet pro `SpriteManager`. Ficou sem uso porque terreno e decoração foram resolvidos por arte procedural (§1.15) — o estilo do Kenney era justamente o problema. Só vale implementar se aparecer outro tileset que se queira usar.
 
+### 2.5 Sistemas grandes, sem prioridade definida ainda
+
+Pesquisados pelo usuário e considerados genuinamente interessantes pro jogo,
+mas **explicitamente fora da causa** do comportamento "travado/burro" que
+motivou o diagnóstico de percepção/alvo. Registrados aqui só pra não se
+perderem — **sem design proposto e sem estimativa**; qualquer um deles exige
+uma conversa de design própria antes de virar tarefa.
+
+- **Evolução genética e especiação de criaturas** — traços herdáveis que
+  divergem ao longo das gerações até formarem populações distintas.
+- **Tecnologia emergente por necessidade da vila** — desbloqueada quando a
+  vila precisa resolver um problema real que está enfrentando, **não** por
+  "turno" nem por árvore de pesquisa com custo fixo.
+- **Sucessão de liderança quando uma linhagem acaba** — o que acontece com a
+  vila/clã quando quem liderava morre sem continuidade.
+- **Construção que se adapta ao bioma** — casa de bioma frio diferente de casa
+  de bioma quente, e assim por diante.
+
 ### 2.5 Item aberto do usuário
 - A sessão anterior perguntou se havia "funções" que o usuário queria adicionar além do que os assets sobrando sugeriam — ainda sem resposta. Vale revisitar se surgir algo que não é sobre sprite nenhum.
 
