@@ -1,81 +1,115 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do estado atual. Sessão longa, muitas rodadas — este arquivo foi reescrito do zero pra consolidar tudo num snapshot único, em vez de manter o histórico fragmentado por sub-sessão (§1a-§1h de versões anteriores). Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Todos os commits desta sessão estão pushados — `git log` é a fonte de verdade pra histórico detalhado, este arquivo é o resumo do estado final.
+Snapshot do estado atual. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). `git log` é a fonte de verdade pro histórico detalhado; este arquivo é o resumo do estado final.
 
-## 1. O que foi implementado ou alterado nesta sessão
+## 0. O tema desta sessão
 
-Em ordem cronológica real:
+O usuário reportou jogando: **"os NPCs não exploram o mapa, ficam limitados a fazer coisas da vila, não vejo soldados, não vejo grupos de exploração"**. Investigar isso acabou desenterrando uma cadeia de causas que também explicava duas pendências antigas do próprio STATUS.md — e revelou que uma delas estava apontando pro lugar errado há sessões.
 
-1. **Inventário exaustivo do pack de assets antigo** (287 arquivos, 5 packs, imagens abertas e analisadas pixel a pixel, não só nomes de arquivo) — conclusão: nenhum serve pra terreno/decoração/civil. O motivo real não é resolução (o Cavaleiro tem só 17×21px de conteúdo, mesma ordem de grandeza dos candidatos) — é **estilo**: os packs candidatos são pixel art de contorno duro e cor chapada saturada, a régua do jogo (Tiny RPG/craftpix) é sombreado suave sem contorno.
-2. **Fauna predadora reduzida de 4 pra 2 espécies** (`demon`/`blood`, decisão do usuário) com arte do Tiny RPG Character Asset Pack 02. Stats **redistribuídos, não inventados**: `demon` herdou o perfil do urso, `blood` o do lobo. `PREDATOR_COUNT_PER_SPECIES` subiu de 6 pra 12 pra manter a densidade total (24 no mapa).
-3. **`src/render/sprites/` — SpriteManager unificado**, criado do zero. Lê dois formatos de spritesheet (tira horizontal por ação; grade RPG 3×4 ou 12×8) por trás de uma interface única. Contagem de quadros é **derivada da imagem**, não de tabela declarada (achado real: a tabela errava a contagem de `attack` em 3 dos 4 atores). `sprite-lab.html` na raiz é o banco de provas isolado.
-4. **`predatorRenderer.js` migrado pro SpriteManager** — animação de verdade (idle/walk/attack/hurt/death), espelhamento por direção, corpo que fica no chão tocando a animação de morte. `renderScale` por espécie (criado no item 2) ficou obsoleto e foi removido — substituído por uma escala única de arte, já que as duas espécies vêm do mesmo pack na mesma escala.
-5. **`agentRenderer.js` migrado pro SpriteManager** — civil vira um dos 32 personagens de `Pers-Sprites/Humanos-separados/` (grade RPG, 4 direções reais, rosto fixo por hash de `agent.id`); guerreiro designado usa as tiras completas de Soldier/Orc (idle/walk/attack/hurt/death). **Perda assumida**: nenhuma pose de trabalho (cortar árvore, minerar, construir, pescar) existe na arte disponível — as partículas de trabalho continuam, a pose do corpo não reflete mais a ação. Civil morto deita e desbota (a grade não tem clipe de morte); guerreiro tem `death` de verdade.
-   - **Confirmado pelo usuário**: os civis usam o pack SuperRetroWorld, que numa rodada anterior tinha sido reprovado por estilo pra essa mesma categoria. Usei porque o usuário entregou esses arquivos dentro de `Pers-Sprites/`; ele viu o resultado ao vivo e aprovou ("os civis ficaram bons") — não é mais uma pendência.
-6. **Correção de extinção total das vilas** (reportado jogando 45s em 4x) — três bugs independentes, nenhum das mudanças de render desta sessão:
-   - `findNearestPredator` sem limite de distância: todo civil entrava em fuga permanente enquanto existisse um predador vivo em qualquer canto do mapa. Corrigido com `maxDistance = PERCEPTION_RADIUS * TILE_SIZE`.
-   - `feedBackgroundVillage` tratava `hunger < 100` como faminto: agente fora de tela comia na taxa cheia continuamente. Corrigido com `BACKGROUND_EAT_HUNGER_THRESHOLD = 55`.
-   - O LOD simulava consumo de quem está fora de tela mas nunca produção — `produceBackgroundVillage` (novo) fecha a simetria, com fator de ciclo útil e divisão do trabalho pela demanda (pra vila madeireira fora de tela não morrer de fome, igual em tela ela sobrevive pescando).
-7. **Terreno e decoração refeitos do zero, 100% procedural** (`src/render/terrain/`, 7 módulos) — busca de substituição em todos os packs fechou negativa (o único tileset disponível, Kenney, é o estilo que se queria eliminar). Ruído de valor, paleta com rampa de 5 tons e luz fixa de cima-esquerda, transição irregular entre tipos de terreno (o que mais tira o aspecto "tabuleiro"), minério como pedra incrustada em vez de ícone centralizado, árvore/planta/casa/baú com arte no mesmo estilo.
-8. **Otimização de FPS do terreno** (`terrainChunks.js`) — terreno assado em blocos offscreen de 32×32 tiles. `drawTiles` caiu de 80ms pra 0.06ms em zoom 0.25. Era o gargalo de FPS mais antigo do projeto.
-9. **Prédios de vila viraram entidades reais** (`village/buildings.js`) — antes, `village.buildings` era um contador sem posição, e as casas no mapa eram decoração visual sem vínculo nenhum. Isso fazia `eat`, `deliver` e `build` mirarem todos `village.center`. Agora: Prefeitura (marco, nasce com a vila), Casa (+pop, onde se dorme), Celeiro (+comida, onde se come/entrega comida), Depósito (+madeira/minério, onde se entrega o resto). `build.js` escolhe o tipo pela carência real da vila. `sleep.js` fechou um TODO aberto desde a fatia 2 (dormir em casa). Cada agente para num ponto do anel ao redor do prédio, não no centro exato.
-10. **Reserva de tile de recurso** (`world/claims.js`) — antes, 42% das observações tinham alvo de colheita compartilhado entre agentes (medido), com grupos de até 5 na mesma árvore. Agora reserva ao escolher, libera ao trocar de alvo/encher carga/morrer, com fallback obrigatório (se todos os tiles conhecidos estão reservados, ignora a reserva) pra vila pequena não travar.
-11. **Timer de travamento** (`agent/stuck.js`) — `noProgressFor` acumula quando posição, carga, obra, fome e sono não mudam; ao passar de 6s, cancela o alvo e bloqueia o tile por 30s na memória do agente. Preventivo: a incidência medida de travamento real era ~zero antes da correção.
-12. **Dois consertos em `eat.js`** — estoque zerado agora limpa o movimento (antes deixava o agente plantado no celeiro); agente com fome 100 não debita mais comida da vila.
-13. **Limpeza final de `assets/sprites/`** — os 24 arquivos apagados pelo usuário em sessões anteriores foram confirmados órfãos (nenhum carregado por código, terreno/decoração/civil já são procedurais/SpriteManager) e commitados como deleção.
-14. **Bug corrigido no `ui/inspector.js`** — os ícones de minério apontavam pra `assets/Assets-testes-para-o-claude-testar/Pedra1.png` (pasta ignorada no git, arquivo nunca existiu ali) — estavam quebrados desde sempre. Trocado por `render/terrain/oreTextures.js`, convertido em data URL uma vez no carregamento.
-15. **`ROADMAP.md`** ganhou duas seções novas: sistemas grandes sem prioridade (evolução genética, tecnologia emergente por necessidade, sucessão de liderança, construção adaptada ao bioma — registrados, não desenhados) e LOD de renderização por zoom (ideia registrada, não implementada — ver §5 abaixo).
+Ordem de trabalho da sessão: as pendências antigas primeiro (contagem no inspetor, construção travada), depois o pedido novo.
 
-## 2. Estado atual por sistema
+## 1. O que foi implementado nesta sessão
+
+### 1.1 Contagem de casas no inspetor (`8f54dee`)
+Bug §3.1 da versão anterior deste arquivo. `village.buildings` passou a conter todos os tipos quando os prédios viraram entidades, mas a linha de população continuou usando `.length`. Filtrado por `type === 'house'`.
+
+### 1.2 A* com heap binário + `wander` com rumo persistente (`d804d75`)
+**`world/pathfinding.js` tinha um gargalo escondido há muito tempo:** o conjunto aberto era um array reordenado por completo (`open.sort`) **a cada iteração** do A*. Enquanto quase todo alvo era vizinho (o `wander` antigo sorteava um tile do próprio raio de percepção), a lista ficava curta e o custo passava despercebido. Assim que alvos distantes viraram comuns, uma busca que estoura o orçamento de 3000 nós passou a ordenar milhares de elementos milhares de vezes. **Medido: 33x o tempo total de simulação (540ms → 17693ms por 5s simulados); com min-heap, de volta a 530ms.** O contador de orçamento também subia em entradas obsoletas descartadas, então o orçamento real era menor e variável — agora conta expansões.
+
+**`wander.js`** sorteava alvo de forma isotrópica dentro da percepção: passeio aleatório puro (deslocamento ~√N), ainda resetado ao centro da vila toda vez que a fome puxava o agente de volta. Agora o agente mantém um rumo (`agent.wanderHeading`) que persiste entre alvos; contra obstáculo, adota a direção do que sobrou (contorna a costa em vez de insistir).
+
+### 1.3 Exploração: ação `explore`, expedições em grupo, quadro de descobertas (`c188913`)
+A cadeia completa que impedia os moradores de sair de um disco de ~11 tiles num mapa de 220 tinha **quatro elos**:
+
+1. `wander` só escolhia alvo dentro da percepção (resolvido em 1.2 — necessário, insuficiente sozinho);
+2. o agente nunca tinha **motivo** de ir longe nem alvo além do que enxerga;
+3. memória individual decai em ~2min, então uma descoberta era esquecida antes de virar ação, e morria com o descobridor;
+4. membro de expedição sairia da tela e o LOD o rebaixaria a `background`, que **não anda** — toda expedição congelaria na borda da viewport.
+
+- **`agent/actions/explore.js`** — alvo a 45 tiles do centro, pontuado por carência institucional (a vila tem demanda por um minério e não conhece nenhum depósito dele). Pilar 3 do design aplicado a território.
+- **`village/expedition.js`** — 1 a 3 moradores saem juntos. Coordenação mínima: dividem um **alvo**, não ordens; cada um anda por conta própria até um ponto do anel em volta dele. Sem líder, e nenhum agente lê o estado de outro. Sair do grupo também é emergente — quem deixa de escolher `explore` é só removido por `prune`.
+- **`village/knowledge.js`** — quadro de descobertas. Um local só entra quando quem o viu chega **fisicamente** ao centro da vila (decisão do usuário, perguntada antes: "só o que foi entregue pessoalmente"). Conhecimento continua viajando no corpo de alguém; o que muda é durar mais que a memória individual e poder ser contado.
+- **`simulation/lod.js`** — membro de expedição roda full-fidelity mesmo fora da tela.
+- **`world/world.js`** — `expeditionRng` própria (padrão de `decorations`/`predators`).
+
+### 1.4 Construção destravada (`68dc783`)
+Item 2 da lista de pendências antiga. **Eram quatro problemas independentes, e nenhum era o custo da pedra** (ver §2 abaixo, é o achado mais importante da sessão).
+
+### 1.5 Guarnição permanente + patrulha (`920d713`)
+`updateWarriorRoles` revertia todo mundo pra `'civilian'` ao voltar à paz e só era chamada nas transições de postura. Como o mundo passa a maior parte do tempo em paz, o efetivo militar era **zero quase sempre** — daí "não vejo soldados". E, mais grave: **ninguém nunca enfrentava predador**, porque `fightPredator.js` exige `role === 'warrior'`.
+
+Agora existe guarnição de paz (15% dos adultos, piso de 1 por vila; 30% em guerra), reavaliada a cada reconsideração do clã. Mais `agent/actions/patrol.js` — o guerreiro ronda o perímetro do território em vez de vagar, que é o que faz ele **perceber** o que se aproxima.
+
+## 2. O achado mais importante: por que nada era construído
+
+O STATUS.md anterior listava como próximo passo *"decidir entre baixar `HOUSE_STONE_COST` ou aumentar a disponibilidade de pedra"*. Medindo, um mundo com **64 de pedra em estoque terminava com zero prédios construídos** — pedra nunca foi o gargalo. E `HOUSE_STONE_COST` era **código morto** desde que os prédios ganharam tipo próprio (os custos moram na tabela `BUILDING`): mexer nela não teria efeito nenhum. Removida.
+
+Os quatro problemas reais, todos achados instrumentando a decisão em vez de lendo o código:
+
+1. **Vazamento de recurso em `build.js` (o decisivo).** O custo era debitado **na chegada** ao canteiro, mas a obra exige 15s de trabalho **contínuo**. Toda interrupção (fome, predador) fazia `decision.js` zerar `agent.target`; o `step` seguinte escolhia outro canteiro, resetava `buildProgress` e **debitava de novo**. Cada tentativa abortada queimava o custo inteiro sem deixar nada — medido: 17-29 de madeira contra custo 25, 175 agente-ticks escolhendo construir, zero prédios em 5 mundos. Agora debita **ao concluir**.
+2. **Score pela pressão populacional sobre um teto inalcançável.** Vila de 19 pontuava 0.32 contra os 0.55 de `gather`. Agora pontua pela carência **do prédio escolhido** (`buildings.js:buildingNeed`), e `nextBuildingType` devolve `null` quando nada está apertado — antes o fallback era `'house'`, contradizendo o "carência real" do próprio comentário do módulo.
+3. **`VILLAGE_POP_CAP` 30** contra 8 fundadores e população que estabiliza em 15-19: o teto nunca era encostado. Baixado pra **18**. (14 foi testado e era um teto **sem escada** — população média caiu pra 43.)
+4. **Casa custava pedra**, e pedra depende de achar cordilheira — a exploração achou uma em só 2 de 5 mundos. Casa passa a custar **só madeira**; pedra continua sendo o gargalo do celeiro e do depósito, os prédios que ampliam estoque.
+
+## 3. A regra que este projeto aprendeu três vezes
+
+`village/stock.js:hasFoodSurplus`, agora declarada num lugar só:
+
+> Toda ação de **desenvolvimento** (explorar, minerar, construir, patrulhar) que ganha peso alto o bastante pra vencer `gather`/`fish` acaba matando de fome as vilas **madeireiras**, que não produzem comida própria.
+
+Aconteceu com quatro ações diferentes nesta sessão, cada uma medida como extinção de vila antes de ser corrigida. A condição é sobre **estoque**, não sobre `distress`: a versão com `distress` desligava o desenvolvimento **permanentemente**, porque as quatro vilas vivem em déficit leve e crônico ao mesmo tempo (distress de 8 a 125s medido simultaneamente).
+
+## 4. Metodologia de medição (vale reusar)
+
+- **`?seed=x` na URL fixa o mundo** (`main.js`). Antes o seed era `Date.now()` e cada reload gerava um mapa diferente — qualquer A/B comparava duas coisas que não são a mesma.
+- **`window.__wb`** expõe `world`/`camera`/`loop`/`update` só pra diagnóstico. O rAF é throttlado em aba de automação, então confirmar comportamento ao vivo exige pausar o loop e avançar `update(dt)` na mão.
+- **Comparação de seed único não vale pra balanceamento.** Qualquer mudança de comportamento desvia a sequência de rng e diverge a trajetória inteira; duas partidas com a mesma seed deixam de ser comparáveis. O jeito honesto é **distribuição sobre vários seeds** (usei 5-6 × 180s), rodando cada mundo num `<iframe>` oculto pra não precisar recarregar a aba.
+- Cada rodada de 180s leva ~30s de tempo real; um lote de 5 seeds não cabe num único `Runtime.evaluate` (timeout de 45s) — rodar em background acumulando em `window.__res` e consultar depois.
+
+## 5. Estado atual por sistema
 
 | Sistema | Estado |
 |---|---|
-| World/Terrain, Time loop, Camera/Render, Pathfinding | ✅ Funcionando |
-| **Terreno e decoração** | ✅ Procedural, testado ao vivo, mais barato que a versão anterior |
-| **Prédios de vila** (Prefeitura/Casa/Celeiro/Depósito) | ✅ Funcionando — posição, efeito e destino de ação corretos |
+| World/Terrain, Time loop, Camera/Render | ✅ Funcionando |
+| **Pathfinding** | ✅ Funcionando — A* com heap binário, 33x mais rápido no pior caso |
+| Terreno e decoração (procedural) | ✅ Funcionando |
+| Prédios de vila | ✅ Funcionando — **e agora efetivamente construídos** (2.4 casas/mundo em 180s; antes: sempre zero) |
 | Perception, Memory, Utility AI/Decision | ✅ Funcionando |
-| **Reserva de tile / timer de travamento** | ✅ Funcionando, verificado ao vivo (0% de alvo compartilhado, medido) |
+| **Exploração / expedições** | ✅ Funcionando — 1-3 membros, quadro de descobertas populado em 4 de 6 mundos |
+| **Guarnição / patrulha** | ✅ Funcionando — 7 guerreiros/mundo em paz (antes: zero) |
+| Reserva de tile / timer de travamento | ✅ Funcionando |
 | Village/Clan/Diplomacy/Trade | ✅ Funcionando |
 | Combat (agente-vs-agente) | ✅ Funcionando |
-| Combat (agente-vs-predador) | 🟡 Funcionando (código não mudou nesta sessão) — mas a animação de ataque/morte nova (predador e guerreiro) nunca foi vista numa guerra/caçada orgânica real, só em harness sintético |
-| Life-cycle, reprodução | ✅ Funcionando, testado com avanço determinístico de centenas de segundos simulados |
-| Simulation LOD (agregado fora de tela) | ✅ Funcionando — agora com produção **e** consumo simétricos |
-| **SpriteManager** (`render/sprites/`) | ✅ Em uso por predador e agente; `sprite-lab.html` é o banco de provas |
-| UI/HUD/Inspetor/Feed | 🟡 Funcionando, com um bug de contagem conhecido (ver §3) |
+| **Combat (agente-vs-predador)** | ✅ Agora acontece em tempo de paz — antes os 24 predadores eram incontestados |
+| Life-cycle, reprodução | ✅ Funcionando |
+| Simulation LOD | ✅ Funcionando — com exceção para membros de expedição |
+| SpriteManager | ✅ Em uso por predador e agente |
+| UI/HUD/Inspetor/Feed | ✅ Funcionando |
 | Necessidades sociais/segurança/pertencimento | ❌ Não iniciado (só fome/sono existem) |
 | `agent.traits` | ❌ Não iniciado |
 | `defense_pact` (efeito real) | ❌ Não iniciado |
-| LOD de renderização por zoom | ❌ Não iniciado — ideia registrada em `ROADMAP.md` §2.3 |
+| LOD de renderização por zoom | ❌ Não iniciado — `ROADMAP.md` §2.3 |
 
-## 3. Bugs / comportamentos estranhos não corrigidos
+## 6. Bugs / limitações conhecidas
 
-1. **`ui/inspector.js` mostra contagem de prédio errada.** A linha de população mostra `(${village.buildings.length} casa/casas)`, mas `buildings.length` agora conta **todos** os tipos (prefeitura + celeiro + depósito + casa), não só casas — uma vila recém-fundada (prefeitura + celeiro, zero casas de verdade) aparece como "(2 casas)". Introduzido na rodada de prédios (`6f72d87`), não pego antes por estar fora do que foi testado ali. Conserto é filtrar por `type === 'house'` nessa linha.
-2. **Construção depende de pedra, que depende de mineração lenta.** Numa sessão curta a vila fica só com Prefeitura + Celeiro (os dois fundacionais); Casa e Depósito, que são o que mais ajuda a espalhar a população, demoram a aparecer. Sinalizado, não corrigido — precisa de decisão sobre calibrar custo ou disponibilidade de pedra.
-3. **Ataque e morte de predador/guerreiro, com a arte animada nova, nunca confirmados numa guerra ou caçada orgânica real.** Só testado em harness sintético (agentes/predadores forjados chamando `step`/`drawX` diretamente) — o caminho de código é o mesmo, mas não houve confirmação visual ao vivo de uma luta de verdade acontecendo.
-4. **Elfo sem arte própria** — cai no guerreiro genérico (Soldier). Decisão aceita há várias sessões, sem substituto disponível.
-5. **Orc de perfil destoa visualmente** do resto (visto de cima/frente) — aceito, pouco tempo de tela.
-6. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa — não recalibrado.
-7. **rAF é throttlado numa aba de automação** (`document.visibilityState: "hidden"`) — limitação de ambiente confirmada de novo. Contornado nesta sessão pausando o loop e avançando `update(dt)` manualmente quando precisou de confirmação ao vivo determinística; a técnica está documentada no histórico de commits pra reuso.
-8. **Confirmações mecânicas nunca vistas numa sessão real longa do usuário** (herdado de sessões anteriores, ainda relevante): reprodução/extinção em sessão de horas, oscilação de postura diplomática ao longo do tempo.
+1. **População média caiu de 57.6 pra ~50** (5 seeds × 180s) desde o início da sessão. É uma troca deliberada — parte da mão de obra passou a ir pra construção, exploração e patrulha, que antes não existiam. Como casa aumenta o teto de população, a **expectativa** é a população ultrapassar o baseline em partidas mais longas que 180s. **Não verificado** — é o próximo teste natural.
+2. **Celeiro e depósito nunca foram construídos** em nenhum teste (só casas). Os dois dependem de pedra, e a exploração acha cordilheira em ~40% dos mundos. Não é bug, mas a progressão de infraestrutura ainda é rara.
+3. **Exploração não acha montanha em ~60% dos mundos.** O alvo é um ângulo sorteado a 45 tiles; nada garante que aponte pra uma cordilheira. Um viés de direção (ex.: preferir onde ainda não se foi) resolveria melhor.
+4. **`granary` é prédio fundacional e conta no `nextBuildingType`** — a métrica de "celeiros construídos" precisa descontar os 4 iniciais.
+5. Elfo sem arte própria (cai no Soldier genérico) — aceito há várias sessões.
+6. Orc de perfil destoa visualmente — aceito, pouco tempo de tela.
+7. Postura de guerra/paz ainda pode alternar com frequência que parece volátil numa sessão longa — não recalibrado.
+8. rAF é throttlado em aba de automação — limitação de ambiente, ver §4.
 
-## 4. Decisões técnicas e o motivo
+## 7. Próximos passos concretos, em ordem
 
-- **Terreno/decoração/prédios são 100% procedurais, não arte de pack.** A busca por substituição foi feita de verdade (inventário completo, imagens abertas) e fechou negativa duas vezes (fauna e depois terreno) — o único tileset achado sempre trazia o estilo chapado que se queria eliminar. Gerar deu controle total sobre paleta e luz, e por acaso saiu mais barato em FPS que a alternativa de cor lisa.
-- **Usuário escolheu, via pergunta explícita**: 4 tipos de prédio (Prefeitura/Casa/Celeiro/Depósito, não só Prefeitura+Casa); vila nasce com Prefeitura+Celeiro e constrói o resto; dormir vai até uma casa real (não só marca lotação por casa, versão mais simples escolhida).
-- **`renderScale` por espécie (predador) foi criado e depois removido na mesma sessão** — existiu só enquanto o recorte era de um quadro estático; virou redundante quando a animação completa (escala única de arte) chegou. Registrado porque é um caso real de decisão técnica revertida pela evolução do próprio trabalho, não por erro.
-- **Reserva de tile sem expiração por tempo** — a reserva é presa ao agente e ele sempre libera nos três pontos de saída (troca de alvo, carga cheia, morte). Um timeout criaria uma segunda fonte de verdade pra sincronizar sem necessidade.
-- **Timer de travamento com limiar de 6s, contando fome e sono como progresso** — colher uma carga cheia leva ~8s parado, mas isso não conta como travamento porque `carrying` sobe todo tick; sem incluir fome/sono no critério de progresso, o timer dispararia falso positivo em quem está comendo ou dormindo direito.
-- **As 24 deleções de `assets/sprites/` só foram commitadas nesta sessão, no fim** — ficaram de fora de todos os commits anteriores porque o remoto (GitHub Pages) ainda dependia delas até terreno/decoração/civil virarem procedurais/SpriteManager. Confirmado arquivo por arquivo antes de commitar, e o jogo publicado testado ao vivo depois (141 requisições, 0 falhas).
+1. **Sessão de jogo real do usuário, mais longa que 180s** — é a confirmação que falta pra quase tudo desta sessão. Especificamente: a população ultrapassa o baseline quando as casas se acumulam? Dá pra ver uma expedição saindo e voltando? O soldado patrulhando lê bem?
+2. **Viés de direção na exploração** (§6.3) — fazer a expedição preferir setores ainda não visitados em vez de ângulo puramente sorteado. É o que faria pedra (e portanto celeiro/depósito) deixar de ser sorte.
+3. **Confirmar guerra/caçada orgânica ao vivo** com a animação nova de ataque/morte — herdado da sessão passada, ainda não visto numa luta real.
+4. Se algo incomodar visualmente, as paletas de terreno estão isoladas em `render/terrain/palette.js`.
+5. **LOD de renderização por zoom** (`ROADMAP.md` §2.3) — sem urgência.
 
-## 5. Próximos passos concretos, em ordem
+## 8. Coisas pedidas pra lembrar que ainda não são código
 
-1. **Corrigir a contagem de prédios no inspetor** (`ui/inspector.js`, bug §3.1) — trocar `village.buildings.length` por uma contagem filtrada em `type === 'house'` na linha de população. Pequeno, isolado, sem risco.
-2. **Calibrar construção de Casa/Depósito** — decidir entre baixar `HOUSE_STONE_COST`/`DEPOT_STONE_COST` ou aumentar a taxa de descoberta de pedra (`PERCEPTION_RADIUS` já foi subido uma vez por um motivo parecido). Sem isso, o espalhamento de população que a rodada de prédios trouxe fica limitado a vilas que já mineraram bastante.
-3. **Sessão de jogo real do usuário, mais longa que os testes automatizados** — confirmar visualmente: prédios se populando com o tempo, guerra/caçada de predador acontecendo organicamente com a animação nova, e ausência de amontoamento numa vila grande e madura (15+ moradores, múltiplos prédios).
-4. **Se algo ainda incomodar visualmente**, as paletas de terreno estão isoladas em `render/terrain/palette.js` e cada terreno tem um pintor próprio em `tileTextures.js` — mudança pontual sem mexer em lógica.
-5. **LOD de renderização por zoom** (`ROADMAP.md` §2.3) — só quando performance ou tamanho de mapa virar prioridade de novo; não é urgente hoje porque o gargalo medido de terreno já foi resolvido pelos chunks.
-
-## 6. Coisas pedidas pra lembrar que ainda não são código
-
-- Nenhuma pendência aberta desta categoria no momento — os itens de design combinados nesta sessão (tipos de prédio, prefeitura+celeiro fundacionais, dormir em casa, reserva com fallback obrigatório, timer de 6s) foram todos implementados e verificados ao vivo.
-- Os quatro sistemas grandes que o usuário pesquisou (evolução genética/especiação, tecnologia emergente por necessidade da vila, sucessão de liderança, construção adaptada ao bioma) estão registrados em `ROADMAP.md` §2.5, explicitamente sem prioridade e sem design — não é pra puxar nenhum deles sem uma conversa de design própria antes.
+- Os quatro sistemas grandes registrados em `ROADMAP.md` §2.5 (evolução genética, tecnologia emergente, sucessão de liderança, construção adaptada ao bioma) continuam **sem prioridade e sem design** — não puxar nenhum sem uma conversa de design própria antes.
+- Decisões do usuário nesta sessão, perguntadas antes de implementar: quadro de descobertas **só com o que foi entregue pessoalmente** (não registro ao ver); guarnição fixa **com** patrulha; grupos de exploração **junto** com a ação de explorar, não numa rodada depois.

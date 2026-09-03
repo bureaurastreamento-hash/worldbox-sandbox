@@ -266,6 +266,46 @@ O princípio da redistribuição foi **não inventar números novos**: os dois p
 
 **Confirmado ao vivo:** urso perseguindo/atacando um civil que foge de verdade (posição se afasta, sobrevive); lobo enfrentado por um guerreiro designado até morrer (dano mútuo correto, lobo entra em `fleeing` com vida baixa antes de morrer); evento de morte com o texto certo no feed; e — sem forçar nada — um agente real foi flagrado em `fleePredator` (score 0.90) numa sessão orgânica, confirmando que o sistema entra em jogo sozinho, não só quando testado manualmente.
 
+## 11. Exploração, expedições e defesa permanente (implementado)
+
+Pedido do usuário, jogando: *"os NPCs não exploram o mapa, ficam limitados a fazer coisas da vila, não vejo soldados, não vejo grupos de exploração"*. Investigar isso desenterrou uma cadeia de causas que também explicava por que a construção (§8) nunca decolava — e mostrou que o `STATUS.md` vinha apontando o culpado errado havia sessões.
+
+### 11.1 Por que ninguém explorava
+
+Quatro elos encadeados, não um problema só:
+
+1. **`wander.js` não era exploração, era difusão local.** Sorteava um tile dentro do raio de percepção atual, sem persistência de direção — passeio aleatório puro, deslocamento ~√N. Pior, a fome puxava o agente de volta à vila a cada ciclo, **resetando o passeio** ao ponto de partida. Medido, os moradores viviam num disco de ~11 tiles num mapa de 220.
+2. **O agente não tinha MOTIVO de ir longe nem alvo além do que enxerga.** Nenhuma ação existente propunha um destino fora da percepção.
+3. **A memória apagava a descoberta antes de ela virar ação.** `memory.js` esquece um local não revisto em ~2min: um batedor achava a jazida, voltava pra entregar carga, e já a tinha esquecido ao reconsiderar minerar. E como memória é 100% por agente, a descoberta **morria com o descobridor**.
+4. **Montanha é gerada como faixa de elevação**, ou seja em cordilheiras, não pedrinhas espalhadas. Uma vila que não nasce colada numa cadeia não achava minério "devagar" — achava com probabilidade ~zero.
+
+### 11.2 O que entrou
+
+**Ação `explore`** (`agent/actions/explore.js`): alvo a 45 tiles do centro da vila, muito além da percepção, pontuado por **carência institucional** — a vila tem demanda por um minério e o quadro de descobertas não conhece nenhum depósito dele. É o pilar 3 do design (pressão econômica enviesando o utility score) aplicado a **território**: ninguém decide mandar um batedor, a carência simplesmente faz explorar pontuar mais alto pra todos os moradores e alguém vai.
+
+**Expedições em grupo** (`village/expedition.js`) — decisão do usuário, perguntada antes: grupos entram junto com a ação de explorar, não numa rodada depois. O desafio de design era que todo o resto do jogo é decisão individual, e nenhum agente jamais consultou o que outro está fazendo. A solução foi o mínimo de estado compartilhado possível: os membros dividem um **alvo**, não ordens. Cada um anda por conta própria até um ponto do anel em volta desse alvo; como todos partem do mesmo lugar, na mesma velocidade, pro mesmo lugar, **o grupo é consequência, não formação imposta**. Não existe líder. Sair também é emergente: quem deixa de escolher `explore` (fome, predador, guerra vencem no score como qualquer coisa) é só removido, sem nenhum código de deserção — por isso uma expedição pode voltar menor do que partiu.
+
+**Quadro de descobertas da vila** (`village/knowledge.js`) — decisão do usuário entre três opções apresentadas: **só o que foi entregue pessoalmente**. Um local só entra quando quem o viu chega fisicamente ao centro da própria vila. Isso preserva o pilar 2 (conhecimento limitado e local): nada entra por percepção, conhecimento continua viajando no corpo de alguém. O que o quadro acrescenta é **durabilidade e alcance social, não visão** — a vila passa a lembrar melhor que um indivíduo e passa a poder **contar**. É o mesmo tipo de conhecimento institucional que `village/trade.js` já assumia (uma rota existe sem nenhum morador ter visto a outra vila).
+
+### 11.3 Guerreiro em tempo de paz (correção, não feature)
+
+`clan/clanDecision.js:updateWarriorRoles` revertia **todo mundo** pra `'civilian'` ao voltar à paz, e só era chamada nas transições de postura. Como o mundo passa a maior parte do tempo em paz, o efetivo militar era zero quase sempre. Duas consequências, nenhuma intencional:
+
+- o jogador nunca via um soldado — a reclamação original;
+- **ninguém nunca enfrentava predador.** `fightPredator.js` exige `role === 'warrior'` e civil só tem `fleePredator`, então sem guerra de clã os 24 predadores do mapa eram literalmente incontestados: matavam moradores e nada respondia. A §9 deste documento já descreve o papel como emergente pela *"demanda de defesa da vila"* — predador **é** demanda de defesa; amarrar o papel só à guerra entre clãs foi efeito colateral, não design.
+
+Agora existe guarnição de paz (15% dos adultos, piso de 1 por vila; 30% em guerra), reavaliada a cada reconsideração do clã. Mais uma ação `patrol`: o guerreiro ronda o perímetro do território em vez de vagar. Isso não é enfeite — `fightPredator` só reage a predador **percebido**, e uma guarnição parada no centro nunca percebe nada.
+
+### 11.4 A regra que o projeto aprendeu quatro vezes
+
+Toda ação de **desenvolvimento** (explorar, minerar, construir, patrulhar) que ganha peso alto o bastante pra vencer `gather`/`fish` acaba matando de fome as vilas **madeireiras**, que não produzem comida própria (pilar 4). Aconteceu com as quatro nesta sessão, cada uma medida como extinção de vila antes de ser corrigida. A condição está declarada num lugar só (`village/stock.js:hasFoodSurplus`) e é sobre **estoque**, não sobre `distress` — a versão com distress desligava o desenvolvimento **permanentemente**, porque as quatro vilas vivem em déficit leve e crônico ao mesmo tempo.
+
+### 11.5 Construção: o gargalo nunca foi o custo da pedra
+
+O `STATUS.md` listava como próximo passo *"baixar `HOUSE_STONE_COST` ou aumentar a disponibilidade de pedra"*. Medindo, um mundo com **64 de pedra em estoque terminava com zero prédios** — e `HOUSE_STONE_COST` era **código morto** desde que os prédios ganharam tipo próprio. Os problemas reais eram um vazamento de recurso em `build.js` (custo debitado na chegada, obra reiniciada a cada interrupção, débito repetido), um score baseado numa pressão populacional contra um teto inalcançável, e o fato de a casa depender de um recurso que só existe em 40% dos mundos. Detalhe completo em `ARCHITECTURE.md` (`village/buildings.js`, `agent/actions/build.js`) e `STATUS.md` §2.
+
+Consequência de design registrada: **casa passou a custar só madeira**. Crescer depende de um recurso que toda vila consegue; pedra continua sendo o gargalo do celeiro e do depósito — os prédios que ampliam **estoque**. A progressão por minério da §8 continua valendo, só deixou de estar no caminho crítico do crescimento populacional.
+
 ---
 
-Status: fatias 1-11 implementadas, mais especialização de vila, diplomacia dinâmica (com ataque ofensivo/saque, §7), evolução da civilização (minério + construção + papéis visuais, §8), pesca/papel de guerreiro/animação de morte/arte de minério e água (§9), reorganização visual completa de `assets/sprites/` (encerrada com Elfo como pendência conhecida de arte) e fauna predadora (§10) além do roteiro original — mais decoração do mapa com arte real, fome individual ligada ao estoque da vila, LOD corrigido (fome/sono fora de tela não são mais artificialmente restauradas) e uma leva de polimento visual (sombra/partículas/câmera suave/tremor/iluminação/HUD, sem sistema novo) em sessões posteriores. **Nesta sessão mais recente, o usuário apagou 30 arquivos de `assets/sprites/` pra reavaliar a régua de qualidade** — estado local diverge do último commit, ver `STATUS.md` §0 antes de mexer em arte. Casas em tiers + rank de vila têm design aprovado (não implementado) — proposta ainda só no histórico da conversa, não registrada aqui em detalhe; ver `STATUS.md` §6. Ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema e os próximos passos concretos.
+Status: fatias 1-11 implementadas, mais especialização de vila, diplomacia dinâmica (com ataque ofensivo/saque, §7), evolução da civilização (minério + construção + papéis visuais, §8), pesca/papel de guerreiro/animação de morte/arte de minério e água (§9), reorganização visual completa de `assets/sprites/` (encerrada com Elfo como pendência conhecida de arte) e fauna predadora (§10) além do roteiro original — mais decoração do mapa com arte real, fome individual ligada ao estoque da vila, LOD corrigido (fome/sono fora de tela não são mais artificialmente restauradas) e uma leva de polimento visual (sombra/partículas/câmera suave/tremor/iluminação/HUD, sem sistema novo) em sessões posteriores. Casas em tiers + rank de vila têm design aprovado (não implementado) — proposta ainda só no histórico da conversa, não registrada aqui em detalhe. **Na sessão mais recente entrou a §11**: exploração com expedições em grupo, quadro de descobertas institucional, guarnição permanente com patrulha, e o destravamento da construção (que revelou um vazamento de recurso pré-existente em `build.js`). Ver `STATUS.md` na raiz do projeto para o estado detalhado por sistema, a metodologia de medição e os próximos passos concretos.

@@ -113,15 +113,27 @@ Fecha o item "animais no mapa", que a Parte 2 listava como bloqueado por arte �
 - Círculo de território da vila virou gradiente de borda em vez de disco chapado, que passou a lavar o terreno texturizado.
 - **Ficou mais barato que o terreno de cor lisa** (4.65ms contra 6.8ms em zoom 1): a arte de cada tile é resolvida uma vez e guardada no tile, eliminando trabalho por-frame num laço que já era o gargalo de FPS.
 
+### 1.16 Exploração, expedições e defesa permanente (`DESIGN.md` §11)
+- **`wander` com rumo persistente** — antes era passeio aleatório isotrópico dentro do raio de percepção, resetado ao centro da vila toda vez que a fome puxava o agente de volta; medido, os moradores viviam num disco de ~11 tiles num mapa de 220.
+- **Ação `explore`** — alvo a 45 tiles do centro, muito além da percepção, pontuado por carência institucional (a vila precisa de um minério e não conhece nenhum depósito dele). Pilar 3 do design aplicado a território.
+- **Expedições em grupo** (`village/expedition.js`) — 1 a 3 moradores saem juntos, com o mínimo de estado compartilhado possível: dividem um alvo, não ordens. Sem líder; o grupo é consequência de todos partirem do mesmo lugar pro mesmo lugar, e sair dele é emergente (quem deixa de escolher `explore` é só removido).
+- **Quadro de descobertas da vila** (`village/knowledge.js`) — depósito visto por um morador fica registrado quando ele **volta e conta**, preservando o pilar 2 (nada entra por percepção).
+- **Guarnição permanente + patrulha** — corrige o efetivo militar ser zero em tempo de paz, o que também deixava os 24 predadores do mapa literalmente incontestados.
+- **Construção destravada** — quatro problemas independentes, nenhum deles o custo da pedra que o `STATUS.md` vinha apontando; o decisivo era um vazamento de recurso em `build.js` (débito na chegada, obra reiniciada a cada interrupção). Casa passou a custar só madeira.
+- **A\* com heap binário** — o conjunto aberto era um array reordenado por completo a cada iteração; com alvos distantes/inalcançáveis virando comuns, custava **33x** o tempo de simulação.
+- **`?seed=x` na URL** fixa o mundo, pra medir A/B de verdade.
+
 ---
 
 ## Parte 2 — O que está planejado / pendente
 
 ### 2.1 Confirmações pendentes (já implementado, ainda não visto ao vivo numa sessão real)
-- **Papel de guerreiro permanente** — nenhuma guerra ocorreu ainda numa sessão de teste; visual e bônus de score não confirmados.
+- **Sessão de jogo real mais longa que 180s** — é a confirmação que falta pra quase tudo de §1.16. Especificamente: a população ultrapassa o baseline quando as casas se acumulam (a expectativa, não verificada)? Dá pra ver uma expedição saindo e voltando? O soldado patrulhando lê bem?
+- **Celeiro e depósito nunca foram construídos** em nenhum teste — só casas. Os dois dependem de pedra, e a exploração acha cordilheira em ~40% dos mundos.
+- **Papel de guerreiro permanente** — nenhuma guerra ocorreu ainda numa sessão de teste; visual e bônus de score não confirmados. (A guarnição de **paz** já foi confirmada: 7 guerreiros/mundo, soldado visto ao vivo.)
 - **Animação de morte** — nenhuma morte ocorreu ainda numa sessão de teste.
 - **Pesca** — confirmada por score/seleção de ação, não pela entrega completa (estoque de comida subindo especificamente por pesca).
-- **Construção completa de ponta a ponta** — mecânica testada isoladamente, custo já reduzido, mas nenhuma casa foi vista sendo adicionada a `village.buildings` numa sessão real.
+- ~~**Construção completa de ponta a ponta**~~ — **resolvido em §1.16**: 2.4 casas por mundo em 180s, contra zero em todo teste anterior.
 - **Ataque ofensivo/saque** — só evidência indireta (desespero resetando sem comércio ativo); nunca confirmado lendo `agent.currentAction === 'raid'` direto num agente selecionado.
 - **Indicador visual `💀 extinta`** — implementado e conferido por leitura de código, nunca visto aparecer ao vivo.
 - **Correção da espiral de extinção por reprodução** (sessão bem anterior) — nunca confirmada numa sessão de jogo real longa, só em simulação em lote.
@@ -134,6 +146,7 @@ Fecha o item "animais no mapa", que a Parte 2 listava como bloqueado por arte �
 
 ### 2.3 Sugestões de evolução levantadas nesta sessão (nada implementado ainda)
 - **LOD de renderização por zoom** (ideia registrada, não implementada) — distinto do LOD de *simulação* que já existe (`simulation/lod.js`, §1.9: decide quem roda percepção/decisão completos). Este seria sobre o que é *desenhado*: em zoom bem aberto (mapa grande visível), reduzir o detalhe visual em degraus — tile vira cor sólida sem textura, agente/construção vira um bloco ou ponto sem sprite/animação, só o suficiente pra ler "aqui tem floresta", "aqui tem vila". Conforme aproxima o zoom, o detalhe sobe em degraus até o nível atual (sprite completo, animação, partícula). Ataca dois problemas ao mesmo tempo: o gargalo de FPS que `drawTiles` tinha antes de `render/terrain/terrainChunks.js` (custo escalava com tiles visíveis, que cresce com zoom out) e permite aumentar o tamanho do mapa sem piorar performance, porque o custo passa a escalar com "tiles × nível de detalhe exigido naquele zoom", não só "quantos tiles estão na tela". **Implementação real (quantos degraus, o que cada um desenha) fica pra quando performance/escala de mapa for prioridade** — não é urgente hoje porque `terrainChunks.js` já resolveu o gargalo medido de terreno; o ganho aqui seria principalmente pra mapas maiores que os atuais 220×220, ou pra aliviar `agentRenderer.js`/`predatorRenderer.js` em telas com centenas de agentes visíveis ao mesmo tempo.
+- **Viés de direção na exploração** — hoje a expedição sorteia um ângulo puro a 45 tiles, e nada garante que aponte pra uma cordilheira: medido, acha montanha em só ~40% dos mundos. Fazer a vila preferir setores ainda não visitados é o que faria pedra (e portanto celeiro/depósito) deixar de ser sorte. **É o próximo passo mais valioso da lista.**
 - **Mais tipos de construção além de casa** — armazém (mais capacidade de estoque), torre (bônus pra guerreiros por perto), poço/fazenda (acelera produção de comida/madeira). Dá uma escada de progressão visível pra vila.
 - **Histerese na troca guerra↔paz** — já sinalizado como podendo parecer volátil numa sessão de observação longa; ajuste de sensação de jogo, não sistema novo.
 - **Conectar `defense_pact`** (ver 2.2) — mencionado aqui de novo porque é tanto uma lacuna quanto uma sugestão de evolução natural pro sistema de diplomacia já existente.
