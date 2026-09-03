@@ -4,7 +4,7 @@ import { spawnPredators } from './predator/predator.js';
 import { updatePredator } from './predator/predatorAI.js';
 import { buildSpatialIndex } from './world/spatialIndex.js';
 import { createVillage, addResident, foundVillageBuildings } from './village/village.js';
-import { computeDemand, updateDistress, updateChaos } from './village/stock.js';
+import { computeDemand, updateDistress, updateChaos, countDevelopmentWorkers } from './village/stock.js';
 import { updateTrade } from './village/trade.js';
 import { updateExpedition } from './village/expedition.js';
 import { createClan, addVillage as addVillageToClan, setStance } from './clan/clan.js';
@@ -216,6 +216,10 @@ function simulationUpdate(dt) {
       computeDemand(v);
       updateDistress(v, dt);
       updateChaos(v);
+      // Cacheia quantos moradores estão em atividade de desenvolvimento, pra
+      // village/stock.js:canDevelop responder em O(1) dentro de cada `score`
+      // em vez de varrer a população por agente por ação.
+      countDevelopmentWorkers(v, world);
     }
 
     for (const c of world.clans) {

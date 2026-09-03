@@ -12,8 +12,9 @@ import {
   GATHER_RATE,
   MINE_SCORE_WEIGHT,
   MINING_RESOURCES,
+  MINE_MAX_TRAVEL_TILES,
 } from '../../utils/constants.js';
-import { hasFoodSurplus } from '../../village/stock.js';
+import { canDevelop } from '../../village/stock.js';
 import { recallNearest } from '../memory.js';
 import { recallVillageSite } from '../../village/knowledge.js';
 import { getVillage, findWalkableNear } from '../../world/world.js';
@@ -52,6 +53,23 @@ function findDeposit(agent, world, village, resource) {
   );
   if (!told) return null;
   if (isHostileTerritory(world, agent, told.tx, told.ty)) return null;
+
+  // O quadro diz ONDE tem minério, não que valha a pena ir. Um depósito a 60
+  // tiles é uma viagem de ~2min de tempo simulado por 10 de pedra, com o
+  // morador fora da produção de comida o tempo todo — e minério nem é recurso
+  // crítico.
+  //
+  // Isto foi medido como o desestabilizador principal da economia: em 5 seeds
+  // de 600s, a população final caía monotonicamente com o número de vilas que
+  // tinham descoberto minério (0 vilas -> 50 moradores; 1 -> 47; 2 -> 32; 3 ->
+  // 16; 4 -> extinção). O quadro de descobertas não criou o problema, só
+  // tornou a mineração possível de verdade pela primeira vez e revelou o custo
+  // que ela sempre teria tido.
+  const dx = (told.tx + 0.5) * TILE_SIZE - agent.position.x;
+  const dy = (told.ty + 0.5) * TILE_SIZE - agent.position.y;
+  const maxPx = MINE_MAX_TRAVEL_TILES * TILE_SIZE;
+  if (dx * dx + dy * dy > maxPx * maxPx) return null;
+
   return { tx: told.tx, ty: told.ty, type: TILE_TYPES.MOUNTAIN, resource: told.resource };
 }
 
@@ -93,7 +111,7 @@ export function score(agent, world) {
   //
   // A regra mora em village/stock.js:hasFoodSurplus — a mesma que trava
   // explorar e construir, pelo mesmo motivo, declarada num lugar só.
-  if (!hasFoodSurplus(village)) return 0;
+  if (!canDevelop(village, agent)) return 0;
 
   return bestChoice(agent, world, village)?.score ?? 0;
 }

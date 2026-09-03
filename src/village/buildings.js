@@ -170,11 +170,36 @@ export function countByType(village, type) {
 // uma pressão populacional que raramente chegava perto do teto. Agora
 // construir é uma candidata que só existe quando há de fato um gargalo.
 export function nextBuildingType(village) {
-  if (village.population.length >= getPopulationCap(village) * BUILD_NEED_THRESHOLD) return 'house';
-  if (village.stock.food >= village.capacity.food * 0.9) return 'granary';
-  if (village.stock.wood >= village.capacity.wood * 0.9) return 'depot';
-  return null;
+  // A MAIOR carência vence, entre as que passaram do limiar — não uma ordem
+  // fixa. A versão anterior testava população primeiro e devolvia 'house'
+  // assim que ela passasse de 75% do teto; como a vila vive encostada no
+  // teto, isso era quase sempre verdade e celeiro/depósito NUNCA chegavam a
+  // ser considerados. O efeito colateral era pior que a prioridade errada:
+  // como só a casa é construída e só ela não custa pedra, o minério ficava
+  // sem nenhum consumidor real — a vila minerava e o estoque só acumulava.
+  let best = null;
+  let bestNeed = BUILD_NEED_THRESHOLD;
+  for (const type of BUILDABLE_TYPES) {
+    // Só concorre o que a vila consegue pagar AGORA. Sem esta checagem, um
+    // tipo de carência alta mas inviável (depósito com madeira no teto e zero
+    // pedra) vencia a comparação e bloqueava um tipo mais barato que estava
+    // perfeitamente ao alcance — a vila "queria" construir e nunca construía.
+    if (!affordable(village, type)) continue;
+    const need = buildingNeed(village, type);
+    if (need > bestNeed) {
+      bestNeed = need;
+      best = type;
+    }
+  }
+  return best;
 }
+
+function affordable(village, type) {
+  const spec = BUILDING[type];
+  return (village.stock.wood ?? 0) >= spec.wood && (village.stock.stone ?? 0) >= spec.stone;
+}
+
+const BUILDABLE_TYPES = Object.keys(BUILDING).filter((t) => BUILDING[t].buildable);
 
 // O quão apertado está o gargalo que `nextBuildingType` apontou, de 0 a 1 —
 // é isto que `build.js` usa pra pontuar, em vez de sempre a pressão

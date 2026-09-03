@@ -15,7 +15,7 @@
 
 import { TILE_SIZE, TERRITORY_RADIUS, PATROL_SCORE, PATROL_RADIUS_FRACTION } from '../../utils/constants.js';
 import { getVillage, findWalkableNear } from '../../world/world.js';
-import { hasFoodSurplus } from '../../village/stock.js';
+import { canDevelop } from '../../village/stock.js';
 import { moveToward, clearMovement } from '../movement.js';
 
 export function score(agent, world) {
@@ -27,7 +27,7 @@ export function score(agent, world) {
   // rondar também não produz comida, e numa vila com o celeiro baixo o
   // guerreiro tem mais o que fazer. É o que faz a guarnição ir pra roça
   // quando aperta, em vez de desfilar enquanto a vila passa fome.
-  if (!hasFoodSurplus(village)) return 0;
+  if (!canDevelop(village, agent)) return 0;
   return PATROL_SCORE;
 }
 

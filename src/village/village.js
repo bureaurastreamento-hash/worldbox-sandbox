@@ -6,6 +6,7 @@ import {
   REPRO_COOLDOWN_MIN,
   TERRITORY_RADIUS,
   STARTING_FOOD_STOCK,
+  EXPLORE_SECTORS,
 } from '../utils/constants.js';
 import { addBuilding, findBuildingSpot, getPopulationCap } from './buildings.js';
 import { createKnownSites } from './knowledge.js';
@@ -23,7 +24,7 @@ export { getPopulationCap };
 // vila colhe, sem gate de especialização (agent/actions/mine.js) — e fica
 // fora de `distress` de propósito: não alimenta guerra/colapso (ver
 // utils/constants.js:CRITICAL_RESOURCES), só comércio genérico e construção.
-export function createVillage({ id, name, center, specialization = 'food' }) {
+export function createVillage({ id, name, center, specialization = 'food', founded = 0 }) {
   const capacity = { food: VILLAGE_FOOD_CAPACITY, wood: VILLAGE_WOOD_CAPACITY };
   const stock = { food: STARTING_FOOD_STOCK, wood: 0 }; // ver STARTING_FOOD_STOCK: bootstrap seguro pra eat.js
   const demand = { food: 0, wood: 0 };
@@ -53,7 +54,22 @@ export function createVillage({ id, name, center, specialization = 'food' }) {
     // ao próprio descobridor, mas só recebe o que alguém trouxe no corpo.
     knownSites: createKnownSites(),
     expedition: null, // expedição de exploração em curso, ver village/expedition.js
+    // Obra em andamento: `{ type, x, y, progress }` ou null. O canteiro é da
+    // VILA e não do agente — o progresso sobrevive a quem foi comer e volta,
+    // e vários moradores podem tocar a mesma obra. Ver agent/actions/build.js.
+    construction: null,
+    // Quantas expedições a vila já mandou pra cada setor do horizonte — o que
+    // faz a próxima escolher o rumo mais esquecido em vez de sortear
+    // (village/expedition.js:pickTarget). É memória do que ela FEZ, não do que
+    // enxerga: nenhuma informação sobre terreno desconhecido entra aqui.
+    exploredSectors: new Array(EXPLORE_SECTORS).fill(0),
     population: [],
+    // Segundo simulado em que a vila foi fundada. Estava no modelo de dados
+    // conceitual do DESIGN.md §3 desde o começo e nunca era setado nem lido —
+    // agora alimenta a idade mostrada no inspetor. Todas as vilas do world-gen
+    // nascem em 0; o campo existe pro dia em que vilas puderem ser fundadas
+    // durante a partida.
+    founded,
     reproCooldown: REPRO_COOLDOWN_MIN,
   };
 }

@@ -21,7 +21,7 @@ import {
   nextBuildingType,
   buildingNeed,
 } from '../../village/buildings.js';
-import { addStock, hasFoodSurplus } from '../../village/stock.js';
+import { addStock, canDevelop } from '../../village/stock.js';
 import { pushEvent } from '../../world/eventLog.js';
 import { moveToward, clearMovement } from '../movement.js';
 
@@ -41,7 +41,7 @@ export function score(agent, world) {
   // condição isso vira gente construindo casa enquanto a vila passa fome —
   // medido, população média caiu de 57.6 pra 35.3 com 3 vilas extintas na
   // primeira versão em que construir passou a funcionar de fato.
-  if (!hasFoodSurplus(village)) return 0;
+  if (!canDevelop(village, agent)) return 0;
 
   const type = nextBuildingType(village);
   if (!canAfford(village, type)) return 0;
@@ -61,66 +61,77 @@ export function score(agent, world) {
   return buildingNeed(village, type) * BUILD_SCORE_WEIGHT;
 }
 
+// O CANTEIRO É DA VILA, NÃO DO AGENTE — e isso não é organização, é o que
+// faz a construção existir sem quebrar a economia.
+//
+// Enquanto o progresso morava em `agent.buildProgress`, toda interrupção o
+// perdia: a obra exige BUILD_WORK_SECONDS de trabalho e o agente é
+// interrompido o tempo todo (fome, predador, guerra). Como `build` pontua
+// acima de `gather`, o agente voltava a escolher construir, caminhava até um
+// canteiro NOVO, trabalhava alguns segundos, era interrompido de novo — um
+// atrator que queimava mão de obra com baixa chance de completar. Medido em
+// 600s simulados: com a construção ligada, as quatro vilas iam à extinção
+// (pico de 66 moradores aos 240s, zero aos 540s); com ela desligada, a mesma
+// configuração ficava estável em ~49 pra sempre. O custo em madeira era
+// desprezível (25 por casa, ~50 no total) — o que matava era o TEMPO.
+//
+// Com o canteiro na vila, o trabalho de qualquer morador se acumula no mesmo
+// lugar, ninguém recomeça do zero, e vários podem tocar a mesma obra.
+function currentSite(world, village) {
+  const site = village.construction;
+  if (!site) return null;
+  // A carência pode ter mudado enquanto a obra rolava (outra vila entregou
+  // comida, alguém morreu): se o tipo deixou de fazer sentido ou de caber no
+  // estoque, o canteiro é abandonado e o progresso some junto.
+  if (!canAfford(village, site.type)) {
+    village.construction = null;
+    return null;
+  }
+  return site;
+}
+
 export function step(agent, world, dt) {
   const village = getVillage(world, agent.villageId);
   if (!village) return;
 
-  if (!agent.target) {
+  let site = currentSite(world, village);
+  if (!site) {
     const type = nextBuildingType(village);
     if (!canAfford(village, type)) return; // espera a próxima reconsideração
 
     const spot = findBuildingSpot(world, village, world.rng);
     if (!spot) return; // clareira cheia; outra ação vence na próxima
 
-    agent.buildType = type;
-    agent.target = spot;
-    agent.buildProgress = 0;
+    site = { type, x: spot.x, y: spot.y, progress: 0 };
+    village.construction = site;
   }
+
+  if (!agent.target) agent.target = { x: site.x, y: site.y };
 
   const status = moveToward(agent, world, dt, agent.target);
   if (status === 'unreachable') {
+    // Só ESTE agente desiste; o canteiro continua de pé pra quem alcançar.
     clearMovement(agent, world);
-    agent.buildProgress = 0;
-    agent.buildType = null;
     return;
   }
   if (status !== 'arrived') return;
 
-  const type = agent.buildType ?? 'house';
-  const spec = BUILDING[type];
+  site.progress += dt;
+  agent.buildProgress = site.progress; // espelho pro agent/stuck.js contar como progresso
 
-  // Reconfere na chegada só pra não gastar 15s de trabalho à toa — mas NÃO
-  // debita nada aqui.
-  if (!canAfford(village, type)) {
-    clearMovement(agent, world);
-    agent.buildProgress = 0;
-    agent.buildType = null;
-    return;
-  }
-
-  agent.buildProgress += dt;
-  if (agent.buildProgress >= BUILD_WORK_SECONDS) {
-    // O recurso sai do estoque AGORA, ao completar — não na chegada.
-    //
-    // Debitar na chegada era um vazamento silencioso que sozinho impedia
-    // qualquer prédio de existir. A obra exige BUILD_WORK_SECONDS de trabalho
-    // CONTÍNUO, mas o agente é interrompido o tempo todo (fome, predador,
-    // guerra): quando isso acontece, decision.js zera `agent.target`, o step
-    // seguinte escolhe outro canteiro e reseta `buildProgress` — e debita a
-    // madeira DE NOVO. Cada tentativa abortada queimava o custo inteiro sem
-    // deixar nada, e o estoque de madeira ficava oscilando logo abaixo do
-    // custo pra sempre (medido: 17-29 de madeira contra um custo de 25, 175
-    // agente-ticks escolhendo construir, zero prédios em 5 mundos).
-    //
-    // Debitando na conclusão, uma obra abandonada custa só o tempo de quem a
-    // tentou, que é o que já se paga em qualquer outra ação interrompida.
-    // Dois agentes concluindo juntos também deixam de ser um problema: o
-    // segundo simplesmente reprova no canAfford acima.
+  if (site.progress >= BUILD_WORK_SECONDS) {
+    const spec = BUILDING[site.type];
+    // O recurso sai do estoque AO CONCLUIR, não na chegada. Debitar na chegada
+    // era um vazamento silencioso que sozinho impedia qualquer prédio de
+    // existir: cada tentativa abortada queimava o custo inteiro sem deixar
+    // nada, e o estoque de madeira ficava oscilando logo abaixo do custo pra
+    // sempre (medido: 17-29 de madeira contra um custo de 25, 175 agente-ticks
+    // escolhendo construir, zero prédios em 5 mundos).
     addStock(village, 'wood', -spec.wood);
     addStock(village, 'stone', -spec.stone);
-    addBuilding(village, type, agent.target.x, agent.target.y);
+    addBuilding(village, site.type, site.x, site.y);
+    village.construction = null;
     agent.buildProgress = 0;
-    agent.buildType = null;
     clearMovement(agent, world);
     pushEvent(world, `${village.name} construiu ${spec.label === 'Casa' ? 'uma casa' : `um ${spec.label.toLowerCase()}`}`);
   }

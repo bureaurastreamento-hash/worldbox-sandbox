@@ -99,6 +99,23 @@ export function updateVillageReproduction(village, world, dt) {
   if (village.reproCooldown > 0) return;
   village.reproCooldown = world.rng.range(REPRO_COOLDOWN_MIN, REPRO_COOLDOWN_MAX);
 
+  // ATENÇÃO ao mexer neste gate: a população de equilíbrio de uma vila
+  // (~12-13 moradores, medido em 600s simulados) é fixada pelas taxas de
+  // nascimento e morte, NÃO pelo teto — e não tem folga nenhuma. Qualquer
+  // coisa que reduza a reprodução nessa faixa empurra a vila abaixo do
+  // equilíbrio e ela espirala até a extinção total.
+  //
+  // Medido nesta sessão: baixar VILLAGE_POP_CAP de 30 pra 18 (pra `build.js`
+  // enxergar carência de moradia) matou as quatro vilas por volta dos 400s.
+  // Trocar o gate rígido por um teto suave NÃO resolveu — não é sincronia de
+  // idades, é o equilíbrio não ter margem. Por isso o teto voltou a ser alto
+  // o bastante pra nunca bindar, e a carência de construção passou a ser
+  // medida por BUILD_NEED_THRESHOLD (utils/constants.js), não por encostar
+  // no teto.
+  //
+  // A janela de teste também importa: nada disso aparece em 180s, porque a
+  // população ainda está subindo pro pico ali. Medir crescimento populacional
+  // com menos de ~500s simulados não diz nada.
   if (village.population.length >= getPopulationCap(village)) return;
   if (village.inChaos) return; // colapso interno (village/stock.js:updateChaos) trava reprodução
   if ((village.demand.food ?? 0) > REPRO_FOOD_DEMAND_MAX) return;

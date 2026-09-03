@@ -22,6 +22,9 @@
 import {
   TILE_SIZE,
   EXPLORE_DISTANCE_TILES,
+  EXPLORE_MAX_DISTANCE_TILES,
+  EXPLORE_DISTANCE_GROWTH,
+  EXPLORE_SECTORS,
   EXPEDITION_MAX_SIZE,
   EXPEDITION_MIN_POPULATION,
   EXPEDITION_POPULATION_PER_MEMBER,
@@ -33,7 +36,7 @@ import {
 import { findWalkableNear } from '../world/world.js';
 import { distance } from '../utils/mathUtils.js';
 import { reportDiscoveries } from './knowledge.js';
-import { hasFoodSurplus } from './stock.js';
+import { hasFoodSurplus, canDevelop } from './stock.js';
 import { destinationFor } from './buildings.js';
 
 function hashId(id) {
@@ -43,18 +46,55 @@ function hashId(id) {
   return h >>> 0;
 }
 
-// Alvo: um ponto a EXPLORE_DISTANCE_TILES do centro da vila, num ângulo
-// sorteado. `findWalkableNear` puxa pro tile andável mais próximo se calhar
-// de cair em água ou montanha — sem isso o pathfinding recusaria o destino de
-// saída e a expedição nasceria morta.
+// Alvo da próxima expedição: o SETOR MENOS VISITADO em volta da vila, com o
+// ângulo exato sorteado dentro dele.
+//
+// A primeira versão sorteava o ângulo inteiro, e o resultado medido foi que a
+// exploração achava cordilheira em só ~40% dos mundos — nada impedia três
+// expedições seguidas de irem praticamente pro mesmo lado, enquanto metade do
+// mapa nunca era olhada. Como montanha é gerada em cadeias (world/terrain.js),
+// achar minério virava sorte, e com ele o celeiro e o depósito.
+//
+// A vila lembra quantas vezes já mandou gente pra cada setor
+// (`village.exploredSectors`) e escolhe o mais esquecido. Continua sendo
+// conhecimento institucional legítimo — é o que a vila já FEZ, não o que ela
+// enxerga; nenhuma informação sobre o terreno desconhecido entra aqui.
+//
+// A distância também cresce com o número de visitas ao setor: se a vila já
+// bateu naquele rumo e não achou nada, a próxima expedição vai mais longe em
+// vez de repetir o mesmo passeio. É o que faz a exploração de fato varrer o
+// mapa em vez de circular sempre no mesmo anel.
 function pickTarget(world, village) {
-  const angle = world.expeditionRng.next() * Math.PI * 2;
-  const tx = Math.round(village.center.x / TILE_SIZE + Math.cos(angle) * EXPLORE_DISTANCE_TILES);
-  const ty = Math.round(village.center.y / TILE_SIZE + Math.sin(angle) * EXPLORE_DISTANCE_TILES);
+  if (!village.exploredSectors) village.exploredSectors = new Array(EXPLORE_SECTORS).fill(0);
+  const sectors = village.exploredSectors;
+
+  let best = 0;
+  for (let i = 1; i < sectors.length; i++) {
+    // Empate desfeito por sorteio, senão a vila varreria os setores sempre na
+    // mesma ordem (horário a partir do leste), o que lê como script.
+    if (sectors[i] < sectors[best] || (sectors[i] === sectors[best] && world.expeditionRng.next() < 0.5)) {
+      best = i;
+    }
+  }
+
+  const sectorWidth = (Math.PI * 2) / sectors.length;
+  const angle = (best + world.expeditionRng.next()) * sectorWidth;
+  const distance = Math.min(
+    EXPLORE_DISTANCE_TILES * (1 + sectors[best] * EXPLORE_DISTANCE_GROWTH),
+    EXPLORE_MAX_DISTANCE_TILES,
+  );
+
+  const tx = Math.round(village.center.x / TILE_SIZE + Math.cos(angle) * distance);
+  const ty = Math.round(village.center.y / TILE_SIZE + Math.sin(angle) * distance);
   const clampedTx = Math.max(1, Math.min(world.width - 2, tx));
   const clampedTy = Math.max(1, Math.min(world.height - 2, ty));
+  // findWalkableNear puxa pro tile andável mais próximo se calhar de cair em
+  // água ou montanha — sem isso o pathfinding recusaria o destino e a
+  // expedição nasceria morta.
   const spot = findWalkableNear(world, clampedTx, clampedTy, 12);
   if (!spot) return null;
+
+  sectors[best]++;
   return { x: (spot.tx + 0.5) * TILE_SIZE, y: (spot.ty + 0.5) * TILE_SIZE };
 }
 
@@ -87,6 +127,10 @@ export function canJoin(village, agent) {
   const exp = village.expedition;
   if (exp?.memberIds.includes(agent.id)) return true; // já está dentro, não reavalia
   if (!canAffordExpedition(village)) return false;
+  // Teto de mão de obra da vila inteira (village/stock.js:canDevelop) — a
+  // expedição concorre pelas mesmas vagas que minerar, construir e patrulhar,
+  // senão as quatro somadas passam do que a economia aguenta.
+  if (!canDevelop(village, agent, EXPLORE_MIN_FOOD_FRACTION)) return false;
   if (!exp) return true; // funda a sua
   if (exp.state !== 'outbound') return false;
   if (exp.memberIds.length >= expeditionCapacity(village)) return false;

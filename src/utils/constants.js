@@ -43,6 +43,20 @@ export const AGENT_COUNT = 8;
 export const WARRIOR_TYPES = ['orc', 'elfo', 'cavaleiro'];
 
 export const CARRY_CAPACITY = 10; // unidades de recurso por viagem
+// NÃO BAIXE ISTO ACHANDO QUE DÁ FOLGA À ECONOMIA. Foi testado (8 -> 6, +33%
+// de produção) e o resultado foi PIOR: a população caiu e mais vilas se
+// extinguiram.
+//
+// O motivo é que a economia é homeostática, não linear. `gather.js` pontua
+// por `village.demand.food`, que cai quando o estoque sobe — então produzir
+// mais comida ABAIXA o score de colher e libera mais gente pra atividades que
+// não são comida (explorar, minerar, construir, patrulhar). O excedente é
+// convertido em outra coisa antes de virar margem, e a vila volta pro mesmo
+// fio de navalha, só que com mais gente pra alimentar.
+//
+// Consequência prática: o jeito de sustentar mais atividade não-alimentar
+// NÃO é aumentar a produção, é mexer no que compete pelo tempo do agente
+// (pesos de score e DEVELOPMENT_MIN_FOOD_FRACTION).
 const GATHER_SECONDS = 8; // tempo pra encher a carga colhendo
 export const GATHER_RATE = CARRY_CAPACITY / GATHER_SECONDS;
 
@@ -121,11 +135,46 @@ export const VILLAGE_MINERAL_CAPACITY = 50;
 // demais por agente-hora, testado e confirmado atrasando o bootstrap de
 // food/wood o bastante pra causar extinção por velhice sem reprodução.
 export const MINE_SCORE_WEIGHT = 0.35;
+// Distância máxima que um morador anda atrás de um depósito indicado pelo
+// QUADRO da vila (village/knowledge.js). A memória própria do agente não
+// passa por aqui: o que ele viu com os próprios olhos já está, por
+// construção, dentro do raio de percepção.
+//
+// Sem este limite, o quadro mandava gente atravessar o mapa por 10 de pedra —
+// medido como o principal desestabilizador da economia (ver o comentário em
+// agent/actions/mine.js:findDeposit). Minério nem é recurso crítico.
+export const MINE_MAX_TRAVEL_TILES = 25;
 // Fração mínima do celeiro pra a vila gastar mão de obra em DESENVOLVIMENTO
 // (explorar, minerar, construir) em vez de em comida. Trava de sobrevivência,
 // não de calibragem — ver village/stock.js:hasFoodSurplus, onde a regra é
 // declarada uma vez e consultada pelas três ações.
+// 0.6, não 0.3. O primeiro valor era reativo demais e por pouco não derrubou
+// a simulação inteira: com o celeiro em 140, 30% são 42 unidades, e as vilas
+// passavam a maior parte do tempo acima disso — ou seja, o desenvolvimento
+// ficava LIBERADO justamente no pico populacional, que é quando a comida é
+// mais necessária. Medido em 600s: a população subia a 64, três ações de
+// desenvolvimento (explorar/patrulhar/construir) consumiam 1780 agente-ticks
+// contra 2406 de colheita, a comida despencava, a fome bloqueava a
+// reprodução (REPRO_FOOD_DEMAND_MAX) e as vilas iam à extinção — 24 mortes de
+// fome contra 8 nascimentos em 420s.
+//
+// A economia desta simulação NÃO TEM FOLGA: a população de equilíbrio é
+// fixada pelas taxas de nascimento e morte, e qualquer mão de obra desviada
+// sai direto da margem de sobrevivência. Desenvolvimento só com excedente de
+// verdade.
 export const DEVELOPMENT_MIN_FOOD_FRACTION = 0.3;
+
+// Fração máxima da vila que pode estar em atividade de DESENVOLVIMENTO
+// (explorar/minerar/construir/patrulhar) ao mesmo tempo — com piso de 1, pra
+// nenhuma vila ficar permanentemente incapaz de evoluir.
+//
+// Esta é a trava que faltava, e a lição central desta sessão: o limite tem
+// que ser sobre QUANTIDADE DE GENTE, não sobre estoque. Limiares de estoque
+// oscilam — assim que o celeiro sobe um pouco, a vila inteira fica liberada
+// de uma vez, justamente no pico populacional, e desaba. Ver
+// village/stock.js:canDevelop pro raciocínio completo, incluindo por que
+// aumentar a produção de comida piorou em vez de ajudar.
+export const DEVELOPMENT_LABOR_FRACTION = 0.1;
 // Proporção de cada minério nos tiles de montanha (world/terrain.js) —
 // cumulativo: stone até 0.6, coal até 0.8, iron até 0.95, gold o resto.
 export const MOUNTAIN_RESOURCE_WEIGHTS = { stone: 0.6, coal: 0.2, iron: 0.15, gold: 0.05 };
@@ -182,6 +231,29 @@ export const EXPLORE_MIN_FOOD_FRACTION = 0.35; // do teto de comida da vila
 // Distância do alvo da expedição, a partir do centro da vila. Bem além do
 // raio de percepção (12) de propósito: o ponto é sair do que já se conhece.
 export const EXPLORE_DISTANCE_TILES = 45;
+// Em quantos setores a vila divide o horizonte pra escolher pra onde ainda
+// não mandou ninguém (village/expedition.js:pickTarget). Com ângulo puramente
+// sorteado, medido, a exploração achava cordilheira em só ~40% dos mundos —
+// três expedições podiam ir praticamente pro mesmo lado enquanto metade do
+// mapa nunca era olhada.
+export const EXPLORE_SECTORS = 8;
+// Quanto a distância cresce a cada visita já feita ao mesmo setor: se a vila
+// já bateu naquele rumo e não achou nada, a próxima vai mais longe em vez de
+// repetir o passeio. É o que faz a exploração varrer o mapa em vez de
+// circular sempre no mesmo anel.
+// ZERO de propósito — a expedição vai sempre a EXPLORE_DISTANCE_TILES, e o
+// que varia é só a DIREÇÃO (rotação de setores acima). A ida e volta é o
+// custo econômico real da exploração: a 60px/s, 45 tiles já são ~48s de tempo
+// simulado com o membro fora da economia; a 70 tiles são ~75s e a 95 são
+// ~100s. Testado com 0.45/95 e com 0.25/70, e nos dois a população de 600s
+// caiu de forma consistente — o alcance extra nunca pagou o tempo.
+//
+// Fica como constante (e não removido) porque o mecanismo é o certo pra o dia
+// em que a economia tiver folga pra bancar expedição longa; ver a nota de
+// BUILD_NEED_THRESHOLD sobre limitar quanta gente pode estar em atividade
+// não-alimentar ao mesmo tempo.
+export const EXPLORE_DISTANCE_GROWTH = 0;
+export const EXPLORE_MAX_DISTANCE_TILES = 70; // teto; o mapa tem 220 de lado
 // Um agente só entra numa expedição já formada se ainda está perto da vila —
 // senão alguém do outro lado do mapa "teleportaria" para o grupo.
 export const EXPEDITION_JOIN_RADIUS_TILES = 15;
@@ -236,6 +308,28 @@ export const BUILD_SCORE_WEIGHT = 0.6;
 // Quão cheio um limite precisa estar pra a vila querer construir. Abaixo
 // disso `nextBuildingType` devolve null e construir nem entra na lista de
 // candidatas.
+//
+// PENDÊNCIA CONHECIDA, medida e deliberadamente deixada como está: com 0.75 e
+// VILLAGE_POP_CAP não-bindante (30), a lotação real de uma vila (~12-13 de 30,
+// ou seja ~0.42) nunca cruza o limiar, e portanto CONSTRUÇÃO QUASE NUNCA
+// ACONTECE. Isso é o comportamento de antes desta sessão, e é o único que
+// mediu estável em 600s simulados.
+//
+// As duas formas de destravar foram testadas e AS DUAS levaram as quatro
+// vilas à extinção total por volta dos 300-450s:
+//   - baixar o teto de população pra 18, pra a lotação subir (ver
+//     VILLAGE_POP_CAP);
+//   - baixar este limiar pra 0.4, pra casar com a lotação real.
+// A causa não é o custo nem o vazamento de recurso (os dois já corrigidos em
+// agent/actions/build.js): é a MÃO DE OBRA. Medido em 600s, com construção
+// ligada as ações de desenvolvimento consumiam 1780 agente-ticks contra 2406
+// de colheita, a comida despencava, a fome bloqueava a reprodução
+// (REPRO_FOOD_DEMAND_MAX) e a espiral fechava — 24 mortes de fome contra 8
+// nascimentos.
+//
+// Destravar construção de verdade exige limitar quanta gente da vila pode
+// estar em atividade não-alimentar ao mesmo tempo (como village/expedition.js
+// já faz com expeditionCapacity), não mexer neste número. Ver STATUS.md.
 export const BUILD_NEED_THRESHOLD = 0.75;
 
 // Idades em segundos de tempo simulado (mesmo relógio dos needs), não anos —
@@ -287,7 +381,19 @@ export const REPRO_FOOD_DEMAND_MAX = 0.9;
 // 14 foi testado antes e era apertado demais: virava um teto sem escada nas
 // vilas que não conseguiam madeira a tempo, e a população média caiu de 57.6
 // pra 43. O valor certo é o que a vila encosta, não o que a prende.
-export const VILLAGE_POP_CAP = 18;
+// NÃO BAIXAR sem rodar 600s simulados. Este número é um gate rígido de
+// reprodução (lifecycle.js:updateVillageReproduction), e a população de
+// equilíbrio de uma vila (~12-13, medido) é fixada pelas taxas de nascimento
+// e morte, não por ele — sem folga nenhuma. Baixar pra 18 (tentativa desta
+// sessão, pra `build.js` enxergar carência de moradia) levou as quatro vilas
+// à EXTINÇÃO TOTAL por volta dos 400s; um teto suave em vez do rígido também
+// não salvou. Nada disso aparece numa janela de 180s, onde a população ainda
+// está subindo pro pico.
+//
+// O teto fica alto de propósito, ou seja NÃO-BINDANTE: casa continua tendo
+// função real (é onde se dorme, e espalha a vila), e a carência de construção
+// é medida por BUILD_NEED_THRESHOLD, não por encostar aqui.
+export const VILLAGE_POP_CAP = 30;
 
 export const TERRITORY_RADIUS = 10; // tiles
 

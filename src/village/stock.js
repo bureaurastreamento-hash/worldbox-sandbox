@@ -4,6 +4,7 @@ import {
   DISTRESS_CHAOS_THRESHOLD_SECONDS,
   CRITICAL_RESOURCES,
   DEVELOPMENT_MIN_FOOD_FRACTION,
+  DEVELOPMENT_LABOR_FRACTION,
 } from '../utils/constants.js';
 
 export function addStock(village, type, amount) {
@@ -33,6 +34,52 @@ export function hasFoodSurplus(village, minFraction = DEVELOPMENT_MIN_FOOD_FRACT
   const capacity = village.capacity?.food ?? 0;
   if (capacity <= 0) return false;
   return (village.stock.food ?? 0) >= capacity * minFraction;
+}
+
+// Ações que consomem tempo de agente sem produzir comida. É esta lista que
+// `countDevelopmentWorkers` conta e que `canDevelop` limita.
+export const DEVELOPMENT_ACTIONS = ['explore', 'mine', 'build', 'patrol'];
+
+// Chamada uma vez por vila por tick (main.js) — cacheia quantos moradores
+// estão AGORA em atividade de desenvolvimento, pra `canDevelop` responder em
+// O(1) em vez de varrer a população dentro de cada `score`.
+export function countDevelopmentWorkers(village, world) {
+  let n = 0;
+  for (const id of village.population) {
+    const agent = world.agents.find((a) => a.id === id);
+    if (agent?.alive && DEVELOPMENT_ACTIONS.includes(agent.currentAction)) n++;
+  }
+  village.devWorkers = n;
+  return n;
+}
+
+// A vila pode colocar MAIS UM morador em atividade de desenvolvimento agora?
+//
+// Esta é a trava que faltava, e é sobre QUANTIDADE DE GENTE, não sobre um
+// limiar de estoque. Travas por limiar (`distress`, fração de comida) oscilam:
+// assim que o estoque sobe um pouco, TODO MUNDO fica liberado de uma vez,
+// justamente no pico populacional — e a vila desaba. Medido em 600s
+// simulados, uma a uma: explorar, minerar, construir e patrulhar levaram as
+// vilas à extinção, cada uma com uma trava de limiar nova e insuficiente.
+//
+// Pior, a economia é HOMEOSTÁTICA: `gather.js` pontua por `village.demand`,
+// que cai quando o estoque sobe, então produzir mais comida ABAIXA o score de
+// colher e converte o excedente em atividade não-alimentar antes que ele vire
+// margem. Aumentar a produção (testado, GATHER_SECONDS 8->6) piorou.
+//
+// Um teto de CABEÇAS não tem esse problema: não importa o quão farto o
+// celeiro fique, no máximo esta fração da vila está longe da comida ao mesmo
+// tempo. É o mesmo princípio que village/expedition.js já usava pro tamanho
+// da expedição — aqui generalizado pras quatro ações.
+//
+// O agente que JÁ está desenvolvendo sempre passa: senão ele seria expulso da
+// própria ação no tick seguinte por outro ter entrado, e ninguém terminaria
+// nada.
+export function canDevelop(village, agent, minFraction = DEVELOPMENT_MIN_FOOD_FRACTION) {
+  if (!hasFoodSurplus(village, minFraction)) return false;
+  if (DEVELOPMENT_ACTIONS.includes(agent.currentAction)) return true;
+  const cap = Math.max(1, Math.floor(village.population.length * DEVELOPMENT_LABOR_FRACTION));
+  return (village.devWorkers ?? 0) < cap;
 }
 
 export function computeDemand(village) {
