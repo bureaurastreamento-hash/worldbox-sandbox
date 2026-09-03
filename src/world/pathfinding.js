@@ -9,6 +9,62 @@ import { worldToTile, tileToWorld } from '../utils/mathUtils.js';
 
 const MAX_VISITED = 3000; // orçamento de busca; estourar = desiste (inalcançável ou longe demais)
 
+// Fila de prioridade (min-heap binário) para o conjunto aberto.
+//
+// Era um array com `open.sort((a,b) => a.f - b.f)` A CADA ITERAÇÃO do laço —
+// ou seja, reordenar a lista inteira ~3000 vezes por busca. Enquanto quase
+// todo alvo era vizinho (o wander antigo sorteava um tile do próprio raio de
+// percepção), a lista ficava curta e o custo passava despercebido. Assim que
+// alvos distantes ou inalcançáveis viraram comuns, uma única busca que
+// estoura o orçamento passou a ordenar milhares de elementos milhares de
+// vezes: medido em 33x o tempo total de simulação. Com o heap, inserir e
+// remover são O(log n) e o pior caso da busca volta a ser proporcional ao
+// orçamento, não ao seu quadrado vezes o log.
+function createHeap() {
+  const items = [];
+
+  function up(i) {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (items[parent].f <= items[i].f) break;
+      [items[parent], items[i]] = [items[i], items[parent]];
+      i = parent;
+    }
+  }
+
+  function down(i) {
+    for (;;) {
+      const l = i * 2 + 1;
+      const r = l + 1;
+      let best = i;
+      if (l < items.length && items[l].f < items[best].f) best = l;
+      if (r < items.length && items[r].f < items[best].f) best = r;
+      if (best === i) break;
+      [items[best], items[i]] = [items[i], items[best]];
+      i = best;
+    }
+  }
+
+  return {
+    get size() {
+      return items.length;
+    },
+    push(node) {
+      items.push(node);
+      up(items.length - 1);
+    },
+    pop() {
+      const top = items[0];
+      const last = items.pop();
+      if (items.length > 0) {
+        items[0] = last;
+        down(0);
+      }
+      return top;
+    },
+  };
+}
+
 const NEIGHBOR_OFFSETS = [
   [1, 0],
   [-1, 0],
@@ -52,21 +108,23 @@ export function findPath(world, fromWorldPos, toWorldPos) {
   const goalTile = getTileAt(world, goal.tx, goal.ty);
   if (!goalTile || !isWalkable(goalTile.type)) return null;
 
-  const startNode = { tx: start.tx, ty: start.ty, g: 0 };
-  const open = [{ ...startNode, f: heuristic(start, goal) }];
+  const open = createHeap();
+  open.push({ tx: start.tx, ty: start.ty, g: 0, f: heuristic(start, goal) });
   const cameFrom = new Map();
   const gScore = new Map([[key(start.tx, start.ty), 0]]);
   const closed = new Set();
   let visited = 0;
 
-  while (open.length > 0) {
-    if (++visited > MAX_VISITED) return null;
-
-    open.sort((a, b) => a.f - b.f);
-    const current = open.shift();
+  while (open.size > 0) {
+    const current = open.pop();
     const currentKey = key(current.tx, current.ty);
-    if (closed.has(currentKey)) continue;
+    if (closed.has(currentKey)) continue; // entrada obsoleta: já fechamos este tile por um caminho melhor
     closed.add(currentKey);
+
+    // Conta tiles EXPANDIDOS, não desenfileiramentos. Antes o contador subia
+    // também nas entradas obsoletas descartadas acima, então o orçamento real
+    // era menor (e variável) do que MAX_VISITED anuncia.
+    if (++visited > MAX_VISITED) return null;
 
     if (current.tx === goal.tx && current.ty === goal.ty) {
       return reconstructPath(cameFrom, current);
@@ -96,6 +154,7 @@ export function findPath(world, fromWorldPos, toWorldPos) {
       gScore.set(nKey, tentativeG);
       cameFrom.set(nKey, current);
       open.push({ tx: ntx, ty: nty, g: tentativeG, f: tentativeG + heuristic({ tx: ntx, ty: nty }, goal) });
+
     }
   }
 

@@ -202,9 +202,8 @@ const eventFeed = createEventFeed(document.getElementById('event-feed'));
 let lastSelectedAgentId = null;
 let lastSelectedVillageId = null;
 
-const loop = createGameLoop({
-  timeState,
-  update(dt) {
+function simulationUpdate(dt) {
+  {
     if (dt <= 0) return;
     world.elapsedSeconds += dt;
 
@@ -273,7 +272,12 @@ const loop = createGameLoop({
     }
 
     pruneDead(world, dt);
-  },
+  }
+}
+
+const loop = createGameLoop({
+  timeState,
+  update: simulationUpdate,
   render(realDt) {
     let selectionState = 'none';
     let selectedAgent = null;
@@ -311,5 +315,13 @@ const loop = createGameLoop({
     eventFeed.update(world.events);
   },
 });
+
+// Alça de diagnóstico. O rAF é throttlado numa aba de automação
+// (visibilityState "hidden"), então a única forma confiável de confirmar
+// comportamento ao vivo é pausar o loop e avançar `update(dt)` na mão, com o
+// tempo simulado que se quiser — técnica já usada em sessões anteriores, aqui
+// só exposta em vez de recolada a cada vez. Não é lida por nenhum módulo de
+// jogo: só existe pra inspeção externa.
+window.__wb = { world, camera, timeState, loop, uiState, update: simulationUpdate };
 
 loop.start();

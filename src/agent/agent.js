@@ -18,6 +18,7 @@ export function createAgent({
     // só aparece durante a ação `fight`. Sorteado se não vier explícito.
     warriorType: warriorType ?? WARRIOR_TYPES[rng.int(0, WARRIOR_TYPES.length - 1)],
     target: null, // alvo de movimento da ação corrente; null = precisa escolher um
+    wanderHeading: null, // rumo persistente de wander.js (radianos); null = ainda não sorteado
     path: null, // waypoints até target (agent/movement.js), calculado via pathfinding
     pathTargetKey: null,
     villageId,
