@@ -1,61 +1,44 @@
-// Árvore e planta usam arte real do kenney_roguelike-rpg-pack (mesma fonte
-// da água/grama/areia, ver render/tileRenderer.js — mantém o traço
-// consistente no mapa inteiro). A leva anterior (ArvoreComum/Pinheiro/
-// Palmeira/Arbusto/ArbustoComida) foi substituída durante a reorganização
-// visual em andamento (ver STATUS.md): `ArvoreComum`/`Pinheiro` são os
-// mesmos nomes de arquivo de antes por coincidência de conceito, mas o
-// conteúdo é novo; `Palmeira` virou `ArvoreAzulada` (o pack não tinha
-// silhueta de palmeira, só uma variante de cor) e `ArbustoComida` virou
-// `Sebe` (não achamos arbusto com fruta, só uma 2ª silhueta de planta).
+// Decoração do mapa (árvore, planta, casa, fogueira, baú).
+//
+// Arte PROCEDURAL (render/terrain/decorTextures.js), no mesmo estilo e na
+// mesma direção de luz do terreno — ver render/tileRenderer.js pro porquê de
+// não vir de pack. Só a fogueira continua vindo de arquivo (`Fogueira.png`,
+// que sobreviveu à limpeza de arte).
+//
+// O tamanho na tela sai da própria altura da textura vezes DECOR_ART_SCALE,
+// em vez de um número por tipo escrito à mão: assim a densidade de pixel da
+// decoração bate com a dos personagens e do terreno automaticamente, e
+// mexer no tamanho de uma árvore é mexer na arte dela, não numa tabela
+// paralela que precisa ser mantida em sincronia.
+//
 // `world.decorations` (world/decorations.js) não muda: cada entrada só tem
 // { type, x, y }, então a variante de espécie é escolhida na hora do
-// desenho, determinística pela posição — mesma decoração sempre cai na
-// mesma variante entre frames, sem precisar guardar isso nos dados.
-
-// Pasta canônica de arte em uso — ver render/agentRenderer.js.
-const SPRITE_DIR = 'assets/sprites';
-
-const TREE_FILES = ['ArvoreComum', 'Pinheiro', 'ArvoreAzulada'];
-const PLANT_FILES = ['Arbusto', 'Sebe'];
-// Fogueira/baú (`SuperRetroWorld_CharacterPack_Full`) — decoração nova,
-// sem mecânica nenhuma associada (baú não é loot de verdade hoje).
-const CAMPFIRE_FILES = ['Fogueira'];
-const CHEST_FILES = ['Bau'];
-const VARIANTS_BY_TYPE = {
-  tree: TREE_FILES,
-  plant: PLANT_FILES,
-  campfire: CAMPFIRE_FILES,
-  chest: CHEST_FILES,
-};
+// desenho, determinística pela posição — mesma decoração sempre cai na mesma
+// variante entre frames, sem precisar guardar isso nos dados.
+//
 // A fauna (que já foi decoração parada aqui) virou predador de verdade — ver
 // render/predatorRenderer.js. Não existe mais como tipo de decoração aqui.
 
-const sprites = {}; // filename -> Image
-for (const file of [...TREE_FILES, ...PLANT_FILES, ...CAMPFIRE_FILES, ...CHEST_FILES]) {
-  const img = new Image();
-  img.src = `${SPRITE_DIR}/${file}.png`;
-  sprites[file] = img;
-}
+import { buildDecorTextures, DECOR_ART_SCALE } from './terrain/decorTextures.js';
 
-// Casa: sem sprite único disponível (o pack só tem casa em peças pra montar
-// construções maiores) — telhado + parede empilhados, mesma estrutura de 2
-// formas que o placeholder geométrico já usava (drawHousePlaceholder
-// abaixo), só que com pixel art de verdade em vez de cor lisa. Full-bleed
-// como água/grama/areia, sem padding — não precisa de recorte por alpha.
-const HOUSE_ROOF_FILE = 'CasaTelhado';
-const HOUSE_WALL_FILE = 'CasaParede';
-const houseRoofSprite = new Image();
-houseRoofSprite.src = `${SPRITE_DIR}/${HOUSE_ROOF_FILE}.png`;
-const houseWallSprite = new Image();
-houseWallSprite.src = `${SPRITE_DIR}/${HOUSE_WALL_FILE}.png`;
+const SPRITE_DIR = 'assets/sprites';
 
-const spriteBounds = new Map(); // Image -> { x, y, w, h } em px da própria imagem
+const VARIANTS_BY_TYPE = {
+  tree: ['ArvoreComum', 'Pinheiro', 'ArvoreAzulada'],
+  plant: ['Arbusto', 'Sebe'],
+  chest: ['Bau'],
+  house: ['Casa'],
+};
 
-// Ver o mesmo helper em render/agentRenderer.js: cada decoração cai no
-// placeholder individualmente se a variante dela especificamente não
-// carregou, em vez de travar TODAS as decorações no placeholder até que
-// 100% dos arquivos existam — importante durante a reorganização visual em
-// andamento, onde árvore pode ficar pronta antes de planta (ou vice-versa).
+let textures = null;
+
+// Fogueira é o único arquivo que sobrou aqui — tem padding em volta, então
+// precisa do recorte por alpha que o resto do jogo já usa.
+const campfireSprite = new Image();
+campfireSprite.src = `${SPRITE_DIR}/Fogueira.png`;
+let campfireBounds = null;
+const CAMPFIRE_SIZE = 14; // px de tela em zoom 1
+
 function isSpriteReady(img) {
   return !!img && img.complete && img.naturalWidth > 0;
 }
@@ -90,63 +73,20 @@ function computeContentBounds(img) {
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-Object.values(sprites).forEach((img) => {
-  img.onload = () => spriteBounds.set(img, computeContentBounds(img));
-});
+campfireSprite.onload = () => {
+  campfireBounds = computeContentBounds(campfireSprite);
+};
 
-// Hash determinístico pela posição de mundo — não é rng consumida de lugar
+// Hash determinístico pela posição de mundo — não consome rng de lugar
 // nenhum, só distribui as variantes entre as decorações de forma estável.
 function pickVariant(list, x, y) {
   const h = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
   return list[Math.floor(h * list.length) % list.length];
 }
 
-// Placeholders geométricos: árvore/planta/casa caem aqui enquanto o sprite
-// real não carregou (ou não existe ainda) — não deixa o mapa vazio.
-function drawTreePlaceholder(ctx, x, y, size) {
-  ctx.fillStyle = '#3b7a3b';
-  ctx.beginPath();
-  ctx.moveTo(x, y - size);
-  ctx.lineTo(x - size * 0.6, y);
-  ctx.lineTo(x + size * 0.6, y);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#5c3a21';
-  ctx.fillRect(x - size * 0.08, y, size * 0.16, size * 0.3);
-}
-
-function drawPlantPlaceholder(ctx, x, y, size) {
-  ctx.fillStyle = '#5fae5f';
-  ctx.beginPath();
-  ctx.arc(x, y, size * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawHousePlaceholder(ctx, x, y, size) {
-  ctx.fillStyle = '#c8a366';
-  ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size * 0.5);
-  ctx.fillStyle = '#8a4b3b';
-  ctx.beginPath();
-  ctx.moveTo(x - size * 0.6, y - size * 0.5);
-  ctx.lineTo(x, y - size * 0.95);
-  ctx.lineTo(x + size * 0.6, y - size * 0.5);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// Telhado + parede empilhados, cada um esticado pro próprio tile (16x16
-// nativo, full-bleed) — mesma proporção 1:2 (altura:largura dobrada) que o
-// placeholder geométrico já usava.
-function drawHouseSprite(ctx, x, y, size) {
-  const half = size / 2;
-  ctx.drawImage(houseWallSprite, x - half, y - half, size, half);
-  ctx.drawImage(houseRoofSprite, x - half, y - size, size, half);
-}
-
-// Brilho pulsante atrás da fogueira — `performance.now()` (não `world.
-// elapsedSeconds`) de propósito: é feedback visual de ambiente, deve
-// continuar pulsando mesmo com o jogo pausado, mesmo espírito do easing de
-// câmera (render/camera.js:tick usa tempo real, não o simulado).
+// Brilho pulsante atrás da fogueira — `performance.now()` (não
+// `world.elapsedSeconds`) de propósito: é feedback visual de ambiente, deve
+// continuar pulsando com o jogo pausado, mesmo espírito do easing de câmera.
 const GLOW_PULSE_MS = 900;
 function drawCampfireGlow(ctx, x, y, size) {
   const pulse = (Math.sin(performance.now() / GLOW_PULSE_MS) + 1) / 2; // 0..1
@@ -160,25 +100,19 @@ function drawCampfireGlow(ctx, x, y, size) {
   ctx.fill();
 }
 
-// Sombra elipse translúcida — mesmo padrão de render/agentRenderer.js.
 function drawShadow(ctx, x, y, width) {
   ctx.beginPath();
   ctx.ellipse(x, y, width / 2, width / 5, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
   ctx.fill();
 }
-const SHADOW_BY_TYPE = { tree: true, house: true }; // planta/fogueira/baú são baixos demais pra render valer a pena
 
-const PLACEHOLDER_BY_TYPE = {
-  tree: drawTreePlaceholder,
-  plant: drawPlantPlaceholder,
-  campfire: drawPlantPlaceholder,
-  chest: drawPlantPlaceholder,
-};
-const BASE_SIZE_BY_TYPE = { tree: 26, plant: 12, house: 30, campfire: 14, chest: 16 }; // px de tela em zoom 1
+// Planta/fogueira/baú são baixos demais pra sombra própria valer a pena.
+const SHADOW_BY_TYPE = { tree: true, house: true };
 
 export function drawDecorations(ctx, world, camera) {
   if (!world.decorations?.length) return;
+  if (!textures) textures = buildDecorTextures();
 
   const viewW = ctx.canvas.width;
   const viewH = ctx.canvas.height;
@@ -198,31 +132,30 @@ export function drawDecorations(ctx, world, camera) {
     }
 
     const pos = camera.worldToScreen(deco.x, deco.y, viewW, viewH);
-    const size = (BASE_SIZE_BY_TYPE[deco.type] ?? 16) * camera.zoom;
 
-    if (SHADOW_BY_TYPE[deco.type]) drawShadow(ctx, pos.x, pos.y, size * 0.7);
-
-    if (deco.type === 'campfire') drawCampfireGlow(ctx, pos.x, pos.y, size);
-
-    if (deco.type === 'house') {
-      if (isSpriteReady(houseRoofSprite) && isSpriteReady(houseWallSprite)) {
-        drawHouseSprite(ctx, pos.x, pos.y, size);
-      } else {
-        drawHousePlaceholder(ctx, pos.x, pos.y, size);
+    if (deco.type === 'campfire') {
+      drawCampfireGlow(ctx, pos.x, pos.y, CAMPFIRE_SIZE * camera.zoom);
+      if (campfireBounds) {
+        const h = CAMPFIRE_SIZE * camera.zoom;
+        const w = h * (campfireBounds.w / campfireBounds.h);
+        ctx.drawImage(
+          campfireSprite,
+          campfireBounds.x, campfireBounds.y, campfireBounds.w, campfireBounds.h,
+          pos.x - w / 2, pos.y - h, w, h,
+        );
       }
       continue;
     }
 
     const variants = VARIANTS_BY_TYPE[deco.type];
-    const sprite = variants ? sprites[pickVariant(variants, deco.x, deco.y)] : null;
-    const bounds = isSpriteReady(sprite) ? spriteBounds.get(sprite) : null;
-    if (!bounds) {
-      PLACEHOLDER_BY_TYPE[deco.type]?.(ctx, pos.x, pos.y, size);
-      continue;
-    }
+    const texture = variants ? textures[pickVariant(variants, deco.x, deco.y)] : null;
+    if (!texture) continue;
 
-    const h = size;
-    const w = h * (bounds.w / bounds.h);
-    ctx.drawImage(sprite, bounds.x, bounds.y, bounds.w, bounds.h, pos.x - w / 2, pos.y - h, w, h);
+    const h = texture.height * DECOR_ART_SCALE * camera.zoom;
+    const w = texture.width * DECOR_ART_SCALE * camera.zoom;
+
+    if (SHADOW_BY_TYPE[deco.type]) drawShadow(ctx, pos.x, pos.y, w * 0.8);
+
+    ctx.drawImage(texture, pos.x - w / 2, pos.y - h, w, h);
   }
 }

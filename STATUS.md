@@ -346,3 +346,71 @@ num laço — 500s simulados em segundos, determinístico e repetível. Sondas
 removidas depois; re-adicionar leva 30 segundos e é o caminho mais rápido
 pra qualquer bug de balanceamento futuro. Cuidado: passos demais numa só
 avaliação estouram o timeout do CDP — quebrar em blocos de ~120s.
+
+## 1f. Terreno e decoração refeitos do zero (procedural)
+
+Pedido: o terreno estava "muito cartoon". Estava mesmo — desde que a arte de
+tile foi apagada, cada tile era um **retângulo de cor lisa** (`TILE_COLORS`).
+
+**Busca por substituição, feita e negativa.** O único tileset em qualquer pack
+baixado é o Kenney roguelike (16x16, em `Pers-Sprites/Vários tipos de chão-`).
+Inspecionado tile a tile: é flat, contorno duro e saturado — exatamente o
+estilo que se queria eliminar. Adotá-lo teria trocado o problema por ele
+mesmo. Aplicado o plano B combinado: **gerar do zero**.
+
+### O que foi feito (`src/render/terrain/`, 7 arquivos)
+
+Três coisas fazem o mapa parar de parecer tabuleiro, **em ordem de impacto**:
+
+1. **Transição irregular entre tipos** (`edgeMasks.js`) — a mais importante, e
+   não é sobre detalhe: enquanto cada tile é um quadrado perfeito de um tipo
+   só, o mapa lê como tabuleiro por mais bonita que seja a textura dentro do
+   quadrado. Máscara de 4 bits (quais lados fazem fronteira com terreno de
+   prioridade menor) recorta o tipo de cima sobre o de baixo com borda mordida.
+2. **Variação por posição** — 6 variantes por tipo escolhidas por hash da
+   coordenada, o que mata a repetição de papel de parede. Com 4 variantes, uma
+   cadeia de montanha grande ainda lia como alvenaria.
+3. **Rampa de 5 tons com luz fixa de cima-esquerda** — o que separa
+   "superfície" de "cor chapada" é variação de VALOR, não quantidade de
+   detalhe. Toda a arte (terreno, minério, decoração) respeita a mesma direção.
+
+Mais: minério virou **pedra incrustada fora do centro do tile** em vez de
+ícone centralizado (o ícone flutuando no meio do quadrado era metade do motivo
+de a montanha parecer tabuleiro); árvore/planta/casa/baú ganharam arte no
+mesmo estilo, substituindo o triângulo verde de placeholder que, com o terreno
+já texturizado, tinha virado o pior elemento da tela.
+
+### Decisões técnicas
+
+- **Autoria em 16x16 desenhado a 32.** Os personagens têm ~20px de arte a
+  ART_SCALE 2.1; autorar o chão a 32px nativo deixaria os pixels do terreno com
+  metade do tamanho dos dos personagens. Mistura de densidade de pixel é o que
+  faz um jogo parecer colado de fontes diferentes.
+- **Ruído de valor interpolado, não `random()` por pixel** — a diferença entre
+  textura e chuvisco de TV.
+- **Água usa ruído alongado na horizontal e de amplitude curta.** A primeira
+  versão usava ruído isotrópico com a rampa inteira, e a quantização em 5 tons
+  criava manchas angulares que liam como detrito boiando. Água tem estrutura
+  horizontal e pouquíssimo contraste.
+- **Círculo de território virou gradiente** (`villageRenderer.js`): enquanto o
+  chão era cor lisa um disco translúcido uniforme não incomodava; com o terreno
+  texturizado ele virou a maior mancha achatada da tela, lavando justamente a
+  área onde o jogador mais olha. Agora tinge só perto da borda.
+
+### Performance — ficou MAIS BARATO
+
+| zoom | antes (cor lisa, §6) | agora (procedural) |
+|---|---|---|
+| 1 | 6.8ms | **4.65ms** |
+| 0.25 | 86-167ms | **80ms** |
+
+Contraintuitivo mas explicável: `tileRenderer.js` passou a resolver a arte de
+cada tile **uma vez e guardar no próprio tile** (`_art`). O terreno é estático,
+então refazer duas varreduras de 4 vizinhos e montar uma string de chave por
+tile por frame era desperdício puro — com ~40 mil tiles visíveis em zoom baixo
+são dezenas de milhares de alocações por frame, num laço que o §6 já
+registrava como o gargalo de FPS do jogo. A geração toda acontece no
+carregamento; o laço de render faz um `drawImage` e nada mais.
+
+**Zoom baixo continua sendo o gargalo** (80ms): a otimização real que falta é
+pré-renderizar o terreno num canvas offscreen por chunk, que segue no roadmap.

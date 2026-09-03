@@ -56,9 +56,19 @@ export function drawTerritories(ctx, world, camera) {
     const r = village.territory.radius * TILE_SIZE * camera.zoom;
     const { fill, stroke } = STANCE_COLORS[worstStance(world, village)];
 
+    // Gradiente em vez de preenchimento chapado: transparente no miolo,
+    // tingindo só perto da borda. Enquanto o terreno era cor lisa, um disco
+    // uniforme não incomodava; com o terreno texturizado ele virou a maior
+    // mancha achatada da tela, lavando justamente a área onde o jogador mais
+    // olha (o centro da vila). O território continua legível pela borda, que
+    // é o que de fato comunica o alcance.
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, r * 0.35, pos.x, pos.y, r);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(1, fill);
+
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = fill;
+    ctx.fillStyle = gradient;
     ctx.fill();
     ctx.strokeStyle = stroke;
     ctx.lineWidth = 1;

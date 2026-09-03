@@ -39,6 +39,14 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
     decorations.js
 
   render/
+    terrain/            (arte PROCEDURAL de terreno e decoração — não vem de pack)
+      noise.js
+      palette.js
+      tileTextures.js
+      edgeMasks.js
+      oreTextures.js
+      decorTextures.js
+      terrainAtlas.js
     sprites/            (SpriteManager — em uso por predatorRenderer.js e agentRenderer.js)
       spriteSheet.js
       animationCatalog.js
@@ -134,6 +142,16 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
 - **`world/pathfinding.js`** — A* no grid de tiles; `agent/movement.js` é o único consumidor. Sem isso, o deslocamento em linha reta cortava direto por água/montanha sempre que o alvo estava do outro lado de um obstáculo.
 - **`world/spatialIndex.js`** — `buildSpatialIndex(agents)` (reconstruído em `main.js` a cada tick) + `queryNearby(index, pos, radius)`, buckets de grid do tamanho do raio de percepção. Substitui a varredura O(n) de `agent/perception.js` sobre `world.agents` — sem isso, achar "quem tá por perto" vira O(n²) no total e não escala (medido: 6.6x mais rápido que força bruta com 1500 agentes).
 - **`world/decorations.js`** — `generateDecorations(world)`, chamado uma vez em `main.js` depois de terreno e vilas existirem (não em `createWorld`, que roda antes das vilas). Árvore/planta por chance em tile de floresta/grama, pulando o raio de "clareira" de qualquer vila; casas espalhadas dentro dessa clareira. Puramente visual — não afeta `isWalkable`, pathfinding, percepção nem nenhum outro sistema. Usa uma rng própria (`${seed}-decorations`) pra não desviar a sequência de `world.rng` (gameplay).
+
+- **`render/terrain/`** — arte de terreno e decoração **gerada por código**, não vinda de pack. A busca por substituição foi feita e fechou negativa: o único tileset disponível (Kenney roguelike, 16x16) é chapado e saturado, exatamente o "muito cartoon" que se queria eliminar — adotá-lo teria trocado o problema por ele mesmo. Gerar dá controle total sobre paleta e direção de luz, custa zero bytes de repositório, e acabou saindo mais rápido que a versão anterior (ver custo abaixo).
+  - **Três coisas fazem o mapa parar de parecer tabuleiro**, em ordem de impacto: (1) `edgeMasks.js` — transição irregular entre tipos, que dissolve a grade de quadrados perfeitos; enquanto cada tile é um quadrado de uma cor só, o mapa lê como tabuleiro por mais bonita que seja a textura dentro dele; (2) variação por posição (6 variantes por tipo, escolhidas por hash), que mata a repetição de papel de parede; (3) rampa de 5 tons com luz vinda sempre de cima-esquerda, porque o que separa "superfície" de "cor chapada" é variação de VALOR, não quantidade de detalhe.
+  - **`noise.js`** — hash e ruído de valor determinísticos. Ruído de valor interpolado, não `random()` por pixel: a diferença entre textura e chuvisco de TV.
+  - **`palette.js`** — as rampas por tipo e `TERRAIN_PRIORITY` (quem invade quem nas transições). É dado: mexer em cor é mexer só aqui.
+  - **`tileTextures.js`** — os pintores por terreno. Autoria em **16x16 desenhado a 32**, deliberado: os personagens têm ~20px de arte a ART_SCALE 2.1, e autorar o chão a 32px nativo deixaria os pixels do terreno com metade do tamanho dos dos personagens — a mistura de densidades é o que faz um jogo parecer colado de fontes diferentes. A água usa ruído **alongado na horizontal e de amplitude curta**: com ruído isotrópico e a rampa inteira, a quantização criava manchas angulares que liam como detrito boiando.
+  - **`oreTextures.js`** — minério como pedra incrustada na rocha, fora do centro. Antes era um ícone centralizado no tile: um objeto flutuando no meio do quadrado, que somado à cor lisa era metade do motivo de a montanha parecer tabuleiro.
+  - **`decorTextures.js`** — árvore/planta/casa/baú. O tamanho na tela sai da altura da própria textura vezes `DECOR_ART_SCALE`, não de uma tabela paralela por tipo — mexer no tamanho de uma árvore é mexer na arte dela.
+  - **`terrainAtlas.js`** — compõe (fundo + tipo mascarado + minério) com cache por combinação. O produto cartesiano completo seria grande, mas só as combinações presentes no mapa chegam a ser construídas.
+  - **Custo**: `drawTiles` mede **4.65ms** em zoom 1 e **80ms** em zoom 0.25, contra os **6.8ms / 86-167ms** que o `STATUS.md` registrava pro terreno de cor lisa. Ficou mais barato porque `tileRenderer.js` resolve a arte de cada tile **uma vez e guarda no próprio tile** (`_art`): o terreno é estático, então refazer duas varreduras de vizinhos e montar uma string de chave por tile por frame era desperdício puro — com ~40 mil tiles visíveis em zoom baixo, dezenas de milhares de alocações por frame num laço que já era o gargalo do jogo.
 
 - **`render/sprites/`** (SpriteManager unificado — **em uso por `predatorRenderer.js`**; `agentRenderer.js` também migrou. A página `sprite-lab.html` na raiz é o banco de provas). Reconhece dois formatos de spritesheet e os expõe por trás de uma interface só, pra quem consome não precisar saber de qual veio:
   - **`spriteSheet.js`** — carrega `Image` com cache por caminho e `encodeURI` (os caminhos do pack têm espaço e acento; sem isso a requisição sai malformada e o `onload` nunca dispara). `loadSheets` usa `allSettled`: uma folha faltando não derruba o carregamento das outras — mesma lição do `isSpriteReady()` por-sprite.

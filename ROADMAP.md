@@ -106,6 +106,13 @@ Fecha o item "animais no mapa", que a Parte 2 listava como bloqueado por arte �
 - **Agentes migrados**: civil vira um dos 32 personagens da grade RPG (rosto fixo por agente, caminhada com 4 direções reais); guerreiro designado usa as tiras completas de Soldier/Orc com idle/walk/attack/hurt/death. Custo medido de 0.195ms/frame com 32 agentes e 1.56ms com 200 — desprezível ao lado do gargalo real (`drawTiles`).
 - **Animação usa tempo SIMULADO**, não real — ao contrário de partículas/câmera/tremor. Uma animação de personagem representa deslocamento no mundo, então congela no pause e acelera em 4x junto com o movimento.
 
+### 1.15 Terreno e decoração procedurais
+- Terreno (água/areia/grama/floresta/montanha), minério e decoração (árvore/planta/casa/baú) **gerados por código** em `src/render/terrain/`, depois de a busca por substituição em todos os packs baixados fechar negativa — o único tileset disponível é flat e saturado, o estilo que se queria eliminar.
+- Transição irregular entre tipos de terreno (máscara de 4 bits por vizinhança), que dissolve a grade de quadrados; 6 variantes por tipo escolhidas por hash da posição; rampa de 5 tons com direção de luz única (cima-esquerda) em toda a arte.
+- Minério deixou de ser ícone centralizado e virou pedra incrustada na rocha, fora do centro.
+- Círculo de território da vila virou gradiente de borda em vez de disco chapado, que passou a lavar o terreno texturizado.
+- **Ficou mais barato que o terreno de cor lisa** (4.65ms contra 6.8ms em zoom 1): a arte de cada tile é resolvida uma vez e guardada no tile, eliminando trabalho por-frame num laço que já era o gargalo de FPS.
+
 ---
 
 ## Parte 2 — O que está planejado / pendente
@@ -132,7 +139,7 @@ Fecha o item "animais no mapa", que a Parte 2 listava como bloqueado por arte �
 
 ### 2.4 Bloqueado externamente (depende de arte que ainda não existe)
 - **Elfo** — segue sem arte própria em nenhum pack baixado; decisão explícita aceita, cai no guerreiro genérico (hoje o `Soldier` do pack novo, com animação completa). Deixou de ser urgente: enquanto a arte antiga estava apagada, o elfo caía no círculo geométrico; agora ele ao menos aparece como guerreiro animado. Trocar continua trivial em `render/agentRenderer.js:WARRIOR_ACTOR` assim que houver candidato.
-- **Terreno, decoração e minério** — a arte dessas categorias foi apagada por estar abaixo da régua atual e segue em fallback geométrico (tiles com cor lisa, árvore como triângulo, casa como retângulo). O pack novo (`assets/Pers-Sprites/`) trouxe uma folha de tiles Kenney em `Vários tipos de chão-separar conforme-recortar/`, ainda **não usada**: é 16x16 com 1px de margem, um terceiro formato de spritesheet que o `SpriteManager` ainda não implementa. **O personagem civil saiu desta lista** — foi resolvido com os 32 humanos de `Pers-Sprites/Humanos-separados/` (ver §1.14).
+- **Folha de tiles Kenney não usada** — `Pers-Sprites/Vários tipos de chão-.../roguelikeSheet_transparent.png` (16x16 com 1px de margem) seria um terceiro formato de spritesheet pro `SpriteManager`. Ficou sem uso porque terreno e decoração foram resolvidos por arte procedural (§1.15) — o estilo do Kenney era justamente o problema. Só vale implementar se aparecer outro tileset que se queira usar.
 
 ### 2.5 Item aberto do usuário
 - A sessão anterior perguntou se havia "funções" que o usuário queria adicionar além do que os assets sobrando sugeriam — ainda sem resposta. Vale revisitar se surgir algo que não é sobre sprite nenhum.
