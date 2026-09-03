@@ -12,14 +12,29 @@
 // escolhe `fightPredator` (ver agent/actions/fightPredator.js).
 
 import { distance, clamp } from '../utils/mathUtils.js';
-import { COMBAT_DAMAGE_PER_SEC } from '../utils/constants.js';
+import { COMBAT_DAMAGE_PER_SEC, PERCEPTION_RADIUS, TILE_SIZE } from '../utils/constants.js';
 
-// Mais próximo entre os predadores vivos percebidos (agent.perception.tiles
-// não cobre entidades; predador ainda não tem "percepção" própria do
-// agente, então varre world.predators direto — lista pequena, barato).
-export function findNearestPredator(agent, world) {
+// Alcance padrão de "percebi um predador": o mesmo raio de visão que o
+// agente usa pra qualquer outra coisa (agent/perception.js). Predador não
+// entra em `agent.perception.tiles` (que só cobre tiles), então a varredura
+// é direta em world.predators — lista pequena, barato —, mas o corte de
+// distância tem que existir aqui, já que não existe em nenhum outro lugar.
+const DEFAULT_SIGHT_RANGE = PERCEPTION_RADIUS * TILE_SIZE;
+
+// Mais próximo entre os predadores vivos DENTRO DO ALCANCE DE VISÃO.
+//
+// O limite de distância é o ponto inteiro desta função. Sem ele (como era
+// até aqui), ela devolvia o predador mais próximo do mundo inteiro, a 200
+// tiles se fosse o caso — e como `FLEE_PREDATOR_SCORE` (0.9) é o score mais
+// alto do jogo, todo civil entrava em fuga permanente enquanto existisse um
+// único predador vivo em qualquer canto do mapa. Ninguém colhia, ninguém
+// entregava, ninguém comia: as quatro vilas morriam de fome em ~100s
+// simulados, sem um só agente ter sido tocado por um predador. O mesmo
+// descuido travava a regeneração de vida em `lifecycle.js:checkDeath`, que
+// usa esta função pra decidir se há ameaça por perto.
+export function findNearestPredator(agent, world, maxDistance = DEFAULT_SIGHT_RANGE) {
   let nearest = null;
-  let nearestDist = Infinity;
+  let nearestDist = maxDistance;
 
   for (const predator of world.predators ?? []) {
     if (!predator.alive) continue;

@@ -14,7 +14,12 @@ import { updateNeeds } from './agent/needs.js';
 import { scanPerception } from './agent/perception.js';
 import { remember, decayMemory } from './agent/memory.js';
 import { updateDecision } from './agent/decision.js';
-import { classifyAgents, stepBackgroundAgent, feedBackgroundVillage } from './simulation/lod.js';
+import {
+  classifyAgents,
+  stepBackgroundAgent,
+  feedBackgroundVillage,
+  produceBackgroundVillage,
+} from './simulation/lod.js';
 import { applySeparation } from './agent/separation.js';
 import { ageAgent, checkDeath, updateVillageReproduction, updateHungerWarning, pruneDead } from './lifecycle/lifecycle.js';
 import { createTimeState } from './core/time.js';
@@ -248,7 +253,10 @@ const loop = createGameLoop({
 
     for (const v of world.villages) {
       const residents = backgroundByVillage.get(v.id);
-      if (residents) feedBackgroundVillage(v, residents, dt);
+      if (residents) {
+        produceBackgroundVillage(v, residents, dt);
+        feedBackgroundVillage(v, residents, dt);
+      }
       updateVillageReproduction(v, world, dt);
       updateHungerWarning(v, world);
     }

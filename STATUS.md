@@ -264,3 +264,85 @@ harness sintético, que exercita o mesmo caminho de código.
 Kenney 16x16 com 1px de margem, em `Pers-Sprites/Vários tipos de chão-...`),
 que devolveria terreno e decoração — as últimas categorias em fallback
 geométrico. A arquitetura já prevê: é um objeto novo em `sheetFormats.js`.
+
+## 1e. 🚨 Correção — extinção total das 4 vilas (reportada jogando 45s em 4x)
+
+O usuário rodou 45s em 4x (≈180s simulados) e **todas as vilas foram
+extintas**. Reproduzido de forma determinística e corrigido. **Nenhum dos
+três bugs veio das mudanças de render desta sessão** — os três nasceram no
+commit `b57ab3d` (fauna predadora + LOD), sessões atrás; só não tinham
+aparecido porque nunca houve uma sessão real longa.
+
+### Bug 1 — `findNearestPredator` sem limite de distância (o pior)
+
+`combat/predatorCombat.js:findNearestPredator` varria `world.predators`
+inteiro e devolvia o mais próximo **do mundo todo**, a 200 tiles se fosse o
+caso. Como `FLEE_PREDATOR_SCORE` (0.9) é o score mais alto do jogo, **todo
+civil entrava em fuga permanente** enquanto existisse um único predador vivo
+em qualquer canto do mapa. Ninguém colhia, ninguém entregava, ninguém comia.
+O mesmo descuido travava a regeneração de vida em `lifecycle.js:checkDeath`,
+que usa essa função pra decidir se há ameaça por perto.
+
+O comentário da função sempre disse "predadores **percebidos**" — a intenção
+estava certa, o raio nunca foi implementado. Corrigido com um parâmetro
+`maxDistance` que já entra valendo `PERCEPTION_RADIUS * TILE_SIZE`, então os
+três consumidores (`fleePredator`, `fightPredator`, `checkDeath`) ficam
+corretos sem mudar nenhuma chamada. Confirmado: `fleePredator` sumiu da
+distribuição de ações.
+
+### Bug 2 — `feedBackgroundVillage` drenando o estoque
+
+O filtro de "quem come" era `hunger < 100`: um morador com fome 99 contava
+como faminto e comia na **taxa cheia, continuamente**, só pra ficar coberto.
+Oito moradores assim consomem 8 de comida por segundo pra sempre. Um agente
+`active` não come assim — só come quando `eat` vence o utility score (fome
+≈55), em rajadas. Corrigido com `BACKGROUND_EAT_HUNGER_THRESHOLD = 55`.
+
+### Bug 3 — o LOD tinha consumo mas **nenhuma produção** (o estrutural)
+
+`stepBackgroundAgent` só decaía necessidades e `feedBackgroundVillage` só
+consumia: **o trabalho de quem está fora de tela nunca foi simulado**. O
+estoque de uma vila fora da câmera só sabia cair. A conta fecha: fome decai
+100/60 por segundo, cada comida restaura 100/15, então **cada morador precisa
+de 0.25 de comida por segundo só pra empatar** — 8 pessoas queimam os 60 de
+estoque inicial em ~30s. Com 4 vilas e uma câmera, três estavam sempre
+condenadas. Era esse o mecanismo por trás do relato.
+
+Corrigido com `produceBackgroundVillage`, contrapartida simétrica de
+`feedBackgroundVillage`:
+- produz o recurso da especialização, com um fator de ciclo útil
+  (`BACKGROUND_WORK_EFFICIENCY = 0.3`) pra estar fora de tela **não** ficar
+  mais produtivo que estar em tela — senão o LOD passaria a mudar o resultado
+  do jogo em vez de só baratear a simulação;
+- **divide o trabalho pela demanda**, igual a demanda enviesa o utility score
+  de um agente `active` (pilar 3): quanto mais falta comida, mais gente larga
+  a especialização e vai pescar. Sem essa parte (primeira tentativa da
+  correção), as duas vilas **madeireiras** morriam enquanto as agrícolas
+  ficavam com o estoque no teto — em tela elas sobrevivem porque `fish.js` é
+  universal, e era esse caminho que faltava no agregado;
+- a pesca leva `BACKGROUND_FISHING_PENALTY = 0.7` por não ser a
+  especialização: a madeireira fica pouco acima do empate, sobrevive sozinha
+  mas só prospera com comércio — o pilar 4 não vira isenção fora de tela.
+
+### Resultado (mundo novo, loop pausado, avanço manual determinístico)
+
+| | antes | depois |
+|---|---|---|
+| t=180 | 4 vilas extintas | 70 vivos, 4 vilas |
+| t=531 | — | 67 vivos, 4 vilas (15-18 cada) |
+| mortes por inanição | 100% | 7 de 85 (8%) |
+| idade média de morte | ~100 | 297 |
+
+Equilíbrio estável por 4 minutos simulados contínuos: agrícolas com estoque
+perto do teto, madeireiras estáveis em ~40 de comida (o ponto de equilíbrio
+pesca+comércio), e a esmagadora maioria das mortes por velhice.
+
+### Técnica de diagnóstico (vale reusar)
+
+Automação não sustenta sessão longa (rAF é throttlado na aba). O que
+funcionou: expor `window.__world` e a função `update` temporariamente,
+**clicar em pause** pra o rAF parar de interferir, e chamar `update(1/60)`
+num laço — 500s simulados em segundos, determinístico e repetível. Sondas
+removidas depois; re-adicionar leva 30 segundos e é o caminho mais rápido
+pra qualquer bug de balanceamento futuro. Cuidado: passos demais numa só
+avaliação estouram o timeout do CDP — quebrar em blocos de ~120s.

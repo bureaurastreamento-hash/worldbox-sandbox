@@ -321,6 +321,32 @@ export const DECORATION_CAMPFIRES_PER_VILLAGE = 1;
 // ao cair pra 2 (ver PREDATOR_SPECIES_STATS), o número por espécie dobrou pra
 // manter a mesma densidade de ~24 predadores no mapa, que é o que foi
 // calibrado jogando — a decisão foi reduzir a variedade, não a ameaça.
+// LOD: fome abaixo da qual um agente `background` come do estoque agregado
+// (simulation/lod.js:feedBackgroundVillage). Aproxima o ponto em que `eat`
+// passa a vencer o utility score de um agente `active` (~55, ver DESIGN.md
+// §6) — o agregado precisa imitar "come em rajadas quando fica com fome", e
+// não "todo mundo bebericando o tempo todo", senão a vila fora de tela gasta
+// muito mais comida do que a mesma vila em tela.
+export const BACKGROUND_EAT_HUNGER_THRESHOLD = 55;
+
+// Ciclo útil de trabalho de um morador `background`, como fração de
+// GATHER_RATE (simulation/lod.js:produceBackgroundVillage). Um agente
+// `active` não colhe 100% do tempo — caminha até o recurso, volta pra
+// entregar, come, dorme. Esse fator é o que impede o LOD de tornar estar
+// fora de tela MAIS produtivo que estar em tela, o que faria a otimização
+// mudar o resultado do jogo em vez de só baratear a simulação.
+// Referência pra calibrar: cada morador consome 0.25 de comida por segundo
+// pra empatar com o decaimento da fome, e GATHER_RATE é 1.25/s.
+export const BACKGROUND_WORK_EFFICIENCY = 0.3;
+
+// Penalidade da produção de comida numa vila que NÃO é agrícola — o
+// equivalente agregado de agent/actions/fish.js, que é universal mas pontua
+// abaixo de gather.js de propósito. Mantém a madeireira fora de tela pouco
+// acima do ponto de empate (0.2625 contra 0.25 de consumo por pessoa):
+// sobrevive sozinha, mas só prospera com comércio — que é o pilar 4 do
+// design, e ele não pode virar isenção só porque a vila saiu da tela.
+export const BACKGROUND_FISHING_PENALTY = 0.7;
+
 export const PREDATOR_COUNT_PER_SPECIES = 12;
 // Não nasce mais perto de nenhuma vila que isso — fora do alcance
 // imediato, ainda dentro do raio que um agente explorando pode topar.
