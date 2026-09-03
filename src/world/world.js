@@ -56,11 +56,27 @@ export function getAgent(world, id) {
   return world.agentsById?.get(id) ?? world.agents.find((a) => a.id === id) ?? null;
 }
 
+// Vilas e clãs não são criados nem removidos depois do world-gen, então estes
+// índices são construídos uma vez e não precisam ser reconstruídos por tick
+// (ao contrário de agentsById, que muda com nascimento e morte).
+//
+// Sem eles, `getVillage`/`getClan` eram `.find` linear — e são chamados de
+// dentro de `isHostileTerritory`, que por sua vez é chamado uma vez POR
+// ENTRADA DE MEMÓRIA em cada pontuação de gather/fish/gatherWood. Com 40
+// vilas e ~300 locais lembrados, isso virava centenas de milhares de
+// operações por agente por reconsideração: o maior custo do tick, medido.
+export function rebuildStaticIndexes(world) {
+  world.villagesById = new Map(world.villages.map((v) => [v.id, v]));
+  world.clansById = new Map(world.clans.map((c) => [c.id, c]));
+}
+
 export function getVillage(world, villageId) {
+  if (world.villagesById) return world.villagesById.get(villageId) ?? null;
   return world.villages.find((v) => v.id === villageId) ?? null;
 }
 
 export function getClan(world, clanId) {
+  if (world.clansById) return world.clansById.get(clanId) ?? null;
   return world.clans.find((c) => c.id === clanId) ?? null;
 }
 

@@ -7,6 +7,19 @@ export const WORLD_HEIGHT = 220;
 // caber o mapa inteiro (220 tiles) em telas comuns; render/camera.js aplica
 // o zoom mínimo real por viewport em cima disso (pode ficar mais alto que
 // isso se a janela for maior que o mundo, nunca mais baixo).
+// LOD de RENDERIZAÇÃO (render/lodRenderer.js). Só afeta o desenho — a
+// simulação é zoom-agnóstica (simulation/scheduler.js) e não consulta a
+// câmera em lugar nenhum.
+//
+// Abaixo de LOD_SIMPLE_ZOOM some a decoração e as partículas; abaixo de
+// LOD_DOTS_ZOOM os agentes e predadores viram pontos coloridos por clã. Os
+// limiares são sobre ZOOM, não sobre "% do mundo visível", porque é o zoom
+// que determina quantos pixels de tela um agente ocupa — que é a pergunta
+// real: abaixo de ~4px de sprite, animação e espelhamento não são visíveis.
+export const LOD_SIMPLE_ZOOM = 0.6;
+export const LOD_DOTS_ZOOM = 0.35;
+export const LOD_DOT_MIN_PX = 2; // um agente nunca some por completo
+
 export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 4;
 
@@ -427,7 +440,7 @@ export const TERRITORY_RADIUS = 10; // tiles
 //
 // A colocação passou de anel pra grade com jitter (main.js) — o anel só sabia
 // posicionar poucas vilas em volta da primeira.
-export const VILLAGE_COUNT = 20; // total de vilas/clãs no mundo (1 vila por clã)
+export const VILLAGE_COUNT = 24; // total de vilas/clãs no mundo (1 vila por clã)
 // Distância de cada vila (exceto a primeira, que nasce perto do centro do
 // mapa) até o centro — espalhadas em ângulos uniformes ao redor da 1ª,
 // com jitter. Não existe mais distância especial pra pares destinados à
@@ -458,6 +471,7 @@ export const NEUTRAL_TRADE_TREATY_CHANCE = 0.4;
 // exportar; acima do outro limite, ela tem déficit e precisa importar.
 export const TRADE_SURPLUS_DEMAND_MAX = 0.45;
 export const TRADE_DEFICIT_DEMAND_MIN = 0.6;
+export const TRADE_INTERVAL_SECONDS = 0.5; // ver village/trade.js
 export const TRADE_RATE_PER_SEC = 4; // unidades de recurso por segundo numa rota ativa
 
 // Diplomacia dinâmica (clan/clanDecision.js): cada clã reavalia sua relação

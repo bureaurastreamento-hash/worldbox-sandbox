@@ -10,7 +10,7 @@
 
 import { TILE_TYPES } from '../../world/tile.js';
 import { TILE_SIZE, CARRY_CAPACITY, GATHER_RATE, FISH_SCORE_WEIGHT } from '../../utils/constants.js';
-import { recallNearest } from '../memory.js';
+import { recallNearest, knowsAny } from '../memory.js';
 import { getVillage, findWalkableNear } from '../../world/world.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
 import { moveToward, clearMovement } from '../movement.js';
@@ -34,8 +34,8 @@ export function score(agent, world) {
   if (agent.carrying >= CARRY_CAPACITY) return 0; // só solta a ação com a carga cheia; ver gather.js pro porquê do `>= CARRY_CAPACITY` (não `> 0`)
   const village = getVillage(world, agent.villageId);
   if (!village) return 0;
-  const known = recallNearest(agent.memory, agent.position, isSafeWater(world, agent), avoid(agent, world), TILE_TYPES.WATER);
-  if (!known) return 0;
+  // Só precisa saber SE existe candidata, não qual — ver memory.js:knowsAny.
+  if (!knowsAny(agent.memory, isSafeWater(world, agent), TILE_TYPES.WATER)) return 0;
   return (village.demand.food ?? 0) * FISH_SCORE_WEIGHT;
 }
 

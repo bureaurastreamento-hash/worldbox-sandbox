@@ -254,11 +254,19 @@ O "jogo parado" que o usuário relata é atacado principalmente por **E, G e H**
 - **World-gen em grade com jitter** — o anel de 70-100 tiles em volta da primeira vila não tinha onde colocar mais que umas poucas, e deixava o resto do mapa vazio pra sempre.
 - **`VILLAGE_COUNT` 4 → 20** (~250 agentes), medido estável em 600s: 262 → 258 → 249 moradores, 4 de 20 vilas extintas. Simulação a **2.72ms/frame** contra um orçamento de 16.7ms; **179 FPS ao vivo**.
 
-**O que falta pra fechar a fase (e é o que destrava o alvo de 500):**
+**Segunda leva (LOD de render, pooling, mais otimização):**
 
-- **LOD de RENDERIZAÇÃO por zoom** — não existe: o jogo desenha todo agente com sprite completo em qualquer zoom. Com 36 vilas (~450 agentes) a simulação ainda cabe (13.3ms), mas não sobra nada pra renderização e a aba fica sem resposta. É o próximo passo imediato.
-- **Object pooling** além de partículas.
-- **Estrutura de chunks com portais** (preparação pra HPA*, Fase C).
+- **LOD de renderização por zoom** (`render/lodRenderer.js`) — três níveis: sprites animados; sprites sem partícula nem decoração; e pontos coloridos por clã agrupados por cor (o análogo em Canvas 2D do instanced rendering). Só afeta o desenho: a simulação não consulta a câmera em lugar nenhum.
+- **Object pooling** (`utils/objectPool.js`), com as partículas migradas — pool de tamanho fixo, `release` só marca flag, `spawn` reinicializa no lugar. O ganho é previsibilidade de frame, não velocidade média: o `push`/`splice` anterior gerava lixo por frame no caminho mais quente do render.
+- **Mais três O(n²) eliminados**, todos achados perfilando e nenhum deles renderização: `updateTrade` rodava O(vilas² × recursos) todo frame (agora acumula dt e roda em intervalo — mesmo total movido); `getVillage`/`getClan` eram `.find` linear chamados de dentro de `isHostileTerritory`, que por sua vez roda uma vez por entrada de memória em cada pontuação de gather/fish/gatherWood; e essas três ações usavam `recallNearest` (varredura completa) só pra responder um booleano — agora `memory.js:knowsAny` sai no primeiro achado.
+- Efeito medido: reconsideração caiu de **4.43ms para 0.12ms**; simulação com 359 agentes de **15.94ms para 11.61ms**.
+
+**O que falta, e por que o alvo de 500 não fecha com folga:**
+
+- **`findPath` custa 8ms por busca** (A* plano, orçamento de 3000 nós, travessias longas). É o gargalo restante e domina o tick — não é renderização. **Só o HPA\* da Fase C resolve.**
+- Medido ao vivo: **566 agentes rodam a 61-73 FPS em todos os zooms** (alvo atingido). Mas a população continua subindo depois disso: com 56 vilas ela chega a **~875 agentes**, e aí a aba satura. `VILLAGE_COUNT` ficou em **24** (pico medido de 389 agentes, simulação a 7.0ms/frame), que é o que aguenta o PICO e não só o começo da partida.
+- **Lição de método:** as primeiras medições de FPS foram feitas antes do pico populacional e estavam otimistas. População de pico ≈ 15.6 por vila; equilíbrio ≈ 12.5.
+- **Estrutura de chunks com portais** (preparação pra HPA*, Fase C) — ainda não feita.
 
 ### 3.5 Critérios de aceite transversais
 

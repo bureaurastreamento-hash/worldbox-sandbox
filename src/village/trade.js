@@ -9,7 +9,12 @@
 import { addStock } from './stock.js';
 import { getClan } from '../world/world.js';
 import { canTrade } from '../clan/diplomacy.js';
-import { TRADE_SURPLUS_DEMAND_MAX, TRADE_DEFICIT_DEMAND_MIN, TRADE_RATE_PER_SEC } from '../utils/constants.js';
+import {
+  TRADE_SURPLUS_DEMAND_MAX,
+  TRADE_DEFICIT_DEMAND_MIN,
+  TRADE_RATE_PER_SEC,
+  TRADE_INTERVAL_SECONDS,
+} from '../utils/constants.js';
 
 function tradeResource(from, to, resource, dt) {
   const amount = Math.min(TRADE_RATE_PER_SEC * dt, from.stock[resource] ?? 0);
@@ -18,7 +23,22 @@ function tradeResource(from, to, resource, dt) {
   addStock(to, resource, amount);
 }
 
+// Comércio é O(vilas^2 x recursos) e `canTrade` ainda varre a lista de
+// tratados por par — com 36 vilas são 630 pares x 6 recursos, TODO FRAME.
+// Medido, era o custo que mais crescia com o número de vilas.
+//
+// A quantidade movida é `TRADE_RATE_PER_SEC * dt`, então acumular o dt e
+// rodar em intervalos move exatamente o mesmo total: é throttle, não
+// mudança de regra. O intervalo é bem menor que o de reconsideração de clã
+// (20-30s), então nenhuma decisão diplomática enxerga um estoque defasado.
+let tradeAccumulator = 0;
+
 export function updateTrade(world, dt) {
+  tradeAccumulator += dt;
+  if (tradeAccumulator < TRADE_INTERVAL_SECONDS) return;
+  dt = tradeAccumulator;
+  tradeAccumulator = 0;
+
   for (let i = 0; i < world.villages.length; i++) {
     const a = world.villages[i];
     const clanA = getClan(world, a.clanId);

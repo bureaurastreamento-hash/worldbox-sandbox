@@ -1,4 +1,4 @@
-import { createWorld, findWalkableNear, getVillage, rebuildAgentIndex } from './world/world.js';
+import { createWorld, findWalkableNear, getVillage, rebuildAgentIndex, rebuildStaticIndexes } from './world/world.js';
 import { generateDecorations } from './world/decorations.js';
 import { spawnPredators } from './predator/predator.js';
 import { updatePredator } from './predator/predatorAI.js';
@@ -160,6 +160,7 @@ for (let i = 0; i < VILLAGE_COUNT; i++) {
   clans.push(clan);
 }
 world.clans.push(...clans);
+rebuildStaticIndexes(world); // vilas/clãs são estáticos daqui pra frente
 
 const homeVillage = villages[0];
 

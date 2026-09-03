@@ -5,7 +5,7 @@
 
 import { TILE_TYPES } from '../../world/tile.js';
 import { TILE_SIZE, CARRY_CAPACITY, GATHER_RATE, GATHER_SCORE_WEIGHT } from '../../utils/constants.js';
-import { recallNearest } from '../memory.js';
+import { recallNearest, knowsAny } from '../memory.js';
 import { getVillage } from '../../world/world.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
 import { moveToward, clearMovement } from '../movement.js';
@@ -35,8 +35,8 @@ export function score(agent, world) {
   if (agent.carrying >= CARRY_CAPACITY) return 0;
   const village = getVillage(world, agent.villageId);
   if (!village || village.specialization !== 'food') return 0; // vila madeireira não colhe comida
-  const known = recallNearest(agent.memory, agent.position, isSafeGrass(world, agent), avoid(agent, world), TILE_TYPES.GRASS);
-  if (!known) return 0;
+  // Só precisa saber SE existe candidata, não qual — ver memory.js:knowsAny.
+  if (!knowsAny(agent.memory, isSafeGrass(world, agent), TILE_TYPES.GRASS)) return 0;
   return (village.demand.food ?? 0) * GATHER_SCORE_WEIGHT;
 }
 

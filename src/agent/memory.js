@@ -60,6 +60,29 @@ export function decayMemory(memory, dt) {
 // candidatos, a busca é refeita ignorando-o — essa segunda passada é o
 // fallback que impede uma vila pequena, com poucos tiles conhecidos, de
 // travar quando todos já estão reservados. Preferência, não proibição.
+// "Existe algum local conhecido que satisfaz isto?" — com SAÍDA ANTECIPADA no
+// primeiro que satisfizer.
+//
+// Existe porque `gather`/`gatherWood`/`fish`/`mine` chamavam `recallNearest`
+// dentro de `score` só pra responder um BOOLEANO ("conheço alguma grama?"), e
+// pagavam uma varredura completa da memória por isso. Pior: o predicado
+// dessas ações chama `isHostileTerritory`, que percorre todas as vilas — ou
+// seja, uma varredura O(memoria x vilas) pra decidir se a ação é sequer
+// candidata. Medido, `fish`+`gather`+`gatherWood` eram 0.31ms dos 0.316ms de
+// uma reconsideração inteira.
+//
+// O `skip` (tiles reservados/bloqueados) não entra aqui de propósito: ele é
+// preferência, não proibição — `recallNearest` refaz a busca sem ele quando
+// descarta tudo, então pra fins de "existe candidata?" a resposta seria a
+// mesma.
+export function knowsAny(memory, predicate, tileType = null) {
+  const source = tileType === null ? memory.locations : (memory.byType.get(tileType) ?? EMPTY);
+  for (const entry of source.values()) {
+    if (predicate(entry)) return true;
+  }
+  return false;
+}
+
 // `tileType` é uma dica de INDEXAÇÃO, não um filtro semântico: quem passa
 // continua responsável pelo `predicate` completo (o tipo é só o que permite
 // varrer um balde em vez da memória inteira — ver createMemory). Omitir é
