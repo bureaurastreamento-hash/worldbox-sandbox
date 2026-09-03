@@ -304,6 +304,25 @@ Toda ação de **desenvolvimento** (explorar, minerar, construir, patrulhar) que
 
 O `STATUS.md` listava como próximo passo *"baixar `HOUSE_STONE_COST` ou aumentar a disponibilidade de pedra"*. Medindo, um mundo com **64 de pedra em estoque terminava com zero prédios** — e `HOUSE_STONE_COST` era **código morto** desde que os prédios ganharam tipo próprio. Os problemas reais eram um vazamento de recurso em `build.js` (custo debitado na chegada, obra reiniciada a cada interrupção, débito repetido), um score baseado numa pressão populacional contra um teto inalcançável, e o fato de a casa depender de um recurso que só existe em 40% dos mundos. Detalhe completo em `ARCHITECTURE.md` (`village/buildings.js`, `agent/actions/build.js`) e `STATUS.md` §2.
 
+### 11.6 O orçamento de tempo de agente (a descoberta estrutural)
+
+Esta é a lição mais importante da sessão, e vale pra qualquer sistema futuro.
+
+**A economia da simulação não tem folga.** A população de equilíbrio de uma vila (~12-13 moradores) é fixada pelas taxas de nascimento e morte, e todo o tempo dos moradores já está comprometido com buscar comida, comer e dormir. Qualquer atividade nova que compita por esse tempo sai direto da margem de sobrevivência.
+
+Nesta sessão isso apareceu **quatro vezes**, com `explore`, `mine`, `build` e `patrol` — cada uma medida como extinção de vila antes de ser corrigida. E apareceu de novo, mais grave, como extinção **total** de todas as vilas por volta dos 400-500s, invisível na janela de 180s em que tudo vinha sendo medido.
+
+Três correções intuitivas foram testadas e falharam:
+- **Teto de população suave** em vez de rígido — não resolveu; não era sincronia de idades.
+- **Progresso de obra que sobrevive a interrupções** (canteiro da vila, não do agente) — correção boa e mantida, mas não era a causa.
+- **Aumentar a produção de comida** em 33% — **piorou**. A economia é homeostática: `gather.js` pontua por `village.demand.food`, que cai quando o estoque sobe, então mais comida **abaixa** o score de colher e o excedente vira atividade não-alimentar antes de virar margem.
+
+O que funcionou foi limitar **quantidade de gente**, não estoque: no máximo uma fração da vila em atividade de desenvolvimento ao mesmo tempo (`village/stock.js:canDevelop`), contando as quatro ações juntas. Limiares de estoque oscilam — assim que o celeiro sobe um pouco, a vila inteira é liberada de uma vez, justamente no pico populacional.
+
+**Consequência pra o roadmap:** as necessidades sociais/pertencimento (§2 deste documento, ainda não implementadas) vão adicionar ações que competem pelo mesmo tempo. Elas precisam nascer dentro deste orçamento, não fora dele — e ser medidas em 600s antes de serem consideradas prontas.
+
+### 11.7 Casa custa só madeira
+
 Consequência de design registrada: **casa passou a custar só madeira**. Crescer depende de um recurso que toda vila consegue; pedra continua sendo o gargalo do celeiro e do depósito — os prédios que ampliam **estoque**. A progressão por minério da §8 continua valendo, só deixou de estar no caminho crítico do crescimento populacional.
 
 ---

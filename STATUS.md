@@ -90,12 +90,38 @@ Aconteceu com quatro ações diferentes nesta sessão, cada uma medida como exti
 | `defense_pact` (efeito real) | ❌ Não iniciado |
 | LOD de renderização por zoom | ❌ Não iniciado — `ROADMAP.md` §2.3 |
 
+## 5b. A REGRESSÃO DA SESSÃO, e o que ela ensinou
+
+**Medir em 180s escondeu uma extinção total.** A população de um mundo *pica* por volta dos 180s e só então desaba — toda a medição desta sessão estava sendo feita exatamente na crista. Rodando 600s, o estado do commit `68dc783` levava as quatro vilas a **zero** por volta dos 400-500s, em todos os seeds. O baseline do início da sessão é estável em ~50 pelos 600s inteiros.
+
+**Nunca mais medir população com menos de ~500s simulados.**
+
+Causa imediata: `VILLAGE_POP_CAP` baixado de 30 pra 18. Esse número é um gate **rígido** de reprodução, e a população de equilíbrio de uma vila (~12-13) é fixada pelas taxas de nascimento e morte, sem folga — encostar o teto nela para a renovação e a vila morre.
+
+Três hipóteses foram levantadas, testadas e **descartadas** (todas documentadas no código pra ninguém repetir):
+
+1. *Sincronia de idades* — trocar o gate rígido por um teto suave não resolveu.
+2. *Desperdício de mão de obra em obras interrompidas* — o canteiro passou a ser da vila, com progresso que sobrevive a interrupções. Correção boa e mantida, mas não era a causa.
+3. *Falta de margem econômica* — aumentar a produção de comida em 33% **piorou**. A economia é **homeostática**: `gather.js` pontua por `village.demand.food`, que cai quando o estoque sobe, então produzir mais comida abaixa o score de colher e converte o excedente em atividade não-alimentar antes que ele vire margem.
+
+A causa real, isolada por diferencial em 5 seeds — a população final cai monotonicamente com o número de vilas que descobrem minério:
+
+| vilas com minério | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| população aos 600s | 50 | 47 | 32 | 16 | 0 |
+
+O quadro de descobertas não criou o problema: tornou a mineração possível de verdade pela primeira vez e revelou o custo que ela sempre teria tido.
+
+**A lição estrutural:** o limite tem que ser sobre **quantidade de gente**, não sobre limiar de estoque. Limiares oscilam — assim que o celeiro sobe um pouco, a vila inteira fica liberada de uma vez, justamente no pico populacional. Daí `village/stock.js:canDevelop` (no máximo uma fração da vila em atividade não-alimentar ao mesmo tempo, contando explorar/minerar/construir/patrulhar juntos) e `MINE_MAX_TRAVEL_TILES`.
+
+Resultado final medido (5 seeds × 600s): s1 = 50, s3 = 47, s2 = 33, s5 = 30, s4 = 27. Baseline ~50 em todos. **Nenhuma extinção total.** Custo residual assumido: mundos ricos em minério estabilizam em ~30 em vez de ~50.
+
 ## 6. Bugs / limitações conhecidas
 
-1. **População média caiu de 57.6 pra ~50** (5 seeds × 180s) desde o início da sessão. É uma troca deliberada — parte da mão de obra passou a ir pra construção, exploração e patrulha, que antes não existiam. Como casa aumenta o teto de população, a **expectativa** é a população ultrapassar o baseline em partidas mais longas que 180s. **Não verificado** — é o próximo teste natural.
-2. **Celeiro e depósito nunca foram construídos** em nenhum teste (só casas). Os dois dependem de pedra, e a exploração acha cordilheira em ~40% dos mundos. Não é bug, mas a progressão de infraestrutura ainda é rara.
-3. **Exploração não acha montanha em ~60% dos mundos.** O alvo é um ângulo sorteado a 45 tiles; nada garante que aponte pra uma cordilheira. Um viés de direção (ex.: preferir onde ainda não se foi) resolveria melhor.
-4. **`granary` é prédio fundacional e conta no `nextBuildingType`** — a métrica de "celeiros construídos" precisa descontar os 4 iniciais.
+1. **Mundos ricos em minério estabilizam em ~30 moradores em vez de ~50.** É o preço de a mineração existir de verdade (ver §5b). A alternativa é desligar o quadro de descobertas — uma constante. **Decisão de sensação de jogo, aberta pro usuário.**
+2. **Construção continua rara** (`BUILD_NEED_THRESHOLD = 0.75`). Isto agora é **pendência de design, não calibragem**: as duas formas de destravá-la (baixar o teto de população pra a lotação subir; baixar o limiar pra casar com a lotação real) foram testadas e **as duas mataram as vilas**. Destravar de verdade exige repensar quanto tempo de agente a economia consegue bancar fora da produção de comida.
+3. **Celeiro e depósito nunca foram construídos** em nenhum teste — só casas.
+4. **Exploração acha montanha em ~40-75% dos mundos.** Melhorou com a rotação de setores, mas a distância é fixa: aumentar o alcance foi testado duas vezes (0.45/95 e 0.25/70) e a ida e volta nunca pagou o tempo.
 5. Elfo sem arte própria (cai no Soldier genérico) — aceito há várias sessões.
 6. Orc de perfil destoa visualmente — aceito, pouco tempo de tela.
 7. Postura de guerra/paz ainda pode alternar com frequência que parece volátil numa sessão longa — não recalibrado.
@@ -103,11 +129,12 @@ Aconteceu com quatro ações diferentes nesta sessão, cada uma medida como exti
 
 ## 7. Próximos passos concretos, em ordem
 
-1. **Sessão de jogo real do usuário, mais longa que 180s** — é a confirmação que falta pra quase tudo desta sessão. Especificamente: a população ultrapassa o baseline quando as casas se acumulam? Dá pra ver uma expedição saindo e voltando? O soldado patrulhando lê bem?
-2. **Viés de direção na exploração** (§6.3) — fazer a expedição preferir setores ainda não visitados em vez de ângulo puramente sorteado. É o que faria pedra (e portanto celeiro/depósito) deixar de ser sorte.
-3. **Confirmar guerra/caçada orgânica ao vivo** com a animação nova de ataque/morte — herdado da sessão passada, ainda não visto numa luta real.
-4. Se algo incomodar visualmente, as paletas de terreno estão isoladas em `render/terrain/palette.js`.
-5. **LOD de renderização por zoom** (`ROADMAP.md` §2.3) — sem urgência.
+1. **Decidir a troca de §6.1**: mineração funcionando com vilas de ~30, ou vilas de ~50 sem mineração. É sensação de jogo, e é uma constante — precisa do usuário.
+2. **Sessão de jogo real do usuário** — é a confirmação que falta pra quase tudo. Dá pra ver uma expedição saindo e voltando? O soldado patrulhando lê bem? A vila "parece" viva?
+3. **As três lacunas do design original** (`ROADMAP.md` §2.2), pedidas pelo usuário e **não implementadas nesta sessão** porque a caça à regressão consumiu o tempo: `defense_pact` com efeito real, `agent.traits`, necessidades sociais/pertencimento. **Atenção**: as duas últimas adicionam coisas que competem pelo tempo do agente, exatamente o padrão que derrubou a economia quatro vezes aqui — cada uma precisa de medição de 600s antes de ser considerada pronta.
+4. **Repensar o orçamento de tempo de agente** (§6.2) — é o pré-requisito real pra construção, e provavelmente pras necessidades sociais também.
+5. **Confirmar guerra/caçada orgânica ao vivo** com a animação nova de ataque/morte — herdado da sessão passada.
+6. **LOD de renderização por zoom** (`ROADMAP.md` §2.3) — sem urgência.
 
 ## 8. Coisas pedidas pra lembrar que ainda não são código
 
