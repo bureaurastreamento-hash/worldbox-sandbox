@@ -1,589 +1,81 @@
 # STATUS.md — Worldbox Sandbox
 
-Snapshot do estado atual. Sessão iniciada depois da pausa registrada em `1561b59`. Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Commits desta sessão: `1561b59`..`597cf3e` (5 commits, todos pushados) — **mais uma leva de deleções locais não commitadas, ver §0 abaixo, é o item mais urgente**. Contexto de antes desta sessão (reorganização visual completa, especialização de vila, diplomacia dinâmica, minério/construção) não é repetido em detalhe — ver `DESIGN.md` e o histórico de commits até `1561b59`.
+Snapshot do estado atual. Sessão longa, muitas rodadas — este arquivo foi reescrito do zero pra consolidar tudo num snapshot único, em vez de manter o histórico fragmentado por sub-sessão (§1a-§1h de versões anteriores). Link ao vivo: https://bureaurastreamento-hash.github.io/worldbox-sandbox/ (GitHub Pages, atualiza a cada push em `main`). Todos os commits desta sessão estão pushados — `git log` é a fonte de verdade pra histórico detalhado, este arquivo é o resumo do estado final.
 
-## 0. ✅ Pendência de arte encerrada — `assets/sprites/` está em dia
+## 1. O que foi implementado ou alterado nesta sessão
 
-**Resolvida.** Durante várias sessões esta seção avisava pra NÃO commitar as
-deleções de `assets/sprites/`, porque o remoto ainda precisava daqueles
-arquivos pro jogo publicado não quebrar. Isso deixou de valer: terreno,
-decoração, minério e prédios passaram a ser **arte procedural**
-(`src/render/terrain/`), e os personagens vêm do `SpriteManager`
-(`assets/Pers-Sprites/`). Nenhum dos 24 arquivos era mais carregado por
-código — conferido um a um antes de commitar.
+Em ordem cronológica real:
 
-O que sobrou em `assets/sprites/`: `Fogueira.png` (única arte de arquivo que
-o `decorationRenderer` ainda usa) e os recortes estáticos de Cavaleiro/Orc,
-que ficaram órfãos quando o `agentRenderer` migrou pras tiras do pack — dá
-pra remover numa limpeza futura, não atrapalham nada.
-
-**Bug pré-existente encontrado ao conferir:** `ui/inspector.js` carrega os
-ícones de minério de `assets/Assets-testes-para-o-claude-testar/Pedra1.png`
-(e Carvao/Ferro/Ouro) — uma pasta **ignorada no git**, e onde esses arquivos
-**não existem**. Ou seja, os ícones da lista de estoque do inspetor estão
-quebrados hoje, e estavam antes desta limpeza. Já existe substituto pronto:
-`render/terrain/oreTextures.js` gera exatamente esses quatro minérios. Não
-corrigido nesta rodada por estar fora do escopo pedido.
-
-## 1a. Sessão seguinte — fauna reduzida a 2 espécies + inventário de assets fechado
-
-1. **Inventário exaustivo de `assets/Assets-testes-para-o-claude-testar/`** (287 arquivos, 241 PNG, 5 packs) — desta vez abrindo e analisando as imagens de verdade, não só lendo nomes de arquivo. Dois packs não tinham aparecido em levantamentos anteriores: **Pixel Champions v3** (8 heróis, overworld 24x24 4-direções + battlers 32x32 com set completo de animação incluindo morte) e **SuperRetroWorld** (32 personagens humanos, 16x20, ciclo de caminhada 4-direções, também fornecidos já separados um por pasta). Conclusão revista mas **mantida**: nenhum serve pra terreno/decoração/civil — e o motivo real **não é resolução** (o Cavaleiro tem só 17x21px de conteúdo dentro do quadro de 100x100, mesma ordem de grandeza que os candidatos). É **estilo**: os dois packs novos são pixel art de contorno preto duro e cor chapada saturada (SNES/JRPG), enquanto a régua atual (Tiny RPG / craftpix) é sombreado suave sem contorno. Colocar os dois lado a lado briga.
-2. **Fauna predadora reduzida de 4 pra 2 espécies** (decisão do usuário): `bear`/`wolf`/`snake`/`beatle` → `demon`/`blood`, com arte do `Tiny RPG Character Asset Pack 02` (Demon_A e Blood Monster_A, mesma família do Cavaleiro/Orc). Os stats foram **redistribuídos, não inventados**: `demon` herdou o perfil do urso (60 vida, 15 dano, tanque) e `blood` o do lobo (35 vida, 10 dano, detecção 7). Cobra e besouro saíram inteiros — com o besouro foi embora o único ataque à distância do jogo (`attackRange` 150), perda aceita explicitamente pelo usuário por falta de substituto à altura.
-3. **Velocidade virou stat por espécie** (`PREDATOR_SPECIES_STATS.speed`, 40 pro demônio / 62 pro monstro) em vez do `PREDATOR_SPEED=50` único — sem isso "tanque lento vs. rápido e frágil" ficaria só na descrição, já que a diferença não apareceria em nada observável. `PREDATOR_SPEED` continua como referência/fallback.
-4. **`renderScale` por espécie** (`render/predatorRenderer.js`): o recorte por alpha sozinho normaliza todo predador pra mesma altura na tela, o que faria o monstro de sangue (bicho rasteiro, 15px de conteúdo) aparecer do tamanho do demônio em pé (20px). `renderScale` preserva a proporção da arte de origem.
-5. **`PREDATOR_COUNT_PER_SPECIES` 6 → 12** — decisão minha dentro do escopo: com 2 espécies em vez de 4, manter 6 por espécie derrubaria a população de predadores de 24 pra 12, cortando pela metade uma densidade que foi calibrada jogando. A decisão do usuário foi reduzir a **variedade**, não a ameaça.
-6. **Duas imprecisões corrigidas no `ROADMAP.md`**: o feed de eventos e os animais no mapa estavam listados na Parte 2 (planejado/bloqueado) quando já estavam implementados há sessões. Ambos movidos pra Parte 1, como o próprio arquivo instrui (feed em §1.10, fauna numa §1.13 nova).
-
-**Testado ao vivo:** jogo carrega sem nenhum erro de console; `spawnPredators` produz 24 predadores, 12 de cada espécie, com os stats certos; os 4 sprites novos carregam e desenham com o recorte e a proporção relativa corretos; monstros de sangue confirmados renderizando no mapa com sombra. **Não** foi observado um ciclo de combate completo com as espécies novas numa sessão orgânica — o código de combate não mudou (só os números por espécie), mas a confirmação ao vivo continua pendente.
-
-## 1. O que foi implementado ou alterado na sessão anterior
-
-1. **`dev-server.py`** (novo, raiz do projeto) — mesmo servidor de sempre, mas manda `Cache-Control: no-store` em toda resposta. Motivo: `python -m http.server` puro não manda header de cache nenhum, e o navegador às vezes serve uma versão em cache de um módulo JS editado recentemente — isso já causou debug perdido em mais de uma sessão (mais recentemente, atrapalhou a verificação ao vivo da Frente 2 desta sessão). **`README.md` e `CLAUDE.md` já apontam pra ele — use `python3 dev-server.py`, não mais `python -m http.server`.**
-2. **Throughput de coleta corrigido**: `gather.js`/`gatherWood.js`/`mine.js`/`fish.js`/`deliver.js` só soltavam a ação quando `carrying` passava de zero (não de `CARRY_CAPACITY` cheio) — o agente entregava ~5-10% da carga por viagem em vez de uma viagem cheia. Corrigido pra `carrying >= CARRY_CAPACITY`.
-3. **`decision.js`**: a margem de interrupção (`INTERRUPT_MARGIN`) checava a ação **candidata** em vez da ação **atual** — o oposto do que o comentário do arquivo sempre descreveu, risco real de oscilação. Corrigido.
-4. **`EAT_URGENCY_WEIGHT=1.8`** em `eat.js` — agente interrompe trabalho e vai comer com mais folga (antes só acontecia com a fome já bem baixa).
-5. **Evento de fome crítica**: `lifecycle.js:updateHungerWarning`, dispara no feed quando a fome média de uma vila cruza 30, com histerese (só reavisa depois de recuperar acima de 45).
-6. **`agent/separation.js`** (novo) — separação leve tipo "boids" entre agentes `active` do LOD: empurrão real de posição (não só visual) quando ficam muito próximos.
-7. **LOD corrigido**: `simulation/lod.js:stepBackgroundAgent` **restaurava** fome/sono até 100 pra quem tava fora de tela (agente fora de foco era praticamente imortal à fome, e podia dar um salto brusco quando a câmera voltava). Agora decai igual a um agente `active`; nova `feedBackgroundVillage(village, residentes, dt)` alimenta em agregado a partir do estoque real da vila, sem cada um andar até o centro — sem estoque, ninguém come, fome de quem tá fora de foco agora pode cair a zero de verdade.
-8. **Fauna predadora** (sistema novo completo) — `predator/predator.js` (modelo de dados + `spawnPredators`, 24 no mundo, 6 por espécie — bear/wolf/snake/beatle —, min. 15 tiles de qualquer vila), `predator/predatorAI.js` (FSM própria: patrolling/chasing/attacking/fleeing, com leash a partir do ponto de nascimento), `combat/predatorCombat.js` (combate agente-vs-predador, paralelo a `combat.js`), `agent/actions/fleePredator.js`/`fightPredator.js` (civil sempre foge; guerreiro designado enfrenta, a menos que a própria vida esteja crítica), `render/predatorRenderer.js`. Testado ao vivo: urso perseguindo/atacando um civil que foge de verdade; lobo enfrentado por um guerreiro (dano mútuo, lobo foge com vida baixa, morre); evento "X perdeu um morador, morto por Y" aparece certo no feed; e um agente real foi flagrado fugindo de um predador organicamente numa sessão limpa (sem forçar nada).
-9. **Polimento visual ("juice")**: sombra elipse sob agente/predador/árvore/casa; `render/particles.js` (novo, pool com teto de 150 — poeira ao andar, faísca ao minerar, lasca ao cortar árvore); brilho pulsante na fogueira; flash vermelho no agente/predador que sofre dano (`hitFlashAt`, comparado contra `world.elapsedSeconds`); `render/camera.js` ganhou `panToTarget`/`tick` (easing suave ao trocar seleção) e `triggerShake` (tremor sutil só em morte por combate, não a cada golpe); `render/lighting.js` (novo, overlay de tom por hora do dia, um `fillRect`); `core/gameLoop.js` passa a mandar o dt real (não só o simulado) pro `render()`, pra esses efeitos continuarem suaves com o jogo pausado/acelerado. HUD/inspetor/feed com paleta "madeira e latão" + tipografia pixel (Press Start 2P/VT323, Google Fonts) em vez do cinza genérico; `ui/eventFeed.js` reescrito pra animar só a linha nova (antes reconstruía o DOM inteiro a cada evento).
-10. **Diagnóstico de FPS** (medido, não implementado — ver §5): `drawTiles` escala linearmente com tiles visíveis (167ms no zoom mínimo, dominante) e `scanPerception`/`checkDeath`/`updateDecision` rodam todo frame em vez de só na reconsideração. `separation.js` **não** é o gargalo (hipótese do usuário refutada por medição: <1ms mesmo em 200 agentes ativos).
-11. **Levantamento de assets pendentes** (Frente 2 de uma rodada anterior) — nenhum pack baixado tem pose de trabalho (cortar árvore/minerar/construir/pescar) pra personagem humano. Nenhum pack tem terreno/tile melhor que o Kenney já em uso.
-12. **Design de casas em tiers + rank de vila** (aprovado, não implementado — ver §5) — 3 níveis de casa (upgrade, não casa nova extra), rank derivado Acampamento→Vila→Cidade.
-13. **5 regras de disciplina de trabalho** combinadas com o usuário e salvas em memória permanente (fora do repo, `~/.claude/.../memory/work_discipline_worldbox.md`) — ver §4.
+1. **Inventário exaustivo do pack de assets antigo** (287 arquivos, 5 packs, imagens abertas e analisadas pixel a pixel, não só nomes de arquivo) — conclusão: nenhum serve pra terreno/decoração/civil. O motivo real não é resolução (o Cavaleiro tem só 17×21px de conteúdo, mesma ordem de grandeza dos candidatos) — é **estilo**: os packs candidatos são pixel art de contorno duro e cor chapada saturada, a régua do jogo (Tiny RPG/craftpix) é sombreado suave sem contorno.
+2. **Fauna predadora reduzida de 4 pra 2 espécies** (`demon`/`blood`, decisão do usuário) com arte do Tiny RPG Character Asset Pack 02. Stats **redistribuídos, não inventados**: `demon` herdou o perfil do urso, `blood` o do lobo. `PREDATOR_COUNT_PER_SPECIES` subiu de 6 pra 12 pra manter a densidade total (24 no mapa).
+3. **`src/render/sprites/` — SpriteManager unificado**, criado do zero. Lê dois formatos de spritesheet (tira horizontal por ação; grade RPG 3×4 ou 12×8) por trás de uma interface única. Contagem de quadros é **derivada da imagem**, não de tabela declarada (achado real: a tabela errava a contagem de `attack` em 3 dos 4 atores). `sprite-lab.html` na raiz é o banco de provas isolado.
+4. **`predatorRenderer.js` migrado pro SpriteManager** — animação de verdade (idle/walk/attack/hurt/death), espelhamento por direção, corpo que fica no chão tocando a animação de morte. `renderScale` por espécie (criado no item 2) ficou obsoleto e foi removido — substituído por uma escala única de arte, já que as duas espécies vêm do mesmo pack na mesma escala.
+5. **`agentRenderer.js` migrado pro SpriteManager** — civil vira um dos 32 personagens de `Pers-Sprites/Humanos-separados/` (grade RPG, 4 direções reais, rosto fixo por hash de `agent.id`); guerreiro designado usa as tiras completas de Soldier/Orc (idle/walk/attack/hurt/death). **Perda assumida**: nenhuma pose de trabalho (cortar árvore, minerar, construir, pescar) existe na arte disponível — as partículas de trabalho continuam, a pose do corpo não reflete mais a ação. Civil morto deita e desbota (a grade não tem clipe de morte); guerreiro tem `death` de verdade.
+   - **Confirmado pelo usuário**: os civis usam o pack SuperRetroWorld, que numa rodada anterior tinha sido reprovado por estilo pra essa mesma categoria. Usei porque o usuário entregou esses arquivos dentro de `Pers-Sprites/`; ele viu o resultado ao vivo e aprovou ("os civis ficaram bons") — não é mais uma pendência.
+6. **Correção de extinção total das vilas** (reportado jogando 45s em 4x) — três bugs independentes, nenhum das mudanças de render desta sessão:
+   - `findNearestPredator` sem limite de distância: todo civil entrava em fuga permanente enquanto existisse um predador vivo em qualquer canto do mapa. Corrigido com `maxDistance = PERCEPTION_RADIUS * TILE_SIZE`.
+   - `feedBackgroundVillage` tratava `hunger < 100` como faminto: agente fora de tela comia na taxa cheia continuamente. Corrigido com `BACKGROUND_EAT_HUNGER_THRESHOLD = 55`.
+   - O LOD simulava consumo de quem está fora de tela mas nunca produção — `produceBackgroundVillage` (novo) fecha a simetria, com fator de ciclo útil e divisão do trabalho pela demanda (pra vila madeireira fora de tela não morrer de fome, igual em tela ela sobrevive pescando).
+7. **Terreno e decoração refeitos do zero, 100% procedural** (`src/render/terrain/`, 7 módulos) — busca de substituição em todos os packs fechou negativa (o único tileset disponível, Kenney, é o estilo que se queria eliminar). Ruído de valor, paleta com rampa de 5 tons e luz fixa de cima-esquerda, transição irregular entre tipos de terreno (o que mais tira o aspecto "tabuleiro"), minério como pedra incrustada em vez de ícone centralizado, árvore/planta/casa/baú com arte no mesmo estilo.
+8. **Otimização de FPS do terreno** (`terrainChunks.js`) — terreno assado em blocos offscreen de 32×32 tiles. `drawTiles` caiu de 80ms pra 0.06ms em zoom 0.25. Era o gargalo de FPS mais antigo do projeto.
+9. **Prédios de vila viraram entidades reais** (`village/buildings.js`) — antes, `village.buildings` era um contador sem posição, e as casas no mapa eram decoração visual sem vínculo nenhum. Isso fazia `eat`, `deliver` e `build` mirarem todos `village.center`. Agora: Prefeitura (marco, nasce com a vila), Casa (+pop, onde se dorme), Celeiro (+comida, onde se come/entrega comida), Depósito (+madeira/minério, onde se entrega o resto). `build.js` escolhe o tipo pela carência real da vila. `sleep.js` fechou um TODO aberto desde a fatia 2 (dormir em casa). Cada agente para num ponto do anel ao redor do prédio, não no centro exato.
+10. **Reserva de tile de recurso** (`world/claims.js`) — antes, 42% das observações tinham alvo de colheita compartilhado entre agentes (medido), com grupos de até 5 na mesma árvore. Agora reserva ao escolher, libera ao trocar de alvo/encher carga/morrer, com fallback obrigatório (se todos os tiles conhecidos estão reservados, ignora a reserva) pra vila pequena não travar.
+11. **Timer de travamento** (`agent/stuck.js`) — `noProgressFor` acumula quando posição, carga, obra, fome e sono não mudam; ao passar de 6s, cancela o alvo e bloqueia o tile por 30s na memória do agente. Preventivo: a incidência medida de travamento real era ~zero antes da correção.
+12. **Dois consertos em `eat.js`** — estoque zerado agora limpa o movimento (antes deixava o agente plantado no celeiro); agente com fome 100 não debita mais comida da vila.
+13. **Limpeza final de `assets/sprites/`** — os 24 arquivos apagados pelo usuário em sessões anteriores foram confirmados órfãos (nenhum carregado por código, terreno/decoração/civil já são procedurais/SpriteManager) e commitados como deleção.
+14. **Bug corrigido no `ui/inspector.js`** — os ícones de minério apontavam pra `assets/Assets-testes-para-o-claude-testar/Pedra1.png` (pasta ignorada no git, arquivo nunca existiu ali) — estavam quebrados desde sempre. Trocado por `render/terrain/oreTextures.js`, convertido em data URL uma vez no carregamento.
+15. **`ROADMAP.md`** ganhou duas seções novas: sistemas grandes sem prioridade (evolução genética, tecnologia emergente por necessidade, sucessão de liderança, construção adaptada ao bioma — registrados, não desenhados) e LOD de renderização por zoom (ideia registrada, não implementada — ver §5 abaixo).
 
 ## 2. Estado atual por sistema
 
 | Sistema | Estado |
 |---|---|
 | World/Terrain, Time loop, Camera/Render, Pathfinding | ✅ Funcionando |
-| Camera easing/shake, partículas, sombra, iluminação | ✅ Funcionando, testado ao vivo |
-| Perception, Memory, Utility AI/Decision | ✅ Funcionando — mas rodando mais caro que precisa (§5) |
+| **Terreno e decoração** | ✅ Procedural, testado ao vivo, mais barato que a versão anterior |
+| **Prédios de vila** (Prefeitura/Casa/Celeiro/Depósito) | ✅ Funcionando — posição, efeito e destino de ação corretos |
+| Perception, Memory, Utility AI/Decision | ✅ Funcionando |
+| **Reserva de tile / timer de travamento** | ✅ Funcionando, verificado ao vivo (0% de alvo compartilhado, medido) |
 | Village/Clan/Diplomacy/Trade | ✅ Funcionando |
 | Combat (agente-vs-agente) | ✅ Funcionando |
-| **Combat (agente-vs-predador)** | ✅ Funcionando, testado ao vivo (chase/attack/flee/death confirmados) |
-| Life-cycle, reprodução | ✅ Funcionando |
-| Simulation LOD | ✅ Funcionando, fome/sono fora de tela agora realistas (item 7) |
-| UI/HUD/Inspetor/Feed | ✅ Funcionando, com polimento visual novo |
-| **Sprites de terreno/decoração/minério/civil** | 🔴 **Quebrado localmente** — ~24 arquivos apagados, sem substituto em pack já baixado; aguarda pack novo do usuário (§0) |
-| Sprites de predador | ✅ Resolvido — 2 espécies com arte do Tiny RPG 02, recortada e testada ao vivo (§1a) |
+| Combat (agente-vs-predador) | 🟡 Funcionando (código não mudou nesta sessão) — mas a animação de ataque/morte nova (predador e guerreiro) nunca foi vista numa guerra/caçada orgânica real, só em harness sintético |
+| Life-cycle, reprodução | ✅ Funcionando, testado com avanço determinístico de centenas de segundos simulados |
+| Simulation LOD (agregado fora de tela) | ✅ Funcionando — agora com produção **e** consumo simétricos |
+| **SpriteManager** (`render/sprites/`) | ✅ Em uso por predador e agente; `sprite-lab.html` é o banco de provas |
+| UI/HUD/Inspetor/Feed | 🟡 Funcionando, com um bug de contagem conhecido (ver §3) |
 | Necessidades sociais/segurança/pertencimento | ❌ Não iniciado (só fome/sono existem) |
 | `agent.traits` | ❌ Não iniciado |
 | `defense_pact` (efeito real) | ❌ Não iniciado |
-| Casas em tiers / rank de vila | ❌ Não iniciado (design aprovado, ver §5) |
-| Otimização de FPS (drawTiles/perception) | ❌ Não iniciado (diagnóstico pronto, ver §5) |
+| LOD de renderização por zoom | ❌ Não iniciado — ideia registrada em `ROADMAP.md` §2.3 |
 
 ## 3. Bugs / comportamentos estranhos não corrigidos
 
-1. **Sprites quebrados localmente** (§0) — prioridade máxima antes de qualquer outra coisa.
-2. **Elfo sem arte própria** — cai no guerreiro genérico, decisão aceita há sessões.
-3. **Orc destoa visualmente** (perfil vs. resto de cima/frente) — aceito, pouco tempo de tela.
-4. **FPS cai perceptivelmente com pouco zoom** — diagnosticado (§5), não corrigido.
-5. Confirmações mecânicas que nunca foram vistas numa sessão real longa do usuário (só em teste automatizado curto ou forçado): papel de guerreiro numa guerra orgânica, animação de morte numa morte orgânica, pesca enchendo estoque por entrega completa, casa completando `village.buildings` numa sessão real, indicador `💀 extinta`, correção da espiral de extinção por reprodução numa sessão longa.
+1. **`ui/inspector.js` mostra contagem de prédio errada.** A linha de população mostra `(${village.buildings.length} casa/casas)`, mas `buildings.length` agora conta **todos** os tipos (prefeitura + celeiro + depósito + casa), não só casas — uma vila recém-fundada (prefeitura + celeiro, zero casas de verdade) aparece como "(2 casas)". Introduzido na rodada de prédios (`6f72d87`), não pego antes por estar fora do que foi testado ali. Conserto é filtrar por `type === 'house'` nessa linha.
+2. **Construção depende de pedra, que depende de mineração lenta.** Numa sessão curta a vila fica só com Prefeitura + Celeiro (os dois fundacionais); Casa e Depósito, que são o que mais ajuda a espalhar a população, demoram a aparecer. Sinalizado, não corrigido — precisa de decisão sobre calibrar custo ou disponibilidade de pedra.
+3. **Ataque e morte de predador/guerreiro, com a arte animada nova, nunca confirmados numa guerra ou caçada orgânica real.** Só testado em harness sintético (agentes/predadores forjados chamando `step`/`drawX` diretamente) — o caminho de código é o mesmo, mas não houve confirmação visual ao vivo de uma luta de verdade acontecendo.
+4. **Elfo sem arte própria** — cai no guerreiro genérico (Soldier). Decisão aceita há várias sessões, sem substituto disponível.
+5. **Orc de perfil destoa visualmente** do resto (visto de cima/frente) — aceito, pouco tempo de tela.
 6. **Postura de guerra/paz pode alternar com frequência que parece volátil** numa sessão de observação longa — não recalibrado.
-7. Testes automatizados de sessão longa esbarram em throttling de `requestAnimationFrame` (a aba de automação fica com `document.visibilityState: "hidden"`) — limitação de ambiente confirmada de novo nesta sessão, contornada avançando o `world` manualmente por dt fixo quando precisou de confirmação ao vivo determinística (predadores).
+7. **rAF é throttlado numa aba de automação** (`document.visibilityState: "hidden"`) — limitação de ambiente confirmada de novo. Contornado nesta sessão pausando o loop e avançando `update(dt)` manualmente quando precisou de confirmação ao vivo determinística; a técnica está documentada no histórico de commits pra reuso.
+8. **Confirmações mecânicas nunca vistas numa sessão real longa do usuário** (herdado de sessões anteriores, ainda relevante): reprodução/extinção em sessão de horas, oscilação de postura diplomática ao longo do tempo.
 
 ## 4. Decisões técnicas e o motivo
 
-- **`dev-server.py` em vez de `python -m http.server`** — resolve cache de módulo instável que já atrapalhou mais de uma sessão. Confirmado que resolve (erro de import refletiu na hora numa mudança real). Um obstáculo diferente (RAF throttlado em aba "hidden" pra automação) continua existindo, é ambiente, não cache.
-- **`separation.js` não é o gargalo de FPS** — hipótese do usuário testada e refutada por medição direta (custo real <1ms mesmo em 200 agentes ativos). O gargalo real é `drawTiles` (escala com tiles visíveis) e `scanPerception`/decisão rodando todo frame em vez de só na reconsideração.
-- **Screen shake só em morte por combate**, não a cada troca de dano — pedido era "golpe forte", sacudir a tela numa luta inteira seria o oposto de sutil.
-- **Fauna predadora: civil sempre foge, guerreiro designado sempre enfrenta** (a menos que a vida já esteja crítica) — decisão de design de uma rodada anterior, implementada e confirmada ao vivo nesta.
-- **Casas em tiers via upgrade de casa existente, não casa nova extra** — design aprovado pelo usuário: tier 2 usa ferro, tier 3 usa ouro, dando uso real a minérios hoje subaproveitados. Kenney já é modular (peças de parede/telhado), não precisa de pack novo pra isso — mas isso caiu junto na deleção de sprites do usuário, então o candidato de arte específico precisa ser re-escolhido quando a Frente de assets for retomada.
-- **5 regras de disciplina de trabalho** (ver memória `work_discipline_worldbox`): uma frente por vez em sistemas acoplados (render/decisão/estado de mundo), sequencial até testado ao vivo; subagentes só pra trabalho mecânico genuinamente independente; critério de parada verificável antes de trabalho maior, com teto de tentativas se for loop; crítica visual com referência concreta, no máximo 2-3 rodadas por item. Vale pro resto do projeto, não só pra esta sessão.
+- **Terreno/decoração/prédios são 100% procedurais, não arte de pack.** A busca por substituição foi feita de verdade (inventário completo, imagens abertas) e fechou negativa duas vezes (fauna e depois terreno) — o único tileset achado sempre trazia o estilo chapado que se queria eliminar. Gerar deu controle total sobre paleta e luz, e por acaso saiu mais barato em FPS que a alternativa de cor lisa.
+- **Usuário escolheu, via pergunta explícita**: 4 tipos de prédio (Prefeitura/Casa/Celeiro/Depósito, não só Prefeitura+Casa); vila nasce com Prefeitura+Celeiro e constrói o resto; dormir vai até uma casa real (não só marca lotação por casa, versão mais simples escolhida).
+- **`renderScale` por espécie (predador) foi criado e depois removido na mesma sessão** — existiu só enquanto o recorte era de um quadro estático; virou redundante quando a animação completa (escala única de arte) chegou. Registrado porque é um caso real de decisão técnica revertida pela evolução do próprio trabalho, não por erro.
+- **Reserva de tile sem expiração por tempo** — a reserva é presa ao agente e ele sempre libera nos três pontos de saída (troca de alvo, carga cheia, morte). Um timeout criaria uma segunda fonte de verdade pra sincronizar sem necessidade.
+- **Timer de travamento com limiar de 6s, contando fome e sono como progresso** — colher uma carga cheia leva ~8s parado, mas isso não conta como travamento porque `carrying` sobe todo tick; sem incluir fome/sono no critério de progresso, o timer dispararia falso positivo em quem está comendo ou dormindo direito.
+- **As 24 deleções de `assets/sprites/` só foram commitadas nesta sessão, no fim** — ficaram de fora de todos os commits anteriores porque o remoto (GitHub Pages) ainda dependia delas até terreno/decoração/civil virarem procedurais/SpriteManager. Confirmado arquivo por arquivo antes de commitar, e o jogo publicado testado ao vivo depois (141 requisições, 0 falhas).
 
 ## 5. Próximos passos concretos, em ordem
 
-1. **Terreno/decoração/minério/civil (§0) — bloqueia visual, não bloqueia lógica.** Levantamento fechado: nenhum dos 5 packs baixados serve (ver §1a item 1 pro motivo — é estilo, não resolução). **Aguardando o usuário providenciar um pack novo**; quando chegar, repetir o mesmo processo de levantamento + proposta por categoria antes de mover qualquer arquivo. A parte de predador já saiu (§1a).
-2. **Otimização de FPS** (diagnóstico pronto, ver item 10 de §1): pré-renderizar a camada de terreno estática num canvas offscreen (`drawTiles` some do custo por-frame, vira 1 `drawImage`); mover `scanPerception` pro ritmo de reconsideração (~0.5s) em vez de todo frame; parar de recalcular "ameaça mais próxima" em paralelo em `checkDeath` + 4 ações de combate.
-3. **Casas em tiers + rank de vila** — design já aprovado (ver `DESIGN.md` se foi anotado, senão está só nesta sessão do histórico de conversa): 3 níveis por upgrade (tier2 = +ferro, tier3 = +ouro), rank derivado Acampamento/Vila/Cidade. Precisa reconfirmar candidato de arte por tier depois do item 1.
-4. **Sessão de jogo real do usuário** (pendente de sessões anteriores, ainda não aconteceu) — só depois dos sprites resolvidos, senão a avaliação visual fica invalidada pelo fallback geométrico.
-5. **Retomar brainstorm de features** (mais construções além de casa, histerese guerra↔paz) — só depois do visual estar redondo de novo.
+1. **Corrigir a contagem de prédios no inspetor** (`ui/inspector.js`, bug §3.1) — trocar `village.buildings.length` por uma contagem filtrada em `type === 'house'` na linha de população. Pequeno, isolado, sem risco.
+2. **Calibrar construção de Casa/Depósito** — decidir entre baixar `HOUSE_STONE_COST`/`DEPOT_STONE_COST` ou aumentar a taxa de descoberta de pedra (`PERCEPTION_RADIUS` já foi subido uma vez por um motivo parecido). Sem isso, o espalhamento de população que a rodada de prédios trouxe fica limitado a vilas que já mineraram bastante.
+3. **Sessão de jogo real do usuário, mais longa que os testes automatizados** — confirmar visualmente: prédios se populando com o tempo, guerra/caçada de predador acontecendo organicamente com a animação nova, e ausência de amontoamento numa vila grande e madura (15+ moradores, múltiplos prédios).
+4. **Se algo ainda incomodar visualmente**, as paletas de terreno estão isoladas em `render/terrain/palette.js` e cada terreno tem um pintor próprio em `tileTextures.js` — mudança pontual sem mexer em lógica.
+5. **LOD de renderização por zoom** (`ROADMAP.md` §2.3) — só quando performance ou tamanho de mapa virar prioridade de novo; não é urgente hoje porque o gargalo medido de terreno já foi resolvido pelos chunks.
 
 ## 6. Coisas pedidas pra lembrar que ainda não são código
 
-- **Casas em tiers**: tier 2 = 30 madeira + 20 pedra + 10 ferro → +8 população líquida (era +5); tier 3 = 50 madeira + 35 pedra + 20 ferro + 10 ouro → +12 população líquida. Upgrade de casa existente, não casa nova. `HOUSE_WOOD_COST`/`HOUSE_STONE_COST` viram tabela por nível; `getPopulationCap` soma por nível de cada `building`; `build.js` ganha regra de nova-vs-upgrade (prioriza nova enquanto população pressiona o teto).
-- **Rank de vila**: Acampamento → Vila → Cidade, **derivado** (população ≥20 E pelo menos 1 casa tier 2+), não um recurso separado — só muda o label exibido + 1 evento no feed na transição.
-- **Otimização de FPS**: números exatos de referência pra comparar depois de qualquer mudança — zoom=1/50 ativos: drawTiles 6.8ms, percepção 16.7ms; zoom=0.25/200 ativos: drawTiles 86-167ms, percepção 90.9ms. `separation.js` sempre <1ms, não mexer nisso achando que é o problema.
-- **Regras de disciplina de trabalho** (§4) — já salvas em memória permanente, mas reforçando aqui: uma frente por vez em sistemas acoplados, sequencial até testado ao vivo, antes de abrir a próxima.
-
-## 1b. Sessão seguinte — SpriteManager unificado (módulo isolado, não ligado no jogo)
-
-O pack novo chegou em `assets/Pers-Sprites/` (99 PNGs). Escrito um gerenciador
-de sprites/animação que lê os dois formatos do pack, **testado isoladamente
-via `sprite-lab.html` — nenhum renderer do jogo foi tocado.**
-
-Três divergências entre a especificação e os arquivos reais, todas achadas
-antes de escrever código (por isso o levantamento vem primeiro):
-
-1. **`Characters-Sheets/` não existe.** O conteúdo do Formato 2 está em
-   `Pers-Sprites/Humanos-separados/`, e são os arquivos **já separados um
-   personagem por pasta** (48x80 e 96x128 = grade **3x4**), não a folha 12x8
-   com 8 personagens que a especificação descreve. As folhas 12x8 de verdade
-   só existem na pasta de matéria-prima ignorada no git. Resolvido suportando
-   **os dois layouts com detecção automática** (decisão do usuário) — a
-   fórmula de recorte é a mesma, só muda quantos blocos cabem.
-2. **A tabela de quadros de `attack` está errada pra 3 dos 4 atores.** Diz 8;
-   Blood Monster tem 8, mas Demon tem 7, Orc e Soldier têm 6, e
-   `Soldier_Attack03` tem 9. Resolvido derivando a contagem da imagem
-   (`largura/altura`) e usando a tabela só como validação com aviso no
-   console. Walk (8), Idle (6), Hurt (4) e Death (4) batem em 100% dos
-   arquivos.
-3. **A variante no nome é opcional** (`Blood Monster_A_Walk` tem `_A`,
-   `Orc_Walk` e `Soldier_Walk` não). Parser lê da direita pra esquerda.
-
-**Armadilha que custou uma rodada:** a primeira versão detectava o Formato 1
-pela pasta (`path.includes('Pers-Sprites/')`), seguindo a especificação. Mas
-no pack os **dois formatos moram dentro de `Pers-Sprites/`** — as 32 grades
-foram classificadas como tira e desenhadas inteiras. O sinal confiável é o
-token de ação no fim do nome, não a pasta.
-
-**Testado ao vivo:** 57 folhas, 36 atores, 0 falhas; os 7 avisos de contagem
-de quadros aparecem exatamente onde previsto e em nenhum outro lugar;
-animação, troca de direção (as 4), ataque e morte-que-segura-o-último-quadro
-confirmados a olho; detecção de layout confirmada nos 4 arquivos reais
-(192x160 e 288x192 → 12x8; 96x128 e 48x80 → 3x4), incluindo os dois casos
-ambíguos por divisibilidade; recorte 12x8 confirmado produzindo 8 personagens
-distintos × 4 direções. Jogo principal recarregado depois: sem erro novo.
-
-**Próximo passo natural:** ligar no `predatorRenderer.js` primeiro (sistema
-mais isolado, e as duas espécies já usam exatamente Demon_A/Blood Monster_A),
-depois nos agentes. Nada disso foi feito ainda — a escolha do usuário nesta
-rodada foi entregar só o módulo.
-
-**Não coberto ainda:** `Pers-Sprites/Animais/` (reprovado por qualidade,
-e as tiras têm layout diferente — 4 colunas × N linhas) e a folha de tiles
-Kenney em `Vários tipos de chão-.../` (16x16 com 1px de margem), que seria um
-terceiro formato.
-
-## 1c. Sessão seguinte — SpriteManager ligado nos predadores
-
-Primeiro consumidor real do módulo da §1b. `render/predatorRenderer.js`
-reescrito: em vez de um quadro estático por estado, toca as tiras completas
-do pack (Idle/Walk/Attack/Hurt/Death) para as duas espécies.
-
-O que ganhou:
-- **Animação de verdade** — patrulhar/perseguir/fugir viram `walking` ou
-  `idle` conforme o bicho tenha se deslocado no quadro; `attacking` toca o
-  golpe e reinicia enquanto o predador continuar atacando.
-- **Espelhamento por direção** — a arte olha pra direita; agora vira pra
-  esquerda quando anda pra esquerda, em vez de todo predador ficar virado
-  pro mesmo lado.
-- **Corpo que fica** — predador morto toca `death` e segura o último quadro.
-  Custo zero de simulação: `world.predators` nunca foi podado (só marca
-  `alive: false`), então o corpo já estava lá, só não havia arte pra mostrar.
-
-Três decisões técnicas que não são óbvias:
-1. **dt SIMULADO, não real** — o oposto de `particles.js`/`camera.js`. Uma
-   animação de personagem representa deslocamento no mundo, então tem que
-   congelar no pause e acelerar em 4x junto com o movimento. Derivado de
-   `world.elapsedSeconds` dentro do próprio módulo, sem mudar a assinatura de
-   `render()`.
-2. **Escala única de arte** (`ART_SCALE = 1.4`) em vez de altura fixa por
-   espécie. Como as duas vêm do mesmo pack na mesma escala, o demônio sair
-   maior que o monstro rasteiro é automático. **Isso aposentou o
-   `renderScale` por espécie** que tinha sido criado na §1a — ele só existia
-   porque o recorte por alfa de um quadro estático normalizava as duas pra
-   mesma altura.
-3. Os 4 recortes estáticos (`Demonio.png`, `MonstroSangue.png` e os dois
-   "Atacando") foram removidos de `assets/sprites/` — eram um quadro
-   escolhido a dedo de cada tira, e agora a tira inteira é usada.
-
-**Bug encontrado e corrigido durante o teste:** a detecção de "andou?" usava
-só `dx`, então um predador subindo ou descendo **em linha reta** contava como
-parado e mostrava a pose de repouso enquanto se deslocava. Invisível a olho —
-apareceu ao medir o índice de quadro ao vivo. Corrigido pra `hypot(dx, dy)`,
-mantendo só o X pra decidir o espelhamento.
-
-**Testado ao vivo:** sem erro de console (só os 2 avisos esperados de
-contagem de quadros do Demon); 24 views criadas, `world.elapsedSeconds`
-avançando 1.000s/s em 1x; ciclo de caminhada percorrendo os 8 quadros e
-repetindo (`3,4,5,6,7,0,1,2...`); `facing` alternando conforme a direção;
-demônio e monstro de sangue confirmados na tela com sombra e proporção certa.
-O ciclo `walking→idle→walking` a cada ~1s **não é bug** — é a patrulha real
-(chega ao alvo, espera a próxima reconsideração, escolhe outro).
-
-**Não confirmado ainda:** o clipe de ataque e o de morte numa perseguição
-orgânica de verdade — o caminho de código é o mesmo já validado no
-`sprite-lab.html`, mas nenhum combate contra predador aconteceu na janela de
-teste.
-
-**Próximo passo:** migrar `agentRenderer.js` pro SpriteManager. É bem mais
-envolvido que o predador — ele escolhe pose por AÇÃO corrente (cortando
-árvore, minerando, construindo, levando tronco, pescando), por papel
-(civil/guerreiro) e por estado de vida, e as poses de trabalho não existem
-nas tiras do pack novo. Precisa de decisão de design antes, não é uma
-tradução mecânica.
-
-## 1d. Sessão seguinte — agentRenderer migrado pro SpriteManager
-
-Segundo (e maior) consumidor do módulo. É o caso que justifica o gerenciador
-ter sido feito unificado: **as duas famílias de arte do agente usam formatos
-diferentes ao mesmo tempo**, e o renderer não precisa saber disso.
-
-- **Civil** → um dos 32 personagens de `Pers-Sprites/Humanos-separados/`
-  (grade RPG 3x4), escolhido por hash de `agent.id` e fixo pra vida toda.
-  Caminhada com **4 direções reais**. Estavam como círculo amarelo desde que
-  a arte antiga foi apagada.
-- **Guerreiro designado** → tiras completas de `Soldado1/` (Cavaleiro) e
-  `Monstro3/` (Orc), com idle/walk/attack/hurt/death. **O elfo deixou de ser
-  um círculo**: cai no Soldier como guerreiro genérico (segue sem arte
-  própria, decisão antiga, mas agora ao menos aparece animado).
-
-### ⚠️ Decisão que precisa da confirmação do usuário
-
-Os 32 civis são o **SuperRetroWorld**, o mesmo pack que numa rodada anterior
-foi reprovado por estilo (contorno preto duro e cor chapada, contra o
-sombreado suave do Soldier/Orc/Demon), com a instrução explícita de "não
-tente resolver o personagem civil com o que já existe". Usei assim mesmo
-porque o usuário **entregou esses arquivos dentro de `Pers-Sprites/`**, a
-pasta curada do pack novo — o que li como decisão revista. **Se não for,
-reverter é uma linha**: apagar `CIVILIAN_ACTORS` de `agentRenderer.js` faz o
-civil voltar ao fallback geométrico sem tocar em mais nada.
-
-### Decisões técnicas
-
-1. **Perda assumida: as poses de trabalho.** Cortar árvore, minerar,
-   construir, pescar, levar tronco — nenhuma existe na arte disponível. As
-   partículas de trabalho (faísca, lasca) continuam, então "está trabalhando
-   ali" ainda se lê, só não pela pose do corpo. `DESIGN.md` §8 foi atualizado:
-   o projeto voltou ao eixo "diversidade visual por indivíduo" que aquela
-   seção dizia ter abandonado, porque a alternativa era manter o círculo.
-2. **Civil morto deita e desbota** (rotação 90°, alfa 0.65) — a grade RPG não
-   tem clipe de morte e a cascata do animator deixaria o cadáver **de pé**
-   durante o `DEATH_LINGER_SECONDS`. Guerreiro tem `death` e toca normal.
-3. **`sweepViews`** — agente É podado de `world.agents` (ao contrário de
-   predador), então o Map de estado visual cresceria pra sempre numa sessão
-   longa. Varredura a cada ~10s. **A versão anterior tinha esse mesmo
-   vazamento no `lastPositions` e ninguém tinha notado.**
-4. **View reconstruída quando o ator muda** — `clanDecision.js` designa e
-   desmobiliza guerreiro em tempo de execução, então o agente troca de
-   família de arte no meio da vida.
-
-**Testado ao vivo:** console limpo (só os 7 avisos esperados de contagem de
-quadros); vila de 8 civis com rostos distintos e direções corretas na tela;
-os 10 casos do renderer exercitados chamando `drawAgents` de verdade com
-agentes sintéticos (civil parado/andando/morto, cavaleiro/orc parado e
-atacando, elfo, elfo morto, criança) — todos corretos.
-
-**Custo medido** (200 iterações, síncrono): 0.195ms/frame com 32 agentes,
-1.56ms com 200, 4.87ms com 600. Contra os 86-167ms de `drawTiles` em zoom
-baixo (§6), é ruído.
-
-**Não confirmado:** ataque e morte de guerreiro numa guerra orgânica — só no
-harness sintético, que exercita o mesmo caminho de código.
-
-**Próximo passo natural:** o terceiro formato de spritesheet (folha de tiles
-Kenney 16x16 com 1px de margem, em `Pers-Sprites/Vários tipos de chão-...`),
-que devolveria terreno e decoração — as últimas categorias em fallback
-geométrico. A arquitetura já prevê: é um objeto novo em `sheetFormats.js`.
-
-## 1e. 🚨 Correção — extinção total das 4 vilas (reportada jogando 45s em 4x)
-
-O usuário rodou 45s em 4x (≈180s simulados) e **todas as vilas foram
-extintas**. Reproduzido de forma determinística e corrigido. **Nenhum dos
-três bugs veio das mudanças de render desta sessão** — os três nasceram no
-commit `b57ab3d` (fauna predadora + LOD), sessões atrás; só não tinham
-aparecido porque nunca houve uma sessão real longa.
-
-### Bug 1 — `findNearestPredator` sem limite de distância (o pior)
-
-`combat/predatorCombat.js:findNearestPredator` varria `world.predators`
-inteiro e devolvia o mais próximo **do mundo todo**, a 200 tiles se fosse o
-caso. Como `FLEE_PREDATOR_SCORE` (0.9) é o score mais alto do jogo, **todo
-civil entrava em fuga permanente** enquanto existisse um único predador vivo
-em qualquer canto do mapa. Ninguém colhia, ninguém entregava, ninguém comia.
-O mesmo descuido travava a regeneração de vida em `lifecycle.js:checkDeath`,
-que usa essa função pra decidir se há ameaça por perto.
-
-O comentário da função sempre disse "predadores **percebidos**" — a intenção
-estava certa, o raio nunca foi implementado. Corrigido com um parâmetro
-`maxDistance` que já entra valendo `PERCEPTION_RADIUS * TILE_SIZE`, então os
-três consumidores (`fleePredator`, `fightPredator`, `checkDeath`) ficam
-corretos sem mudar nenhuma chamada. Confirmado: `fleePredator` sumiu da
-distribuição de ações.
-
-### Bug 2 — `feedBackgroundVillage` drenando o estoque
-
-O filtro de "quem come" era `hunger < 100`: um morador com fome 99 contava
-como faminto e comia na **taxa cheia, continuamente**, só pra ficar coberto.
-Oito moradores assim consomem 8 de comida por segundo pra sempre. Um agente
-`active` não come assim — só come quando `eat` vence o utility score (fome
-≈55), em rajadas. Corrigido com `BACKGROUND_EAT_HUNGER_THRESHOLD = 55`.
-
-### Bug 3 — o LOD tinha consumo mas **nenhuma produção** (o estrutural)
-
-`stepBackgroundAgent` só decaía necessidades e `feedBackgroundVillage` só
-consumia: **o trabalho de quem está fora de tela nunca foi simulado**. O
-estoque de uma vila fora da câmera só sabia cair. A conta fecha: fome decai
-100/60 por segundo, cada comida restaura 100/15, então **cada morador precisa
-de 0.25 de comida por segundo só pra empatar** — 8 pessoas queimam os 60 de
-estoque inicial em ~30s. Com 4 vilas e uma câmera, três estavam sempre
-condenadas. Era esse o mecanismo por trás do relato.
-
-Corrigido com `produceBackgroundVillage`, contrapartida simétrica de
-`feedBackgroundVillage`:
-- produz o recurso da especialização, com um fator de ciclo útil
-  (`BACKGROUND_WORK_EFFICIENCY = 0.3`) pra estar fora de tela **não** ficar
-  mais produtivo que estar em tela — senão o LOD passaria a mudar o resultado
-  do jogo em vez de só baratear a simulação;
-- **divide o trabalho pela demanda**, igual a demanda enviesa o utility score
-  de um agente `active` (pilar 3): quanto mais falta comida, mais gente larga
-  a especialização e vai pescar. Sem essa parte (primeira tentativa da
-  correção), as duas vilas **madeireiras** morriam enquanto as agrícolas
-  ficavam com o estoque no teto — em tela elas sobrevivem porque `fish.js` é
-  universal, e era esse caminho que faltava no agregado;
-- a pesca leva `BACKGROUND_FISHING_PENALTY = 0.7` por não ser a
-  especialização: a madeireira fica pouco acima do empate, sobrevive sozinha
-  mas só prospera com comércio — o pilar 4 não vira isenção fora de tela.
-
-### Resultado (mundo novo, loop pausado, avanço manual determinístico)
-
-| | antes | depois |
-|---|---|---|
-| t=180 | 4 vilas extintas | 70 vivos, 4 vilas |
-| t=531 | — | 67 vivos, 4 vilas (15-18 cada) |
-| mortes por inanição | 100% | 7 de 85 (8%) |
-| idade média de morte | ~100 | 297 |
-
-Equilíbrio estável por 4 minutos simulados contínuos: agrícolas com estoque
-perto do teto, madeireiras estáveis em ~40 de comida (o ponto de equilíbrio
-pesca+comércio), e a esmagadora maioria das mortes por velhice.
-
-### Técnica de diagnóstico (vale reusar)
-
-Automação não sustenta sessão longa (rAF é throttlado na aba). O que
-funcionou: expor `window.__world` e a função `update` temporariamente,
-**clicar em pause** pra o rAF parar de interferir, e chamar `update(1/60)`
-num laço — 500s simulados em segundos, determinístico e repetível. Sondas
-removidas depois; re-adicionar leva 30 segundos e é o caminho mais rápido
-pra qualquer bug de balanceamento futuro. Cuidado: passos demais numa só
-avaliação estouram o timeout do CDP — quebrar em blocos de ~120s.
-
-## 1f. Terreno e decoração refeitos do zero (procedural)
-
-Pedido: o terreno estava "muito cartoon". Estava mesmo — desde que a arte de
-tile foi apagada, cada tile era um **retângulo de cor lisa** (`TILE_COLORS`).
-
-**Busca por substituição, feita e negativa.** O único tileset em qualquer pack
-baixado é o Kenney roguelike (16x16, em `Pers-Sprites/Vários tipos de chão-`).
-Inspecionado tile a tile: é flat, contorno duro e saturado — exatamente o
-estilo que se queria eliminar. Adotá-lo teria trocado o problema por ele
-mesmo. Aplicado o plano B combinado: **gerar do zero**.
-
-### O que foi feito (`src/render/terrain/`, 7 arquivos)
-
-Três coisas fazem o mapa parar de parecer tabuleiro, **em ordem de impacto**:
-
-1. **Transição irregular entre tipos** (`edgeMasks.js`) — a mais importante, e
-   não é sobre detalhe: enquanto cada tile é um quadrado perfeito de um tipo
-   só, o mapa lê como tabuleiro por mais bonita que seja a textura dentro do
-   quadrado. Máscara de 4 bits (quais lados fazem fronteira com terreno de
-   prioridade menor) recorta o tipo de cima sobre o de baixo com borda mordida.
-2. **Variação por posição** — 6 variantes por tipo escolhidas por hash da
-   coordenada, o que mata a repetição de papel de parede. Com 4 variantes, uma
-   cadeia de montanha grande ainda lia como alvenaria.
-3. **Rampa de 5 tons com luz fixa de cima-esquerda** — o que separa
-   "superfície" de "cor chapada" é variação de VALOR, não quantidade de
-   detalhe. Toda a arte (terreno, minério, decoração) respeita a mesma direção.
-
-Mais: minério virou **pedra incrustada fora do centro do tile** em vez de
-ícone centralizado (o ícone flutuando no meio do quadrado era metade do motivo
-de a montanha parecer tabuleiro); árvore/planta/casa/baú ganharam arte no
-mesmo estilo, substituindo o triângulo verde de placeholder que, com o terreno
-já texturizado, tinha virado o pior elemento da tela.
-
-### Decisões técnicas
-
-- **Autoria em 16x16 desenhado a 32.** Os personagens têm ~20px de arte a
-  ART_SCALE 2.1; autorar o chão a 32px nativo deixaria os pixels do terreno com
-  metade do tamanho dos dos personagens. Mistura de densidade de pixel é o que
-  faz um jogo parecer colado de fontes diferentes.
-- **Ruído de valor interpolado, não `random()` por pixel** — a diferença entre
-  textura e chuvisco de TV.
-- **Água usa ruído alongado na horizontal e de amplitude curta.** A primeira
-  versão usava ruído isotrópico com a rampa inteira, e a quantização em 5 tons
-  criava manchas angulares que liam como detrito boiando. Água tem estrutura
-  horizontal e pouquíssimo contraste.
-- **Círculo de território virou gradiente** (`villageRenderer.js`): enquanto o
-  chão era cor lisa um disco translúcido uniforme não incomodava; com o terreno
-  texturizado ele virou a maior mancha achatada da tela, lavando justamente a
-  área onde o jogador mais olha. Agora tinge só perto da borda.
-
-### Performance — ficou MAIS BARATO
-
-| zoom | antes (cor lisa, §6) | agora (procedural) |
-|---|---|---|
-| 1 | 6.8ms | **4.65ms** |
-| 0.25 | 86-167ms | **80ms** |
-
-Contraintuitivo mas explicável: `tileRenderer.js` passou a resolver a arte de
-cada tile **uma vez e guardar no próprio tile** (`_art`). O terreno é estático,
-então refazer duas varreduras de 4 vizinhos e montar uma string de chave por
-tile por frame era desperdício puro — com ~40 mil tiles visíveis em zoom baixo
-são dezenas de milhares de alocações por frame, num laço que o §6 já
-registrava como o gargalo de FPS do jogo. A geração toda acontece no
-carregamento; o laço de render faz um `drawImage` e nada mais.
-
-**Zoom baixo continua sendo o gargalo** (80ms): a otimização real que falta é
-pré-renderizar o terreno num canvas offscreen por chunk, que segue no roadmap.
-
-## 1g. FPS, prédios com função e fim do amontoado no centro
-
-Três pedidos numa rodada, tratados como três frentes.
-
-### Frente 1 — FPS (terrain/terrainChunks.js)
-
-O terreno é assado em blocos offscreen de 32x32 tiles, na resolução de
-autoria (16px/tile). O terreno é **estático**, então desenhar os mesmos ~40
-mil tiles 60 vezes por segundo era refazer trabalho idêntico.
-
-| zoom | antes desta rodada | agora |
-|---|---|---|
-| 1 | 4.65ms | **0.01ms** |
-| 0.25 | 80ms | **0.06ms** |
-| 0.1 | — | **0.20ms** |
-
-O gargalo de FPS mais antigo do projeto acabou. Detalhe: a ondulação da água
-só é desenhada acima de `WATER_ANIM_MIN_ZOOM` (0.6) — abaixo disso um tile
-tem <19px de tela e a ondulação é um traço de 1px, imperceptível, mas
-custaria um `drawImage` por tile de água justamente no zoom em que existem
-dezenas de milhares deles.
-
-### Frente 2 — Prédios viraram entidades (village/buildings.js)
-
-**A raiz do amontoado não era visual.** `village.buildings` era um CONTADOR
-(lista de `{type:'house'}` sem posição, usada só como `.length`), e as casas
-no mapa eram decoração puramente visual, sem vínculo nenhum: o jogador via
-casinhas numa vila que mecanicamente tinha zero prédios. Como nenhum prédio
-tinha lugar, **`eat`, `deliver` e `build` miravam todos `village.center`** —
-três das ações mais frequentes do jogo no mesmo pixel.
-
-Agora cada prédio tem posição e função:
-
-| Tipo | Efeito | Quem vai lá |
-|---|---|---|
-| Prefeitura | marco institucional, fallback de destino | — (nasce com a vila, no centro) |
-| Casa | +5 teto de população | quem vai **dormir** |
-| Celeiro | +40 capacidade de comida | quem vai **comer** e quem entrega comida |
-| Depósito | +30 capacidade de madeira/minério | quem entrega madeira e minério |
-
-`build.js` escolhe **o tipo pela carência real** da vila (teto de população →
-espaço de comida → espaço de material) e constrói num terreno escolhido, não
-no centro. Vila nasce com prefeitura + celeiro: sem celeiro não haveria onde
-comer no minuto 1, e voltaríamos à espiral de fome do §1e.
-
-### Frente 3 — Destinos diferentes, e ponto de parada por agente
-
-Cada agente para num ponto do **anel** em volta do prédio, escolhido por hash
-do próprio id — não no centro exato dele. O espalhamento não é cosmético
-forçado: é consequência de os destinos serem diferentes.
-
-Fechado também o TODO que estava no `sleep.js` **desde a fatia 2** ("dorme
-onde estiver; isso entra quando existir vila/casa"). É a maior alavanca
-isolada, porque sono é constante e as casas ficam espalhadas.
-
-**Medido** (Vila 1, loop pausado, avanço manual):
-
-| | antes | depois |
-|---|---|---|
-| agentes | 13 | 17 |
-| pares empilhados (<12px) | 19 | **7** |
-| % dos pares possíveis | 24% | **5%** |
-| distância média ao centro | — | 163px (~5 tiles) |
-
-~5x menos amontoamento **com mais gente**. Não some por completo, e não
-deveria: quem compartilha destino ainda se junta perto dele.
-
-Efeitos conferidos ao vivo: teto de população 30+4x5=50; comida 100+40=140;
-madeira 100+30=130; prédios colocados com espaçamento mínimo respeitado.
-
-### Arte
-
-Quatro silhuetas deliberadamente diferentes, não variações de cor — o jogador
-tem que identificar cada prédio de relance, em zoom baixo, sem legenda:
-prefeitura de pedra clara com telhado azul e mastro; casa de madeira com
-telhado de duas águas; celeiro com **telhado curvo** e porta larga em X;
-depósito baixo de pedra com caixotes fora. Telhas (linhas escuras) em todos
-os telhados — telhado é a maior área do prédio, e área chapada grande era
-exatamente o que fazia o mapa parecer cartoon.
-
-O quadrado vermelho que marcava o centro da vila saiu: a prefeitura ocupa
-esse ponto e comunica o mesmo com arte de verdade (o marcador ficava
-desenhado por cima do próprio telhado).
-
-**Pendência conhecida:** construção continua dependendo de pedra, que depende
-de mineração, que é lenta — numa sessão curta a vila fica só com prefeitura +
-celeiro. Já era assim antes (§8 do DESIGN.md), mas agora incomoda mais,
-porque casa/depósito são o que espalha. Vale calibrar o custo ou a
-disponibilidade de pedra numa próxima rodada.
-
-## 1h. Reserva de recurso e detecção de travamento
-
-Diagnóstico pedido antes de qualquer código. Os dois problemas **existiam**,
-mas com incidências radicalmente diferentes — vale registrar isso, porque a
-intuição inicial (a minha inclusive) estava errada sobre qual doía.
-
-### Diagnóstico (medido, não suposto)
-
-**Reserva de recurso: não existia, e a incidência era alta.** Nenhum
-`claim/reserv/occupied` no código; `Tile.occupantIds` está no modelo de dados
-do DESIGN.md e nunca foi implementado. Cada agente chamava `recallNearest` da
-própria posição, isoladamente, e como os moradores ficam próximos e têm
-memórias parecidas, convergiam. **42% das observações tinham alvo
-compartilhado**, com grupos de até 5 agentes indo ao mesmo tile. Não era bug
-de correção (recurso é infinito por design), mas é a cara do "burro".
-
-**Timer de travamento: não existia, mas a incidência era ~zero.**
-`unreachable` É detectado e todas as ações chamam `clearMovement` — só que
-limpar não resolvia: as ações re-escolhem com `recallNearest`, que devolve
-deterministicamente o MESMO tile mais próximo, e o `score` não olha
-alcançabilidade. O ciclo "escolhe → falha → limpa → escolhe o mesmo" só
-terminava por decaimento de memória (~114s) — **e nem sempre terminava**: se
-o alvo estiver dentro do raio de percepção, `scanPerception` restaura a
-confiança pra 1 todo tick e o agente nunca esquece. Mas medindo:
-`unreachable` disparou **ZERO vezes em 390s simulados com 63 agentes**. É um
-buraco real com incidência quase nula — seguro preventivo, não fogo.
-
-**Dois defeitos encontrados de brinde no `eat.js`**, medindo travamento:
-estoque zerado fazia `return` sem `clearMovement` (agente plantado no
-celeiro), e um agente com fome 100 **continuava debitando comida da vila** —
-`consume` era calculado antes de checar se ainda cabia fome.
-
-### Correções
-
-**Reserva** (`world/claims.js`): `world.claims` mapeia `"tx,ty" -> agentId`, e
-o agente guarda a chave em `agent.claimedTile`. Vínculo dos dois lados torna a
-liberação O(1). Sem expiração por tempo de propósito: a reserva é presa ao
-agente, e ele sempre libera — em `clearMovement`, ao encher a carga, ou ao
-morrer (`pruneDead`). Um timeout seria uma segunda fonte de verdade.
-
-`recallNearest` ganhou um `skip` **opcional e não-obrigatório**: se ele
-descartar todos os candidatos, a busca é refeita sem ele. É o fallback que
-impede vila pequena de travar. Preferência, não proibição.
-
-**Travamento** (`agent/stuck.js`): `noProgressFor` acumula quando posição,
-carga, obra, fome E sono ficam parados. Limiar de **6s**. O detalhe que evita
-falso positivo: colher uma carga leva 8s parado, mas `carrying` sobe todo
-tick; comer/dormir sobem a necessidade; construir sobe `buildProgress` — todos
-contam como progresso, então nenhuma ação legítima chega perto dos 6s. Ao
-disparar, marca o tile em `agent.memory.blocked` por **30s** (na memória do
-agente, não no mundo: o tile pode estar acessível pra outro morador vindo de
-outra direção).
-
-### Verificação ao vivo
-
-| | antes | depois |
-|---|---|---|
-| observações com alvo compartilhado | **42%** | **0%** |
-| amostras com pelo menos uma colisão | 62,5% | **0** |
-| maior grupo no mesmo tile | 5 | **0** |
-| agentes travados (pico) | 1 | **0** |
-
-Sem regressão: 65 vivos, 4 vilas com 15-17 cada, todas com comida. O timer de
-travamento disparou **1 vez em 60s com 65 agentes** — ativo, sem falso
-positivo.
-
-**Fallback testado explicitamente**: reservando os **523 tiles conhecidos** de
-um agente em nome de um fantasma, ele ainda acha alvo; sem a segunda passada
-não acharia nada. É a prova de que vila pequena não trava.
+- Nenhuma pendência aberta desta categoria no momento — os itens de design combinados nesta sessão (tipos de prédio, prefeitura+celeiro fundacionais, dormir em casa, reserva com fallback obrigatório, timer de 6s) foram todos implementados e verificados ao vivo.
+- Os quatro sistemas grandes que o usuário pesquisou (evolução genética/especiação, tecnologia emergente por necessidade da vila, sucessão de liderança, construção adaptada ao bioma) estão registrados em `ROADMAP.md` §2.5, explicitamente sem prioridade e sem design — não é pra puxar nenhum deles sem uma conversa de design própria antes.

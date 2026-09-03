@@ -6,12 +6,24 @@
 
 import { getStance } from '../clan/clan.js';
 import { getPopulationCap } from '../village/village.js';
+import { buildOreTextures } from '../render/terrain/oreTextures.js';
 
 // Ícone por recurso mineral — sem sprite, o estoque aparecia como texto puro
 // (`stone`, `coal`...) na lista; food/wood já tinham 🌾/🪵 no label da vila
 // (render/villageRenderer.js), minério não tinha nada equivalente.
-const MINERAL_ICON_FILE = { stone: 'Pedra1', coal: 'Carvao', iron: 'Ferro', gold: 'Ouro' };
-const RESOURCE_ICON_DIR = 'assets/Assets-testes-para-o-claude-testar';
+//
+// Apontava pra `assets/Assets-testes-para-o-claude-testar/Pedra1.png` (e
+// Carvao/Ferro/Ouro) — pasta ignorada no git, onde esses arquivos nunca
+// existiram, então o ícone sempre esteve quebrado. Corrigido usando a mesma
+// textura procedural de depósito que `tileRenderer.js` já desenha na
+// montanha (`render/terrain/oreTextures.js`), convertida uma vez em data URL
+// (o inspetor monta HTML por `innerHTML`, não tem contexto de canvas à mão).
+const MINERAL_ICON_SRC = (() => {
+  const textures = buildOreTextures();
+  const src = {};
+  for (const [ore, variants] of Object.entries(textures)) src[ore] = variants[0].toDataURL();
+  return src;
+})();
 
 const ACTION_LABELS = {
   wander: 'vagando',
@@ -102,10 +114,8 @@ export function createInspector(container) {
       const demandPct = Math.round((village.demand[type] ?? 0) * 100);
       const distressSec = Math.floor(village.distress?.[type] ?? 0);
       const distressLabel = distressSec > 0 ? ` · desespero há ${distressSec}s` : '';
-      const iconFile = MINERAL_ICON_FILE[type];
-      const label = iconFile
-        ? `<img class="resource-icon" src="${RESOURCE_ICON_DIR}/${iconFile}.png" alt="">${type}`
-        : type;
+      const iconSrc = MINERAL_ICON_SRC[type];
+      const label = iconSrc ? `<img class="resource-icon" src="${iconSrc}" alt="">${type}` : type;
       const li = document.createElement('li');
       li.innerHTML = `<span>${label}</span><span>${stock}/${cap} · demanda ${demandPct}%${distressLabel}</span>`;
       villageStockEl.appendChild(li);
