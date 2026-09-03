@@ -15,7 +15,7 @@ Decisões-base assumidas (confirmadas com o usuário):
 3. **Hierarquia de pressão econômica.** Necessidade individual → demanda da vila → postura do clã. A demanda da vila (estoque baixo de um recurso) sobe a pontuação das ações que suprem esse recurso para todos os moradores, sem que ninguém "decida" isso centralmente — é pressão emergente sobre o utility score.
 4. **Interdependência real entre vilas especializadas.** Uma vila guerreira que não produz comida depende de um tratado de comércio com uma vila agrícola. Se a vila agrícola cai, a guerreira sente fome de verdade — não é flavor text, é o mesmo sistema de estoque/demanda que rege o resto do jogo.
 5. **Jogador como observador, não como onipotência.** Sem WorldBox-style god powers nesta fase. O produto é assistir e entender *por que* a sociedade tomou as decisões que tomou (scores de utilidade inspecionáveis), não moldá-la diretamente.
-6. **Design para escala desde o início.** O sistema de utilidade e o loop de decisão são desenhados para suportar milhares de agentes via um nível de detalhe de simulação (LOD) — agentes fora de foco são simulados de forma agregada, não desativados nem full-fidelity o tempo todo.
+6. **Design para escala desde o início.** O sistema de utilidade e o loop de decisão são desenhados para suportar milhares de agentes. **Como isso é feito mudou** (ver §11.6 e §11.9): a versão original simulava de forma agregada quem estava fora da câmera. Isso foi removido — a câmera não decide mais quem existe, e todo agente roda a plena fidelidade sempre. O que escalona é o TEMPO (time-slicing: cada agente faz o ciclo caro a cada intervalo, não todo frame), não o espaço.
 
 ## 2. Sistemas necessários
 
@@ -37,10 +37,10 @@ Cada sistema lista o que faz e de que depende (dependências = precisa existir a
 | **Trade/Economy** | Rotas de comércio entre vilas (dentro do clã ou entre clãs aliados), move excedente para quem tem déficit | Village, Clan |
 | **Combat** | Guerreiros calculam engajamento/fuga via utility, resolução unidade a unidade no grid | Agentes, Village, Clan (declaração de guerra) |
 | **Life-cycle** | Envelhecimento por tick, morte (fome crítica, combate, idade), reprodução entre agentes da mesma vila | Needs, Village |
-| **Simulation LOD** | Agentes/vilas fora da área ativa (fora da câmera / não marcados como relevantes) rodam em modo agregado/estatístico em vez de full-fidelity; promove/rebaixa conforme o jogador navega | Todos acima — é uma camada transversal de otimização |
+| **Escalonamento de cognição** (era "Simulation LOD") | Distribui no TEMPO o ciclo caro de cada agente (percepção + memória + decisão), mantendo todo mundo a plena fidelidade o tempo todo. Substituiu o LOD por viewport — ver §11.9 | Todos acima — é uma camada transversal de otimização |
 | **UI/HUD** | Inspeção de agente/vila/clã selecionado, controles de tempo, indicadores visuais de estado | Todos os sistemas de dados |
 
-Nota sobre **Simulation LOD**: é o sistema que resolve a tensão entre "milhares de agentes" e "combate + IA + ciclo de vida completos por agente". Ele não é opcional em escala grande, mas também não precisa existir nas primeiras fatias — as fatias iniciais rodam em escala pequena (dezenas), onde full-fidelity para todo mundo é barato o suficiente. LOD entra depois que o núcleo comportamental já está validado (ver fatia 10).
+Nota sobre **escalonamento de cognição**: é o sistema que resolve a tensão entre "milhares de agentes" e "combate + IA + ciclo de vida completos por agente". A primeira versão resolvia isso pelo ESPAÇO (só simulava quem estava na tela) e isso se provou errado — ver §11.9. A versão atual resolve pelo TEMPO, e é o que permite a simulação ser 100% independente do zoom.
 
 ## 3. Modelo de dados
 
@@ -320,6 +320,32 @@ Três correções intuitivas foram testadas e falharam:
 O que funcionou foi limitar **quantidade de gente**, não estoque: no máximo uma fração da vila em atividade de desenvolvimento ao mesmo tempo (`village/stock.js:canDevelop`), contando as quatro ações juntas. Limiares de estoque oscilam — assim que o celeiro sobe um pouco, a vila inteira é liberada de uma vez, justamente no pico populacional.
 
 **Consequência pra o roadmap:** as necessidades sociais/pertencimento (§2 deste documento, ainda não implementadas) vão adicionar ações que competem pelo mesmo tempo. Elas precisam nascer dentro deste orçamento, não fora dele — e ser medidas em 600s antes de serem consideradas prontas.
+
+### 11.9 Simulação independente da câmera (o que mudou no pilar 6)
+
+O LOD de simulação original só rodava percepção/decisão/movimento para os agentes dentro da viewport; o resto da população era simulado por uma aproximação agregada (a vila "se virava sozinha" fora de vista).
+
+**Isso foi removido**, por dois motivos que só ficaram claros medindo:
+
+1. **Navegar o mapa mudava o resultado do jogo.** A aproximação agregada tinha regras próprias de comer e produzir, então uma vila fora de tela vivia numa segunda física paralela. Foi fonte crônica de divergência — a versão que só simulava consumo, sem produção, chegou a matar três das quatro vilas de qualquer partida em que a câmera ficasse parada.
+2. **O custo real não estava onde parecia.** O gasto dominante era a percepção varrendo ~450 tiles por agente **por frame**, para um resultado usado uma vez a cada meio segundo. Escalonar isso no tempo (`simulation/scheduler.js`) foi mais barato que desligar metade do mundo, e sem nenhuma das consequências.
+
+O que ficou no lugar: todo agente é simulado sempre; o ciclo caro (percepção + memória + pontuar ações) roda no intervalo de reconsideração do agente, e o barato (needs, idade, passo da ação corrente) roda todo frame. A fatia é ancorada no relógio **simulado**, não no número do frame — senão rodar em 4x faria os agentes pensarem menos, e o comportamento passaria a depender do framerate.
+
+O LOD por zoom continua existindo, mas **só na renderização** (`render/lodRenderer.js`), onde ele é inofensivo: o que muda é o desenho, nunca o estado.
+
+### 11.8 Decisão por neurônios (o que mudou no pilar 1)
+
+O pilar 1 deste documento sempre disse "comportamento emergente, não scripts de tarefa", e o utility AI cumpria isso. O que faltava era **hierarquia de urgência**: tudo competia num espaço plano de 0 a 1, então fome e madeira eram comparadas pelo mesmo número e a madeira podia ganhar. Era a razão de a IA ler como rasa jogando.
+
+O sistema de neurônios (`agent/neuron.js`) mantém o utility AI e acrescenta três coisas: faixas de prioridade, condição de ativação explícita, e escolha com ruído. **A pontuação contínua não foi descartada — ela virou o peso.**
+
+Duas decisões deste desenho vieram de erro medido, e valem como regra geral:
+
+- **Prioridade não é propriedade da ação.** Comer não é urgente; comer com fome crítica é. Faixa fixa por ação matou 22 de 24 vilas em 135s. A faixa escala com o peso (`urgentAbove`).
+- **Peso não é probabilidade.** Sorteio proporcional fazia o agente passar um quarto do tempo na segunda melhor opção. O sorteio usa peso ao quadrado.
+
+E uma consequência de design pra tudo que vier depois: **modificador de peso só importa quando há competição dentro da faixa.** Um traço (ou gene) que multiplica o peso de uma ação que costuma estar sozinha na sua faixa é inerte. Traços que mexem em **prioridade** são muito mais expressivos — isso deve guiar o desenho de genes na Fase D.
 
 ### 11.7 Casa custa só madeira
 

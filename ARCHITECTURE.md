@@ -32,6 +32,9 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
 
   world/
     world.js
+    chunks.js
+    hpaStar.js
+    flowField.js
     claims.js
     terrain.js
     tile.js
@@ -59,6 +62,7 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
       packManifest.js   (dado: lista de arquivos de assets/Pers-Sprites/)
       spriteLab.js      (só da página de teste sprite-lab.html)
     camera.js
+    lodRenderer.js
     renderer.js
     tileRenderer.js
     villageRenderer.js
@@ -71,6 +75,9 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
 
   agent/
     agent.js
+    neuron.js
+    traits.js
+    priorityNames.js
     stuck.js
     needs.js
     perception.js
@@ -122,7 +129,7 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
     lifecycle.js
 
   simulation/
-    lod.js
+    scheduler.js
 
   input/
     inputHandler.js
@@ -132,6 +139,7 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
     inspector.js
 
   utils/
+    objectPool.js
     rng.js
     mathUtils.js
     constants.js
@@ -147,6 +155,18 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
 - **`world/world.js`** — o "banco de dados" central: tiles, agentes, vilas, clãs, tick atual. Outros módulos leem e escrevem aqui; a lógica de *como* o estado muda mora nos módulos donos de cada domínio, não em `world.js`.
 - **`world/terrain.js`** — geração procedural do grid a partir de uma seed (usa `utils/rng.js`). Só gera dados. Tiles de montanha ganham `resource` (`resourceForMountain`, cumulativo sobre `MOUNTAIN_RESOURCE_WEIGHTS`) — função pura de coordenada+seed, mesmo padrão determinístico do resto do arquivo (não consome uma sequência de rng por tile).
 - **`world/tile.js`** — tipos de tile, factory e `isWalkable` (água e montanha bloqueiam; é a única fonte de verdade sobre o que é andável — `pathfinding.js`, `perception.js` e a colocação inicial de vila/agente usam essa mesma função).
+- **`simulation/scheduler.js`** — escalonamento temporal da COGNIÇÃO, que substituiu o LOD de simulação por viewport. Todo agente é simulado a plena fidelidade sempre; o que se distribui é *quando* cada um faz o ciclo caro (percepção + memória + pontuar as ações). A percepção era o desperdício principal: varria ~450 tiles por agente **por frame** pra usar o resultado uma vez a cada 0.5s. Duas decisões não-óbvias: a fatia sai do relógio **simulado** (com fatias por frame, rodar em 4x faria cada agente reconsiderar 4x menos em tempo de jogo), e o teto por frame **acompanha o `dt`** (um teto fixo de 15% é furado — a demanda real é `dt/RECONSIDER_INTERVAL`, que passa disso em 4x, e a dívida se acumula).
+
+- **`world/chunks.js`** — grafo de chunks e portais pro HPA\*. Uma fronteira vira **um portal por trecho contínuo atravessável**, não um por célula: é o que mantém o grafo em ~200 portais num mapa de 48 mil células sem perder topologia (dois trechos separados por montanha viram dois portais porque são duas passagens de verdade). As arestas internas guardam o **caminho**, não só o custo — guardar só o custo obrigava a consulta a refazer o A\* que a construção já tinha feito.
+
+- **`world/hpaStar.js`** — A\* sobre os portais, depois refinamento trecho a trecho. Começo e fim entram como nós temporários ligados só aos `HPA_TEMP_LINKS` portais mais próximos; tentar todos era o custo dominante da consulta. **Cai no A\* plano se não resolver**, o que garante que nenhum comportamento existente quebre por lacuna do grafo abstrato. Medido: travessia longa de 3.5ms pra 0.98ms, e a qualidade melhorou junto (19 de 20 caminhos contra 11 de 20).
+
+- **`world/flowField.js`** — busca em largura a partir do destino, campo de direções lido por N unidades. Uma busca por destino em vez de N. Fila circular sobre array pré-alocado, não `shift()`, que tornaria a BFS quadrática. Vantagem além do custo: unidade empurrada pra fora da rota por `separation.js` não recalcula nada, lê a direção da célula onde caiu.
+
+- **`render/lodRenderer.js`** — LOD de RENDERIZAÇÃO por zoom, e **só** de renderização: a simulação não consulta a câmera em lugar nenhum. Três níveis (sprites animados / sprites sem partícula nem decoração / pontos coloridos por clã). No nível de pontos o desenho é agrupado por cor — o análogo em Canvas 2D do instanced rendering: N agentes de C clãs custam C trocas de `fillStyle` em vez de N.
+
+- **`utils/objectPool.js`** — pool de tamanho fixo. Estourar não aloca: `acquire` devolve null e quem chamou desiste — um pool que cresce sob pressão tem o mesmo problema que existe pra resolver. O ganho é previsibilidade de frame, não velocidade média.
+
 - **`world/pathfinding.js`** — A* no grid de tiles; `agent/movement.js` é o único consumidor. Sem isso, o deslocamento em linha reta cortava direto por água/montanha sempre que o alvo estava do outro lado de um obstáculo. O conjunto aberto é um **min-heap binário**, e isso não é preciosismo: era um array reordenado por completo (`open.sort`) a cada iteração do laço. Enquanto quase todo alvo era vizinho (o `wander` antigo sorteava um tile do próprio raio de percepção), a lista ficava curta e o custo passava despercebido; assim que alvos distantes e inalcançáveis viraram comuns (exploração), uma única busca que estoura o orçamento de 3000 nós passou a ordenar milhares de elementos milhares de vezes — **medido em 33x o tempo total de simulação (540ms → 17693ms por 5s simulados), de volta a 530ms com o heap**. O contador de orçamento também subia em entradas obsoletas descartadas, então o orçamento real era menor e variável que o `MAX_VISITED` anunciado; agora conta expansões.
 - **`world/spatialIndex.js`** — `buildSpatialIndex(agents)` (reconstruído em `main.js` a cada tick) + `queryNearby(index, pos, radius)`, buckets de grid do tamanho do raio de percepção. Substitui a varredura O(n) de `agent/perception.js` sobre `world.agents` — sem isso, achar "quem tá por perto" vira O(n²) no total e não escala (medido: 6.6x mais rápido que força bruta com 1500 agentes).
 - **`world/decorations.js`** — `generateDecorations(world)`, chamado uma vez em `main.js` depois de terreno e vilas existirem (não em `createWorld`, que roda antes das vilas). Árvore/planta por chance em tile de floresta/grama, pulando o raio de "clareira" de qualquer vila; casas espalhadas dentro dessa clareira. Puramente visual — não afeta `isWalkable`, pathfinding, percepção nem nenhum outro sistema. Usa uma rng própria (`${seed}-decorations`) pra não desviar a sequência de `world.rng` (gameplay).
@@ -195,10 +215,19 @@ dev-server.py   (servidor local com Cache-Control: no-store — usar em vez de `
 - **`world/claims.js`** — reserva de tile de recurso. `world.claims` mapeia `"tx,ty" -> agentId` e o agente guarda a chave em `agent.claimedTile`; o vínculo dos dois lados torna a liberação O(1) em vez de varrer o mapa. **Sem expiração por tempo de propósito**: a reserva é presa ao agente, e ele sempre libera (em `clearMovement`, ao encher a carga, ou ao morrer em `pruneDead`) — um timeout criaria uma segunda fonte de verdade pra sincronizar. Antes disto, cada agente escolhia alvo com `recallNearest` isoladamente e **42% das observações tinham alvo compartilhado**, com grupos de até 5 indo à mesma árvore; depois, 0%.
 - **`agent/stuck.js`** — timer de "sem progresso". `movement.js` já detectava `unreachable`, mas limpar o alvo não resolvia: as ações re-escolhem com `recallNearest`, que devolve deterministicamente o mesmo tile, e o `score` não olha alcançabilidade — o ciclo só terminava por decaimento de memória, **e nem sempre terminava** (alvo dentro do raio de percepção é relembrado todo tick, confiança nunca cai). O que conta como progresso é posição, carga, obra, fome **e** sono: é isso que impede falso positivo em quem está legitimamente parado colhendo (8s), comendo, dormindo ou construindo. Ao disparar, marca o tile em `agent.memory.blocked` por 30s — na memória do agente, não no mundo, porque o tile pode estar acessível pra outro morador vindo de outra direção.
 
+- **`agent/neuron.js`** — a camada de PRIORIDADE por cima do utility AI. O score contínuo de cada ação não foi jogado fora (carrega calibragem de muitas sessões): ele virou o **peso**. O que este módulo acrescenta é (1) faixas de prioridade, porque antes tudo competia num espaço plano de 0 a 1 e um agente faminto podia continuar trabalhando porque a madeira valia 0.8 naquele instante; (2) `canFire` com limiar de verdade, sem o qual a faixa vira armadilha — `eat` pontua acima de zero já com fome 90; (3) escolha com ruído 80/20, que é o que impede dois moradores na mesma situação de agirem como cópias.
+  - **`urgentAbove` é a correção de um erro medido**: pôr `eat` numa faixa fixa de SURVIVAL fez a fome vencer qualquer trabalho sempre que pudesse disparar — 46% dos agentes comendo ao mesmo tempo, 22 de 24 vilas extintas em 135s. Prioridade não é propriedade da AÇÃO: comer não é urgente, comer *com fome crítica* é. A faixa escala com o peso.
+  - **O sorteio usa o peso elevado a `NEURON_WEIGHT_EXPONENT`** (2), não o peso puro. Peso não é probabilidade: proporcional fazia uma ação de 0.3 ser escolhida 27% das vezes contra uma de 0.8, e o agente passava um quarto do tempo na segunda melhor coisa (população de ~250 pra ~133).
+  - O registro de neurônios é um mapa de **dados** sobre as ações que já existem, não uma reescrita dos 16 módulos: a lógica de cada ação continua sendo dela.
+
+- **`agent/traits.js`** — traços como **pacotes de modificadores**, não comportamentos. Três eixos: `attributes` (números do personagem — base das Fases F/G, ainda quase não lidos), `neuronWeight` (multiplica o peso; os multiplicadores **compõem** entre si) e `neuronPriority` (promove a faixa — o modificador mais forte do sistema). `refreshTraitEffects` consolida tudo num cache, sem o qual cada pontuação de cada ação varreria a lista de traços dentro de um laço que já roda 16 vezes por reconsideração. **Limitação conhecida**: modificador de peso só muda algo quando há competição dentro da faixa — traço que mexe em prioridade vale muito mais.
+
+- **`agent/priorityNames.js`** — só o mapa nome→número das faixas, num módulo próprio pra quebrar o ciclo de importação entre `neuron.js` e `traits.js`.
+
 - **`agent/needs.js`** — decaimento de necessidades por tempo e aplicação de efeitos (comer reduz fome etc.).
 - **`agent/perception.js`** — varre o raio de visão (tiles direto no grid; agentes via `world/spatialIndex.js:queryNearby`, que devolve um superconjunto por bounding box — ainda filtra por distância real depois); produz o que o agente vê *agora* — tiles (incluindo `resource`, quando o tile é montanha) e também outros agentes vivos por perto (`agent.perception.agents`, usado por `combat/combat.js`).
 - **`agent/memory.js`** — locais/relações conhecidos, com confiança que decai. `perception` alimenta `memory`; `decision` só considera o que está em `memory` ou na percepção atual — nunca o estado real do `world` que o agente não viu. Essa é a fronteira mais importante da arquitetura: **decision.js nunca lê `world` diretamente para saber "o que existe", só para executar uma ação já escolhida sobre um alvo já conhecido.**
-- **`agent/decision.js`** — o utility AI: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand` (via `village/stock.js`), pontua, escolhe, aplica o limiar de interrupção. Guarda o snapshot de scores em `agent.lastScores` a cada reconsideração, consumido só por `ui/inspector.js` (fatia 11).
+- **`agent/decision.js`** — o utility AI, agora com a camada de **neurônios** (`agent/neuron.js`) por cima: gera candidatas a partir de `needs` + `perception`/`memory` + `village.demand`, pontua, e a pontuação vira o **peso** do neurônio. A regra de interrupção tem dois casos — faixa de prioridade mais alta interrompe na hora, mesma faixa exige a margem anti-oscilação de sempre. Guarda o snapshot de scores em `agent.lastScores` a cada reconsideração, consumido só por `ui/inspector.js` (fatia 11).
 - **`agent/movement.js`** — `moveToward(agent, world, dt, targetWorldPos)` compartilhado por toda ação que anda até um alvo: calcula o caminho uma vez (`world/pathfinding.js`) e segue os waypoints, devolvendo `'moving' | 'arrived' | 'unreachable'`. Nenhuma ação implementa movimento por conta própria. Posição avança continuamente por `AGENT_SPEED * dt` todo frame — nunca salta de tile em tile, já é interpolado por natureza (confirmado ao pedido de "movimento suave" de uma rodada de polimento visual; nenhuma mudança foi necessária).
 - **`agent/separation.js`** — `applySeparation(activeAgents, dt)`, chamada uma vez por frame em `main.js` só sobre o conjunto `active` do LOD: empurrão leve de posição de verdade (não só do desenho, ao contrário do offset cosmético de `agentRenderer.js:stackOffset`) quando dois agentes ficam mais perto que `SEPARATION_RADIUS`. O(n²) sobre `active` — aceitável porque o LOD já mantém esse conjunto pequeno; medido num diagnóstico de FPS como custo desprezível (<1ms mesmo com 200 agentes ativos, não é gargalo).
 - **`agent/actions/*`** — cada ação é um módulo com `score(agent, world)` e `step(agent, world, dt)`; `actionTypes.js` é o registro que `decision.js` consulta. `wander.js` mantém um **rumo persistente** (`agent.wanderHeading`) em vez de sortear alvo isotrópico dentro da percepção — sem isso é passeio aleatório puro (deslocamento ~√N), ainda resetado ao centro da vila toda vez que a fome puxa o agente de volta; medido, os moradores viviam num disco de ~11 tiles num mapa de 220. Contra obstáculo o agente **adota** a direção do que sobrou em vez de insistir, o que faz contornar a costa naturalmente. `explore.js` é o que `wander.js` não é: escolhe um ponto a `EXPLORE_DISTANCE_TILES` do centro da vila — muito **além** da percepção — e o trata como destino de verdade, pontuando por carência institucional (a vila tem demanda por um minério e o quadro de descobertas não conhece nenhum depósito dele). É o pilar 3 do design aplicado a território: ninguém "decide mandar um batedor", a carência faz explorar pontuar mais alto pra todos os moradores e alguém vai; a coordenação em grupo fica em `village/expedition.js`. `patrol.js` é o guerreiro rondando o perímetro do território — não é enfeite: `fightPredator.js` só reage a predador **percebido**, e uma guarnição parada no centro nunca percebe nada, então a patrulha é o que transforma "existe um soldado na vila" em "a vila é defendida". As quatro ações de desenvolvimento (`explore`, `mine`, `build`, `patrol`) consultam `village/stock.js:hasFoodSurplus` antes de pontuar — ver lá o porquê.

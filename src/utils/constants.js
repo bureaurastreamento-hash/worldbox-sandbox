@@ -75,6 +75,18 @@ export const RECONSIDER_INTERVAL = 0.5;
 // necessidade crítica — os 20% são exploração, não burrice.
 export const NEURON_TOP_PRIORITY_CHANCE = 0.8;
 
+// Expoente aplicado ao peso no sorteio (agent/neuron.js:pickWeighted).
+//
+// 1 = proporcional ao peso. Foi testado e é RUIM: uma ação valendo 0.3
+// competindo com outra de 0.8 era escolhida 27% das vezes, ou seja o agente
+// passava um quarto do tempo fazendo a segunda melhor coisa. Custou população
+// (~250 -> ~133) e 15 de 24 vilas.
+//
+// 2 derruba o mesmo caso pra 12%: mantém a variedade (a opção fraca continua
+// possível) sem abrir mão do favoritismo. Subir mais aproxima do argmax
+// determinístico de antes, que fazia a vila inteira agir como cópia.
+export const NEURON_WEIGHT_EXPONENT = 2;
+
 // Traços (agent/traits.js): quantos sorteios de traço permanente cada agente
 // faz ao nascer, e a chance de cada um pegar. Na Fase D isto vira herança.
 export const TRAIT_COUNT_MAX = 2;

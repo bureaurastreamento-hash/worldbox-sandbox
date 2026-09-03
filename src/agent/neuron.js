@@ -28,7 +28,7 @@
 //      moradores na mesma situação não agirem como cópias.
 
 import { ACTION_TYPES } from './actions/actionTypes.js';
-import { NEURON_TOP_PRIORITY_CHANCE } from '../utils/constants.js';
+import { NEURON_TOP_PRIORITY_CHANCE, NEURON_WEIGHT_EXPONENT } from '../utils/constants.js';
 import { neuronWeightFactor, neuronPriorityOverride } from './traits.js';
 
 // Ordem crescente de urgência. O número é o que se compara; os nomes existem
@@ -122,7 +122,7 @@ export function collectActive(agent, world, scoresOut) {
   return active;
 }
 
-// Sorteio proporcional ao peso AO QUADRADO.
+// Sorteio proporcional ao peso elevado a NEURON_WEIGHT_EXPONENT.
 //
 // Proporcional ao peso puro foi testado e custou caro: a população caiu de
 // ~250 pra ~133 e 15 de 24 vilas se extinguiram. O motivo é que peso não é
@@ -137,13 +137,15 @@ export function collectActive(agent, world, scoresOut) {
 // vila inteira agir como cópia, e o sorteio proporcional, que fazia todo
 // mundo trabalhar mal.
 function pickWeighted(list, rng) {
+  const bias = (w) => w ** NEURON_WEIGHT_EXPONENT;
+
   let total = 0;
-  for (const n of list) total += n.weight * n.weight;
+  for (const n of list) total += bias(n.weight);
   if (total <= 0) return list[0] ?? null;
 
   let roll = rng.next() * total;
   for (const n of list) {
-    roll -= n.weight * n.weight;
+    roll -= bias(n.weight);
     if (roll <= 0) return n;
   }
   return list[list.length - 1];
