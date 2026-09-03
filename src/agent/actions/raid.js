@@ -50,14 +50,14 @@ export function step(agent, world, dt) {
 
   const status = moveToward(agent, world, dt, agent.target);
   if (status === 'unreachable') {
-    clearMovement(agent);
+    clearMovement(agent, world);
     return;
   }
   if (status !== 'arrived') return;
 
   const resource = pickLoot(targetVillage);
   if (!resource) {
-    clearMovement(agent); // nada pra saquear agora; tenta de novo na próxima reconsideração
+    clearMovement(agent, world); // nada pra saquear agora; tenta de novo na próxima reconsideração
     return;
   }
 
@@ -66,6 +66,6 @@ export function step(agent, world, dt) {
   agent.carryingType = resource;
   agent.carrying = Math.min(CARRY_CAPACITY, agent.carrying + amount);
   if (agent.carrying >= CARRY_CAPACITY) {
-    clearMovement(agent); // carga cheia; decision.js troca pra "deliver" na próxima reconsideração
+    clearMovement(agent, world); // carga cheia; decision.js troca pra "deliver" na próxima reconsideração
   }
 }

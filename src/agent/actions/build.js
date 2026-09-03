@@ -58,7 +58,7 @@ export function step(agent, world, dt) {
 
   const status = moveToward(agent, world, dt, agent.target);
   if (status === 'unreachable') {
-    clearMovement(agent);
+    clearMovement(agent, world);
     agent.buildProgress = 0;
     agent.buildType = null;
     return;
@@ -72,7 +72,7 @@ export function step(agent, world, dt) {
     // Reconfere na chegada: outro agente pode ter começado (e gasto o
     // estoque) primeiro entre o momento em que este saiu e o de chegar.
     if (!canAfford(village, type)) {
-      clearMovement(agent);
+      clearMovement(agent, world);
       agent.buildType = null;
       return;
     }
@@ -85,7 +85,7 @@ export function step(agent, world, dt) {
     addBuilding(village, type, agent.target.x, agent.target.y);
     agent.buildProgress = 0;
     agent.buildType = null;
-    clearMovement(agent);
+    clearMovement(agent, world);
     pushEvent(world, `${village.name} construiu ${spec.label === 'Casa' ? 'uma casa' : `um ${spec.label.toLowerCase()}`}`);
   }
 }

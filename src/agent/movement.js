@@ -5,6 +5,7 @@
 import { findPath } from '../world/pathfinding.js';
 import { distance, lerp } from '../utils/mathUtils.js';
 import { AGENT_SPEED } from '../utils/constants.js';
+import { releaseClaim } from '../world/claims.js';
 
 const ARRIVE_THRESHOLD = 3;
 
@@ -43,8 +44,12 @@ export function moveToward(agent, world, dt, targetWorldPos) {
   return distance(agent.position, targetWorldPos) <= ARRIVE_THRESHOLD ? 'arrived' : 'moving';
 }
 
-export function clearMovement(agent) {
+// `world` é opcional só por compatibilidade com os pontos de chamada que não
+// o têm à mão; quando vem, a reserva de tile do agente é liberada junto —
+// largar o alvo sem liberar deixaria o tile bloqueado pros outros pra sempre.
+export function clearMovement(agent, world = null) {
   agent.target = null;
   agent.path = null;
   agent.pathTargetKey = null;
+  if (world) releaseClaim(world, agent);
 }

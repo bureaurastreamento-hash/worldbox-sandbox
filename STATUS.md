@@ -504,3 +504,73 @@ de mineração, que é lenta — numa sessão curta a vila fica só com prefeitu
 celeiro. Já era assim antes (§8 do DESIGN.md), mas agora incomoda mais,
 porque casa/depósito são o que espalha. Vale calibrar o custo ou a
 disponibilidade de pedra numa próxima rodada.
+
+## 1h. Reserva de recurso e detecção de travamento
+
+Diagnóstico pedido antes de qualquer código. Os dois problemas **existiam**,
+mas com incidências radicalmente diferentes — vale registrar isso, porque a
+intuição inicial (a minha inclusive) estava errada sobre qual doía.
+
+### Diagnóstico (medido, não suposto)
+
+**Reserva de recurso: não existia, e a incidência era alta.** Nenhum
+`claim/reserv/occupied` no código; `Tile.occupantIds` está no modelo de dados
+do DESIGN.md e nunca foi implementado. Cada agente chamava `recallNearest` da
+própria posição, isoladamente, e como os moradores ficam próximos e têm
+memórias parecidas, convergiam. **42% das observações tinham alvo
+compartilhado**, com grupos de até 5 agentes indo ao mesmo tile. Não era bug
+de correção (recurso é infinito por design), mas é a cara do "burro".
+
+**Timer de travamento: não existia, mas a incidência era ~zero.**
+`unreachable` É detectado e todas as ações chamam `clearMovement` — só que
+limpar não resolvia: as ações re-escolhem com `recallNearest`, que devolve
+deterministicamente o MESMO tile mais próximo, e o `score` não olha
+alcançabilidade. O ciclo "escolhe → falha → limpa → escolhe o mesmo" só
+terminava por decaimento de memória (~114s) — **e nem sempre terminava**: se
+o alvo estiver dentro do raio de percepção, `scanPerception` restaura a
+confiança pra 1 todo tick e o agente nunca esquece. Mas medindo:
+`unreachable` disparou **ZERO vezes em 390s simulados com 63 agentes**. É um
+buraco real com incidência quase nula — seguro preventivo, não fogo.
+
+**Dois defeitos encontrados de brinde no `eat.js`**, medindo travamento:
+estoque zerado fazia `return` sem `clearMovement` (agente plantado no
+celeiro), e um agente com fome 100 **continuava debitando comida da vila** —
+`consume` era calculado antes de checar se ainda cabia fome.
+
+### Correções
+
+**Reserva** (`world/claims.js`): `world.claims` mapeia `"tx,ty" -> agentId`, e
+o agente guarda a chave em `agent.claimedTile`. Vínculo dos dois lados torna a
+liberação O(1). Sem expiração por tempo de propósito: a reserva é presa ao
+agente, e ele sempre libera — em `clearMovement`, ao encher a carga, ou ao
+morrer (`pruneDead`). Um timeout seria uma segunda fonte de verdade.
+
+`recallNearest` ganhou um `skip` **opcional e não-obrigatório**: se ele
+descartar todos os candidatos, a busca é refeita sem ele. É o fallback que
+impede vila pequena de travar. Preferência, não proibição.
+
+**Travamento** (`agent/stuck.js`): `noProgressFor` acumula quando posição,
+carga, obra, fome E sono ficam parados. Limiar de **6s**. O detalhe que evita
+falso positivo: colher uma carga leva 8s parado, mas `carrying` sobe todo
+tick; comer/dormir sobem a necessidade; construir sobe `buildProgress` — todos
+contam como progresso, então nenhuma ação legítima chega perto dos 6s. Ao
+disparar, marca o tile em `agent.memory.blocked` por **30s** (na memória do
+agente, não no mundo: o tile pode estar acessível pra outro morador vindo de
+outra direção).
+
+### Verificação ao vivo
+
+| | antes | depois |
+|---|---|---|
+| observações com alvo compartilhado | **42%** | **0%** |
+| amostras com pelo menos uma colisão | 62,5% | **0** |
+| maior grupo no mesmo tile | 5 | **0** |
+| agentes travados (pico) | 1 | **0** |
+
+Sem regressão: 65 vivos, 4 vilas com 15-17 cada, todas com comida. O timer de
+travamento disparou **1 vez em 60s com 65 agentes** — ativo, sem falso
+positivo.
+
+**Fallback testado explicitamente**: reservando os **523 tiles conhecidos** de
+um agente em nome de um fantasma, ele ainda acha alvo; sem a segunda passada
+não acharia nada. É a prova de que vila pequena não trava.

@@ -8,6 +8,17 @@ import { recallNearest } from '../memory.js';
 import { getVillage } from '../../world/world.js';
 import { isHostileTerritory } from '../../clan/diplomacy.js';
 import { moveToward, clearMovement } from '../movement.js';
+import { claimTile, isClaimedByOther } from '../../world/claims.js';
+import { isTileBlocked } from '../stuck.js';
+
+// Filtro de preferência pro recallNearest: evita tile reservado por outro
+// agente (world/claims.js) e tile marcado como sem-saída por travamento
+// (agent/stuck.js). NÃO é proibição — se descartar todos os candidatos, o
+// recallNearest refaz a busca sem ele.
+function avoid(agent, world) {
+  return (e) => isClaimedByOther(world, agent, e.tx, e.ty) || isTileBlocked(agent, world, e.tx, e.ty);
+}
+
 
 function isSafeForest(world, agent) {
   return (e) => e.type === TILE_TYPES.FOREST && !isHostileTerritory(world, agent, e.tx, e.ty);
@@ -17,14 +28,17 @@ export function score(agent, world) {
   if (agent.carrying >= CARRY_CAPACITY) return 0; // só solta a ação com a carga cheia; ver gather.js pro porquê do `>= CARRY_CAPACITY` (não `> 0`)
   const village = getVillage(world, agent.villageId);
   if (!village || village.specialization !== 'wood') return 0; // vila agrícola não colhe madeira
-  const known = recallNearest(agent.memory, agent.position, isSafeForest(world, agent));
+  const known = recallNearest(agent.memory, agent.position, isSafeForest(world, agent), avoid(agent, world));
   if (!known) return 0;
   return (village.demand.wood ?? 0) * GATHER_SCORE_WEIGHT;
 }
 
 function findGatherTile(agent, world) {
-  const entry = recallNearest(agent.memory, agent.position, isSafeForest(world, agent));
+  const entry = recallNearest(agent.memory, agent.position, isSafeForest(world, agent), avoid(agent, world));
   if (!entry) return null;
+  // Reserva na hora de escolher: é o que impede o próximo agente a decidir de
+  // mirar esta mesma árvore.
+  claimTile(world, agent, entry.tx, entry.ty);
   return { x: (entry.tx + 0.5) * TILE_SIZE, y: (entry.ty + 0.5) * TILE_SIZE };
 }
 
@@ -36,7 +50,7 @@ export function step(agent, world, dt) {
 
   const status = moveToward(agent, world, dt, agent.target);
   if (status === 'unreachable') {
-    clearMovement(agent);
+    clearMovement(agent, world);
     return;
   }
   if (status !== 'arrived') return;
@@ -44,6 +58,6 @@ export function step(agent, world, dt) {
   agent.carryingType = 'wood';
   agent.carrying = Math.min(CARRY_CAPACITY, agent.carrying + GATHER_RATE * dt);
   if (agent.carrying >= CARRY_CAPACITY) {
-    clearMovement(agent); // carga cheia; decision.js troca pra "deliver" na próxima reconsideração
+    clearMovement(agent, world); // carga cheia; decision.js troca pra "deliver" na próxima reconsideração
   }
 }

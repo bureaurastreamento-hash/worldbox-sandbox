@@ -45,7 +45,7 @@ function pickFleeTarget(agent, predator) {
 export function step(agent, world, dt) {
   const predator = findNearestPredator(agent, world);
   if (!predator) {
-    clearMovement(agent);
+    clearMovement(agent, world);
     return;
   }
 
@@ -55,5 +55,5 @@ export function step(agent, world, dt) {
   }
 
   const status = moveToward(agent, world, dt, agent.target);
-  if (status !== 'moving') clearMovement(agent);
+  if (status !== 'moving') clearMovement(agent, world);
 }

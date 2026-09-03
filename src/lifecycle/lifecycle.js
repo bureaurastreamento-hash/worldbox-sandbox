@@ -3,6 +3,7 @@ import { createAgent } from '../agent/agent.js';
 import { addResident, getPopulationCap } from '../village/village.js';
 import { findNearestEnemy } from '../combat/combat.js';
 import { findNearestPredator } from '../combat/predatorCombat.js';
+import { releaseClaim } from '../world/claims.js';
 import { SPECIES_LABEL } from '../predator/predator.js';
 import { pushEvent } from '../world/eventLog.js';
 import {
@@ -159,5 +160,8 @@ export function pruneDead(world, dt) {
   for (const agent of toRemove) {
     const village = world.villages.find((v) => v.id === agent.villageId);
     if (village) village.population = village.population.filter((id) => id !== agent.id);
+    // Sem isso, o tile que o morto tinha reservado ficaria bloqueado pros
+    // vivos pra sempre — uma reserva órfã, sem dono, que ninguém libera.
+    releaseClaim(world, agent);
   }
 }

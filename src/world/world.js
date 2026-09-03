@@ -1,6 +1,7 @@
 import { generateTerrain } from './terrain.js';
 import { isWalkable } from './tile.js';
 import { createRng } from '../utils/rng.js';
+import { createClaims } from './claims.js';
 
 export function createWorld({ seed, width, height }) {
   const tiles = generateTerrain({ seed, width, height });
@@ -17,6 +18,7 @@ export function createWorld({ seed, width, height }) {
     decorations: [], // preenchido por world/decorations.js depois de as vilas existirem
     rng,
     events: [], // feed de eventos institucionais, ver world/eventLog.js
+    claims: createClaims(), // reserva de tile de recurso, ver world/claims.js
     elapsedSeconds: 0, // tempo simulado total, incrementado em main.js — só usado pra registrar quando um evento aconteceu
   };
 }

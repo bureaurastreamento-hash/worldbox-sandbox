@@ -21,6 +21,7 @@ import {
   produceBackgroundVillage,
 } from './simulation/lod.js';
 import { applySeparation } from './agent/separation.js';
+import { updateStuck } from './agent/stuck.js';
 import { ageAgent, checkDeath, updateVillageReproduction, updateHungerWarning, pruneDead } from './lifecycle/lifecycle.js';
 import { createTimeState } from './core/time.js';
 import { createGameLoop } from './core/gameLoop.js';
@@ -236,6 +237,10 @@ const loop = createGameLoop({
       if (!agent.alive) continue;
 
       updateDecision(agent, world, dt);
+      // Depois da ação, não antes: mede o resultado do passo que acabou de
+      // rodar. Cancela o alvo e marca o tile como sem-saída se o agente ficar
+      // parado sem progredir em nada (ver agent/stuck.js).
+      updateStuck(agent, world, dt);
     }
 
     applySeparation(

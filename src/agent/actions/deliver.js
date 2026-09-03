@@ -36,7 +36,7 @@ export function step(agent, world, dt) {
 
   const status = moveToward(agent, world, dt, agent.target);
   if (status === 'unreachable') {
-    clearMovement(agent); // preso longe da vila; tenta de novo na próxima reconsideração
+    clearMovement(agent, world); // preso longe da vila; tenta de novo na próxima reconsideração
     return;
   }
   if (status !== 'arrived') return;
@@ -44,5 +44,5 @@ export function step(agent, world, dt) {
   addStock(village, agent.carryingType ?? 'food', agent.carrying);
   agent.carrying = 0;
   agent.carryingType = null;
-  clearMovement(agent);
+  clearMovement(agent, world);
 }

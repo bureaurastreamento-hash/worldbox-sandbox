@@ -39,13 +39,29 @@ export function step(agent, world, dt) {
 
   const status = moveToward(agent, world, dt, agent.target);
   if (status === 'unreachable') {
-    clearMovement(agent);
+    clearMovement(agent, world);
     return;
   }
   if (status !== 'arrived') return;
 
+  // Fome já cheia: para de comer em vez de continuar consumindo. `applyEffect`
+  // trava a fome em 100, mas o estoque era debitado do mesmo jeito — um agente
+  // satisfeito parado no celeiro queimava comida da vila silenciosamente, sem
+  // ganhar nada. Achado medindo travamento: era o único agente "parado sem
+  // progresso" numa vila com 120 de estoque.
+  if (agent.needs.hunger >= 100) {
+    clearMovement(agent, world);
+    return;
+  }
+
   const consume = Math.min(EAT_FOOD_PER_SEC * dt, village.stock.food ?? 0);
-  if (consume <= 0) return; // estoque esvaziou enquanto ele vinha andando; espera a próxima reconsideração
+  if (consume <= 0) {
+    // Estoque vazio: LARGA o alvo. Antes era só `return`, e o agente ficava
+    // plantado no celeiro com a ação e o alvo intactos — sem nada que o
+    // tirasse de lá enquanto a comida não voltasse.
+    clearMovement(agent, world);
+    return;
+  }
   addStock(village, 'food', -consume);
   applyEffect(agent.needs, 'hunger', consume * EAT_RESTORE_PER_FOOD);
 }

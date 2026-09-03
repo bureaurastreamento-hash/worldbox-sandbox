@@ -23,9 +23,9 @@ export function score(agent) {
   return urgency(agent.needs.sleep);
 }
 
-function restAndFinish(agent, dt) {
+function restAndFinish(agent, world, dt) {
   applyEffect(agent.needs, 'sleep', RESTORE_PER_SEC * dt);
-  if (agent.needs.sleep >= 100) clearMovement(agent);
+  if (agent.needs.sleep >= 100) clearMovement(agent, world);
 }
 
 export function step(agent, world, dt) {
@@ -33,7 +33,7 @@ export function step(agent, world, dt) {
   const house = village ? findBuilding(village, 'house', agent.position) : null;
 
   if (!house) {
-    restAndFinish(agent, dt);
+    restAndFinish(agent, world, dt);
     return;
   }
 
@@ -43,11 +43,11 @@ export function step(agent, world, dt) {
   if (status === 'unreachable') {
     // Casa inalcançável (do outro lado de um rio, por exemplo): dorme mesmo
     // assim em vez de ficar acordado pra sempre tentando chegar.
-    clearMovement(agent);
-    restAndFinish(agent, dt);
+    clearMovement(agent, world);
+    restAndFinish(agent, world, dt);
     return;
   }
   if (status !== 'arrived') return;
 
-  restAndFinish(agent, dt);
+  restAndFinish(agent, world, dt);
 }

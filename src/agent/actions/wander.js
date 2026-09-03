@@ -31,5 +31,5 @@ export function step(agent, world, dt) {
   }
 
   const status = moveToward(agent, world, dt, agent.target);
-  if (status !== 'moving') clearMovement(agent); // chegou (ou não dá): escolhe outro alvo depois
+  if (status !== 'moving') clearMovement(agent, world); // chegou (ou não dá): escolhe outro alvo depois
 }
