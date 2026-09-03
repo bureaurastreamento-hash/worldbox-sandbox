@@ -12,7 +12,7 @@
 import { CARRY_CAPACITY, GATHER_RATE, RAID_SCORE, FLEE_HEALTH_THRESHOLD, WARRIOR_ROLE_SCORE_BONUS } from '../../utils/constants.js';
 import { getVillage } from '../../world/world.js';
 import { addStock } from '../../village/stock.js';
-import { moveToward, clearMovement } from '../movement.js';
+import { moveTowardShared, clearMovement } from '../movement.js';
 
 export function score(agent, world) {
   if (agent.carrying > 0) return 0; // já tem carga; ver deliver.js
@@ -48,7 +48,10 @@ export function step(agent, world, dt) {
     agent.target = { x: targetVillage.center.x, y: targetVillage.center.y };
   }
 
-  const status = moveToward(agent, world, dt, agent.target);
+  // Saque é o caso clássico de movimento em massa: todos os agentes elegíveis
+  // da vila marcham pro MESMO centro inimigo. Um campo de fluxo por destino
+  // custa uma busca; um caminho por agente custaria N.
+  const status = moveTowardShared(agent, world, dt, agent.target);
   if (status === 'unreachable') {
     clearMovement(agent, world);
     return;

@@ -9,6 +9,12 @@ import { worldToTile, tileToWorld } from '../utils/mathUtils.js';
 
 const MAX_VISITED = 3000; // orçamento de busca; estourar = desiste (inalcançável ou longe demais)
 
+// Orçamento de uma busca LOCAL (dentro de um ou dois chunks). Um chunk de
+// 32x32 tem 1024 células, então 2500 cobre com folga a travessia de dois
+// chunks vizinhos — e falha rápido se não houver caminho, em vez de gastar o
+// orçamento de mapa inteiro.
+export const LOCAL_MAX_VISITED = 2500;
+
 // Fila de prioridade (min-heap binário) para o conjunto aberto.
 //
 // Era um array com `open.sort((a,b) => a.f - b.f)` A CADA ITERAÇÃO do laço —
@@ -99,10 +105,17 @@ function reconstructPath(cameFrom, endNode) {
 // Retorna waypoints (em px de mundo) do tile atual até o tile de destino,
 // sem incluir o ponto de partida. [] se já está no tile de destino.
 // null se inalcançável (ou fora do orçamento de busca).
-export function findPath(world, fromWorldPos, toWorldPos) {
-  const start = worldToTile(fromWorldPos.x, fromWorldPos.y, TILE_SIZE);
-  const goal = worldToTile(toWorldPos.x, toWorldPos.y, TILE_SIZE);
-
+// A* em coordenadas de TILE, com duas opções que o HPA* precisa:
+//
+//   `bounds`     — restringe a busca a um retângulo de tiles. É o que torna
+//                  a busca local dentro de um chunk barata E previsível: o
+//                  espaço de busca deixa de ser o mapa e passa a ser a área
+//                  do chunk, independentemente de onde fica o destino.
+//   `maxVisited` — orçamento próprio, pra uma busca local não herdar o
+//                  orçamento generoso de uma travessia de mapa inteiro.
+//
+// Devolve waypoints em px de MUNDO (mesmo contrato de findPath) ou null.
+export function findTilePath(world, start, goal, { bounds = null, maxVisited = MAX_VISITED } = {}) {
   if (start.tx === goal.tx && start.ty === goal.ty) return [];
 
   const goalTile = getTileAt(world, goal.tx, goal.ty);
@@ -124,7 +137,7 @@ export function findPath(world, fromWorldPos, toWorldPos) {
     // Conta tiles EXPANDIDOS, não desenfileiramentos. Antes o contador subia
     // também nas entradas obsoletas descartadas acima, então o orçamento real
     // era menor (e variável) do que MAX_VISITED anuncia.
-    if (++visited > MAX_VISITED) return null;
+    if (++visited > maxVisited) return null;
 
     if (current.tx === goal.tx && current.ty === goal.ty) {
       return reconstructPath(cameFrom, current);
@@ -133,6 +146,7 @@ export function findPath(world, fromWorldPos, toWorldPos) {
     for (const [dx, dy] of NEIGHBOR_OFFSETS) {
       const ntx = current.tx + dx;
       const nty = current.ty + dy;
+      if (bounds && (ntx < bounds.minTx || ntx > bounds.maxTx || nty < bounds.minTy || nty > bounds.maxTy)) continue;
       const nKey = key(ntx, nty);
       if (closed.has(nKey)) continue;
 
@@ -159,4 +173,21 @@ export function findPath(world, fromWorldPos, toWorldPos) {
   }
 
   return null;
+}
+
+// Comprimento em passos de um caminho local, ou null se não há caminho.
+// Usado só na pré-computação do grafo de portais (world/chunks.js) — o
+// caminho em si é descartado ali, só a distância importa.
+export function tilePathCost(world, start, goal, bounds) {
+  const path = findTilePath(world, start, goal, { bounds, maxVisited: LOCAL_MAX_VISITED });
+  return path === null ? null : path.length;
+}
+
+// Assinatura pública original, preservada: recebe posições em px de mundo.
+// A escolha entre A* plano e HPA* mora em agent/movement.js, que é quem sabe
+// se a viagem é longa.
+export function findPath(world, fromWorldPos, toWorldPos, options) {
+  const start = worldToTile(fromWorldPos.x, fromWorldPos.y, TILE_SIZE);
+  const goal = worldToTile(toWorldPos.x, toWorldPos.y, TILE_SIZE);
+  return findTilePath(world, start, goal, options);
 }

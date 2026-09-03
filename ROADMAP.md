@@ -268,6 +268,17 @@ O "jogo parado" que o usuário relata é atacado principalmente por **E, G e H**
 - **Lição de método:** as primeiras medições de FPS foram feitas antes do pico populacional e estavam otimistas. População de pico ≈ 15.6 por vila; equilíbrio ≈ 12.5.
 - **Estrutura de chunks com portais** (preparação pra HPA*, Fase C) — ainda não feita.
 
+### 3.7 Fase C — navegação hierárquica (entregue)
+
+- **`world/chunks.js`** — grafo de chunks e portais. Uma fronteira vira **um portal por trecho contínuo atravessável**, não um por célula: é o que mantém o grafo pequeno (204 portais num mapa de 48 mil células) e ao mesmo tempo preserva a topologia real (dois trechos separados por montanha viram dois portais, porque são duas passagens de verdade). As arestas internas guardam o **caminho**, não só o custo — guardar só o custo obrigava a consulta a refazer o A* que a construção já tinha feito.
+- **`world/hpaStar.js`** — A* sobre os portais, depois refinamento por trecho. Começo e fim entram como nós temporários ligados só aos `HPA_TEMP_LINKS` portais mais próximos: tentar todos era o custo dominante da consulta.
+- **`world/flowField.js`** — busca em largura a partir do destino, campo de direções lido por N unidades. Fila circular sobre array pré-alocado (não `shift()`, que tornaria a BFS quadrática). Ligado a `raid.js`, o caso de movimento em massa que já existe.
+- **`agent/movement.js`** decide qual busca usar; nenhuma ação sabe que HPA* existe. Viagem curta usa A* plano, longa usa HPA*, e **cai no A* plano se o HPA* não resolver** — é o que garante que nada quebre por uma lacuna do grafo abstrato.
+
+**Medido:** travessia longa **3.5ms → 0.98ms** (3.6x), e o HPA* ainda acha **19 de 20** caminhos contra 11 de 20 do A* plano, que desiste ao estourar o orçamento. Flow field: **17.8ms uma vez por destino, 0.116µs por unidade** — 50 unidades no mesmo destino custam 17.8ms contra ~175ms de busca individual.
+
+**Não resolvido, e honesto registrar:** o custo por agente da simulação ficou **inconsistente entre medições** (350 agentes custaram 14ms num teste, 511 custaram 6.8ms em outro). Há um fator não isolado — a densidade por vila é parte da explicação (`perception.agents` e `agent/separation.js` são quadráticos na densidade local), mas não explica tudo. `VILLAGE_COUNT` ficou em **24** por prudência, não por limite medido.
+
 ### 3.5 Critérios de aceite transversais
 
 Valem pra toda fase, e vêm das lições medidas nesta sessão:

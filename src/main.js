@@ -1,5 +1,6 @@
 import { createWorld, findWalkableNear, getVillage, rebuildAgentIndex, rebuildStaticIndexes } from './world/world.js';
 import { generateDecorations } from './world/decorations.js';
+import { buildChunkGraph } from './world/chunks.js';
 import { spawnPredators } from './predator/predator.js';
 import { updatePredator } from './predator/predatorAI.js';
 import { buildSpatialIndex } from './world/spatialIndex.js';
@@ -193,6 +194,10 @@ for (let i = 0; i < clans.length; i++) {
 for (const village of world.villages) {
   foundVillageBuildings(world, village, world.rng);
 }
+
+// Grafo de chunks/portais pro HPA* (world/chunks.js). Construído uma vez,
+// depois do terreno existir — o terreno é estático, então o grafo também é.
+world.chunkGraph = buildChunkGraph(world);
 
 world.decorations = generateDecorations(world);
 world.predators = spawnPredators(world);

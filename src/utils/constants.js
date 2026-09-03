@@ -20,6 +20,27 @@ export const LOD_SIMPLE_ZOOM = 0.6;
 export const LOD_DOTS_ZOOM = 0.35;
 export const LOD_DOT_MIN_PX = 2; // um agente nunca some por completo
 
+// Navegação hierárquica (world/chunks.js, world/hpaStar.js).
+//
+// Lado do chunk em tiles. 32 é o equilíbrio: chunk grande demais e a busca
+// local volta a ser cara; pequeno demais e o grafo de portais cresce a ponto
+// de o A* de alto nível deixar de ser barato. Com o mapa de 220 dá 7x7 chunks.
+export const CHUNK_SIZE = 32;
+
+// Abaixo desta distância, A* plano — a hierarquia não compensa o custo de
+// inserir os nós temporários. Acima, HPA*. Ver agent/movement.js:computePath.
+export const HPA_MIN_DISTANCE_PX = CHUNK_SIZE * 32 * 0.75;
+
+// Quantos portais do próprio chunk o começo e o fim de uma viagem tentam
+// alcançar ao entrar no grafo abstrato. Ver hpaStar.js:connectTemp — era o
+// custo dominante da consulta quando tentava todos.
+export const HPA_TEMP_LINKS = 4;
+
+// Campos de fluxo (world/flowField.js): quanto tempo simulado um campo vale
+// antes de ser recalculado. O terreno não muda, então isto não é sobre o
+// campo ficar errado — é só pra o cache não crescer sem limite.
+export const FLOW_FIELD_TTL_SECONDS = 30;
+
 export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 4;
 
@@ -422,15 +443,28 @@ export const VILLAGE_POP_CAP = 30;
 
 export const TERRITORY_RADIUS = 10; // tiles
 
-// Fase A (escala): 4 -> 20. Com a população de equilíbrio medida em ~12-13
-// por vila, 20 vilas dão ~250 agentes.
+// Calibrado pelo PICO populacional, não pelo começo da partida — a população
+// de uma vila sobe até ~16 antes de assentar em ~12-13, então 40 vilas dão um
+// pico de ~640 agentes.
 //
-// 36 (~450 agentes) foi testado e a SIMULAÇÃO aguenta (13.3ms/frame contra um
-// orçamento de 16.7ms), mas aí não sobra nada pra renderização — ao vivo a
-// aba fica sem resposta. Subir daqui depende do LOD de RENDERIZAÇÃO por zoom,
-// que ainda não existe: hoje o jogo desenha todo agente com sprite completo
-// em qualquer zoom. Esse é o próximo passo da Fase A, e é o que destrava o
-// alvo de 500.
+// 24 é conservador de propósito. O HPA* (Fase C) tirou o pathfinding do
+// caminho crítico, mas as medições de custo POR AGENTE ficaram inconsistentes
+// entre seeds e entre durações de partida (350 agentes chegaram a custar
+// 14ms num teste e 511 agentes custaram 6.8ms em outro), e essa variância NÃO
+// foi isolada. Subir daqui é seguro, mas exige medir de novo — não confie nos
+// números de pico sem repetir o teste.
+//
+// ATENÇÃO, achado contra-intuitivo: o custo é dominado pela DENSIDADE por
+// vila, não pelo número total de agentes. Medido, 641 agentes em 40 vilas
+// custaram 27ms enquanto 633 em 48 vilas custaram 10ms — mesma população,
+// 2.7x de diferença. Quanto mais gente na mesma vila, mais vizinhos cada um
+// enxerga em `perception.agents` e em agent/separation.js, e esses dois são
+// quadráticos na densidade local. Ou seja: pra mais agentes, prefira MAIS
+// VILAS, não vilas maiores.
+//
+// Histórico: 4 (original) -> 20 -> 24 -> 40. Cada salto dependeu de remover
+// um gargalo diferente: LOD de simulação por viewport, depois os O(n^2) de
+// busca por id/memória, depois o A* plano.
 //
 // Não dá pra chegar lá engordando a vila em vez de multiplicá-la: o equilíbrio
 // por vila é fixado pelas taxas de nascimento/morte e pela economia, não pelo
