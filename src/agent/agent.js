@@ -19,6 +19,13 @@ export function createAgent({
     warriorType: warriorType ?? WARRIOR_TYPES[rng.int(0, WARRIOR_TYPES.length - 1)],
     target: null, // alvo de movimento da ação corrente; null = precisa escolher um
     wanderHeading: null, // rumo persistente de wander.js (radianos); null = ainda não sorteado
+    // Vila cuja expedição este agente integra agora (village/expedition.js),
+    // ou null. Também é o que mantém o agente fora do LOD agregado
+    // (simulation/lod.js): um explorador sai da tela por definição, e quem é
+    // rebaixado a `background` para de andar — sem esta exceção, toda
+    // expedição congelaria na borda da viewport.
+    expeditionVillageId: null,
+    exploreState: null, // fase da expedição na última vez que o alvo foi calculado ('outbound' | 'returning')
     path: null, // waypoints até target (agent/movement.js), calculado via pathfinding
     pathTargetKey: null,
     villageId,

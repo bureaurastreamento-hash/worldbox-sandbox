@@ -125,6 +125,70 @@ export const MINE_SCORE_WEIGHT = 0.35;
 // cumulativo: stone até 0.6, coal até 0.8, iron até 0.95, gold o resto.
 export const MOUNTAIN_RESOURCE_WEIGHTS = { stone: 0.6, coal: 0.2, iron: 0.15, gold: 0.05 };
 
+// Exploração (agent/actions/explore.js) e expedições (village/expedition.js).
+//
+// Por que existe: `wander.js` só escolhe alvo dentro do raio de percepção, e
+// a fome puxa o agente de volta à vila a cada ciclo — medido, os moradores
+// viviam num disco de ~11 tiles em volta da vila num mapa de 220. Como
+// montanha é gerada como faixa de elevação (cordilheira, não pedrinha
+// espalhada), uma vila que não nasce colada numa cordilheira NUNCA achava
+// minério: não era "devagar", era probabilidade ~zero. Isso é a causa raiz do
+// gargalo de construção que o STATUS.md registrava como "calibrar custo de
+// pedra" — o custo nunca foi o problema, a descoberta era.
+//
+// Piso de score: acima de wander (0.05), abaixo de qualquer trabalho real —
+// alguém sempre explora quando não há nada melhor a fazer, sem competir com
+// a economia.
+export const EXPLORE_BASE_SCORE = 0.12;
+// Peso da parte movida por CARÊNCIA: sobe quando a vila tem demanda por um
+// minério e o quadro de descobertas (village/knowledge.js) não conhece
+// nenhum depósito dele. É a exploração deixar de ser passeio e virar
+// resposta a uma necessidade real da vila — mesmo mecanismo de pressão
+// econômica do pilar 3 do design, aplicado a território em vez de recurso.
+// Teto deliberadamente ABAIXO de GATHER_SCORE_WEIGHT (0.55): exploração é
+// por minério, e minério não é recurso crítico (ver CRITICAL_RESOURCES) —
+// não pode ganhar de produzir comida. Com 0.5 aqui, as duas vilas
+// madeireiras de um teste morreram de fome inteiras: elas não produzem
+// comida própria, dependem de pescar (FISH_SCORE_WEIGHT 0.4), e explorar
+// vencia a pesca. Regressão medida e corrigida, não teoria.
+export const EXPLORE_SCORE_WEIGHT = 0.33;
+// Score de quem JÁ está numa expedição em andamento. Acima do teto de
+// gather/mine/build, abaixo de fugir/lutar/comer crítico: uma vez que a
+// expedição partiu, o agente não a abandona porque passou perto de uma
+// árvore — mas fome, predador e guerra ainda o tiram dela (e a expedição o
+// remove da lista sozinha quando isso acontece).
+export const EXPEDITION_COMMITTED_SCORE = 0.58;
+// Uma expedição é atividade de EXCEDENTE, e o tamanho é o que mais decide se
+// ela custa caro: uma viagem de ida e volta tira o membro da economia por
+// ~1min simulado. Com 3 membros fixos, uma vila de 9 pessoas mandava um
+// TERÇO da mão de obra pro mapa — medido, isso derrubou duas vilas de 9 para
+// 1 morador no mesmo seed em que, sem exploração, elas terminavam com 9.
+// Agora o teto sai da população: uma vila só manda mais gente quando de fato
+// tem gente sobrando.
+export const EXPEDITION_MAX_SIZE = 3; // teto absoluto, mesmo numa vila grande
+export const EXPEDITION_MIN_POPULATION = 7; // abaixo disso ninguém sai
+export const EXPEDITION_POPULATION_PER_MEMBER = 9; // +1 vaga a cada N moradores
+
+// A vila também precisa estar alimentada pra bancar a viagem. `distress` não
+// basta como trava: ele só acumula DEPOIS do déficit se firmar, e a essa
+// altura a expedição já partiu. Isto é a condição de partida; a distress
+// continua sendo o que CHAMA DE VOLTA quem já saiu.
+export const EXPLORE_MIN_FOOD_FRACTION = 0.35; // do teto de comida da vila
+// Distância do alvo da expedição, a partir do centro da vila. Bem além do
+// raio de percepção (12) de propósito: o ponto é sair do que já se conhece.
+export const EXPLORE_DISTANCE_TILES = 45;
+// Um agente só entra numa expedição já formada se ainda está perto da vila —
+// senão alguém do outro lado do mapa "teleportaria" para o grupo.
+export const EXPEDITION_JOIN_RADIUS_TILES = 15;
+// Teto de duração (ida + volta). Sem isso, uma expedição cujo alvo virou
+// inalcançável (ilha, cordilheira fechando o caminho) prenderia os membros
+// fora da economia para sempre.
+export const EXPEDITION_TIMEOUT_SECONDS = 240;
+// Raio do anel em que os membros caminham em volta do alvo comum, pra o
+// grupo viajar junto sem empilhar no mesmo pixel — mesmo padrão de
+// village/buildings.js:approachPoint.
+export const EXPEDITION_FORMATION_RADIUS = 40; // px de mundo
+
 // Únicos recursos que contam pra desespero/guerra/colapso institucional
 // (clan/clanDecision.js, village/stock.js) — é sobre sobrevivência (pilar 4
 // do design), não sobre minério de construção.

@@ -6,6 +6,7 @@ import { buildSpatialIndex } from './world/spatialIndex.js';
 import { createVillage, addResident, foundVillageBuildings } from './village/village.js';
 import { computeDemand, updateDistress, updateChaos } from './village/stock.js';
 import { updateTrade } from './village/trade.js';
+import { updateExpedition } from './village/expedition.js';
 import { createClan, addVillage as addVillageToClan, setStance } from './clan/clan.js';
 import { proposeTreaty, signTreaty } from './clan/diplomacy.js';
 import { updateClanDecision } from './clan/clanDecision.js';
@@ -54,7 +55,11 @@ const canvas = document.getElementById('game-canvas');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const seed = String(Date.now());
+// Seed do mundo. `?seed=x` na URL fixa o mundo, pra poder rodar a mesma
+// partida duas vezes e comparar o efeito de uma mudança — sem isso, cada
+// reload gera um mapa diferente e qualquer medição A/B compara duas coisas
+// que não são a mesma. Sem o parâmetro, mundo novo a cada carregamento.
+const seed = new URLSearchParams(location.search).get('seed') ?? String(Date.now());
 const world = createWorld({ seed, width: WORLD_WIDTH, height: WORLD_HEIGHT });
 
 function spawnVillage({ id, name, tx, ty, specialization }) {
@@ -267,6 +272,7 @@ function simulationUpdate(dt) {
         produceBackgroundVillage(v, residents, dt);
         feedBackgroundVillage(v, residents, dt);
       }
+      updateExpedition(world, v, dt);
       updateVillageReproduction(v, world, dt);
       updateHungerWarning(v, world);
     }

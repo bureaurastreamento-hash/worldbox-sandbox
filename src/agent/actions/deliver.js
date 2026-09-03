@@ -8,6 +8,7 @@ import { addStock } from '../../village/stock.js';
 import { getVillage } from '../../world/world.js';
 import { moveToward, clearMovement } from '../movement.js';
 import { destinationFor, approachPoint } from '../../village/buildings.js';
+import { reportDiscoveries } from '../../village/knowledge.js';
 import { CARRY_CAPACITY } from '../../utils/constants.js';
 
 export const SCORE_WHEN_CARRYING = 0.8; // alto e fixo, mas ainda interrompível por fome/sono crítica
@@ -44,5 +45,10 @@ export function step(agent, world, dt) {
   addStock(village, agent.carryingType ?? 'food', agent.carrying);
   agent.carrying = 0;
   agent.carryingType = null;
+  // Chegou em casa carregado: aproveita a viagem pra contar onde viu minério
+  // (village/knowledge.js). É o gancho natural — não existe momento mais
+  // "voltei e contei" que este, e nenhum agente precisa de uma ação própria
+  // pra isso.
+  reportDiscoveries(village, agent);
   clearMovement(agent, world);
 }

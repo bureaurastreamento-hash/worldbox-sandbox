@@ -35,7 +35,14 @@ export function classifyAgents(world, camera, viewW, viewH) {
       pos.x <= viewW + LOD_SCREEN_MARGIN &&
       pos.y >= -LOD_SCREEN_MARGIN &&
       pos.y <= viewH + LOD_SCREEN_MARGIN;
-    (onScreen ? active : background).push(agent);
+    // Membro de expedição roda full-fidelity mesmo fora da tela. Explorar é,
+    // por definição, ir para onde a câmera não está: rebaixado a `background`
+    // o agente PARA DE ANDAR (stepBackgroundAgent só decai needs), então toda
+    // expedição congelaria na borda da viewport e nunca chegaria a lugar
+    // nenhum. É o caso que o DESIGN.md já previa ao falar em promover quem
+    // está "marcado como relevante", não só quem está em foco. O custo é
+    // limitado por EXPEDITION_MAX_SIZE por vila.
+    (onScreen || agent.expeditionVillageId ? active : background).push(agent);
   }
 
   return { active, background };

@@ -17,6 +17,13 @@ export function createWorld({ seed, width, height }) {
     clans: [],
     decorations: [], // preenchido por world/decorations.js depois de as vilas existirem
     rng,
+    // Rng própria pro sorteio de rumo de expedição (village/expedition.js),
+    // mesmo padrão de world/decorations.js e predator/predator.js. Não é
+    // preciosismo: sem ela, ligar ou desligar exploração desvia a sequência
+    // de `rng` inteira, e duas partidas com a MESMA seed deixam de ser
+    // comparáveis — reprodução, postura de clã e tudo o mais divergem. Foi o
+    // que invalidou a primeira rodada de medição A/B desta feature.
+    expeditionRng: createRng(`${seed}-expeditions`),
     events: [], // feed de eventos institucionais, ver world/eventLog.js
     claims: createClaims(), // reserva de tile de recurso, ver world/claims.js
     elapsedSeconds: 0, // tempo simulado total, incrementado em main.js — só usado pra registrar quando um evento aconteceu

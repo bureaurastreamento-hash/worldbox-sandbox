@@ -8,6 +8,7 @@ import {
   STARTING_FOOD_STOCK,
 } from '../utils/constants.js';
 import { addBuilding, findBuildingSpot, getPopulationCap } from './buildings.js';
+import { createKnownSites } from './knowledge.js';
 
 // getPopulationCap mora em village/buildings.js (é efeito de prédio), mas
 // continua sendo importado daqui pelo resto do jogo.
@@ -47,6 +48,11 @@ export function createVillage({ id, name, center, specialization = 'food' }) {
     hungerWarningActive: false, // fome média crítica já avisada no feed — ver lifecycle.js:updateHungerWarning
     raidTargetVillageId: null, // ordem institucional de saque, ver clan/clanDecision.js e agent/actions/raid.js
     buildings: [],
+    // Depósitos de minério que moradores viram e vieram contar — ver
+    // village/knowledge.js. Sobrevive ao decaimento da memória individual e
+    // ao próprio descobridor, mas só recebe o que alguém trouxe no corpo.
+    knownSites: createKnownSites(),
+    expedition: null, // expedição de exploração em curso, ver village/expedition.js
     population: [],
     reproCooldown: REPRO_COOLDOWN_MIN,
   };
